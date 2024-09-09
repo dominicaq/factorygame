@@ -5,25 +5,21 @@
 #include <string>
 #include "mesh.h"
 
-class MeshLoader {
-public:
-    // Enumeration for supported file types (currently only OBJ)
+namespace MeshLoader {
+    // Enumeration for supported file types
     enum class FileType {
-        OBJ,
-        GLTF // Placeholder for future support
+        OBJ,    // Wavefront OBJ format
+        GLTF    // Placeholder for GLTF format (not yet implemented)
     };
 
-    // Loads a mesh from a file with the specified type (currently OBJ only)
-    bool loadMesh(const std::string& filepath, FileType type, Mesh& mesh, int* status);
+    // Main function to load a mesh from a file of the specified type
+    Mesh* loadMesh(const std::string& filepath, FileType type);
 
-private:
-    // Helper functions to load specific file formats
-    bool loadOBJ(const std::string& filepath, Mesh& mesh, int* status);
-    // Placeholder for future GLTF loading functionality
-    bool loadGLTF(const std::string& filepath, Mesh& mesh, int* status);
+    // Helper function to load OBJ files specifically
+    Mesh* loadOBJ(const std::string& filepath);
 
-    // Helper function to parse a line in the OBJ file
+    // Helper function to parse a line from the OBJ file
     void parseOBJLine(const std::string& line, Mesh& mesh);
-};
+}
 
 #endif // MESH_LOADER_H

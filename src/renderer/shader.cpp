@@ -105,6 +105,24 @@ void Shader::setFloat(const std::string& name, float value) const {
     }
 }
 
+void Shader::setMat4(const std::string& name, const glm::mat4& mat) const {
+    GLint location = glGetUniformLocation(m_ID, name.c_str());
+    if (location != -1) {
+        glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(mat));
+    } else {
+        std::cerr << "ERROR::SHADER::UNIFORM_NOT_FOUND: " << name << std::endl;
+    }
+}
+
+void Shader::setVec3(const std::string& name, const glm::vec3& value) const {
+    GLint location = glGetUniformLocation(m_ID, name.c_str());
+    if (location != -1) {
+        glUniform3fv(location, 1, glm::value_ptr(value));
+    } else {
+        std::cerr << "ERROR::SHADER::UNIFORM_NOT_FOUND: " << name << std::endl;
+    }
+}
+
 /*
 * Shader creation
 */

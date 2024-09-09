@@ -26,7 +26,7 @@ void Renderer::init() {
     glDisable(GL_CULL_FACE);
 }
 
-void Renderer::setupMesh(const Mesh& mesh) {
+void Renderer::setupMesh(const Mesh* mesh) {
     // If already setup, don't do it again
     if (VAO != 0) {
         return;
@@ -41,11 +41,11 @@ void Renderer::setupMesh(const Mesh& mesh) {
 
     // Bind and fill vertex buffer
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(glm::vec3), &mesh.vertices[0], GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, mesh->vertices.size() * sizeof(glm::vec3), &mesh->vertices[0], GL_STATIC_DRAW);
 
     // Bind and fill element (indices) buffer
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(unsigned int), &mesh.indices[0], GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->indices.size() * sizeof(unsigned int), &mesh->indices[0], GL_STATIC_DRAW);
 
     // Set vertex attribute pointers (only positions for now)
     glEnableVertexAttribArray(0);
@@ -54,9 +54,9 @@ void Renderer::setupMesh(const Mesh& mesh) {
     glBindVertexArray(0); // Unbind VAO for now
 }
 
-void Renderer::render(const Mesh& mesh, const Shader& shader) {
+void Renderer::render(const Mesh* mesh, const Shader& shader) {
     // Set up the mesh if it hasn't been set up yet
-    if (VAO == 0) {
+    if (VAO == 0 && mesh != nullptr) {
         setupMesh(mesh);
     }
 
@@ -67,7 +67,7 @@ void Renderer::render(const Mesh& mesh, const Shader& shader) {
     glBindVertexArray(VAO);
 
     // Render the mesh using the indices stored in EBO
-    glDrawElements(GL_TRIANGLES, mesh.indices.size(), GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, mesh->indices.size(), GL_UNSIGNED_INT, 0);
 
     // Unbind VAO after rendering
     glBindVertexArray(0);
