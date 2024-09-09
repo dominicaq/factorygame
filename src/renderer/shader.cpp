@@ -3,7 +3,7 @@
 #include <fstream>
 #include <sstream>
 
-Shader::Shader(const std::string &vertexPath, const std::string &fragmentPath) {
+Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath) {
     // Read files
     std::string vertexCode;
     std::string fragmentCode;
@@ -78,7 +78,7 @@ void Shader::use() const {
 /*
 * Uniform data
 */
-void Shader::setBool(const std::string &name, bool value) const {
+void Shader::setBool(const std::string& name, bool value) const {
     GLint location = glGetUniformLocation(m_ID, name.c_str());
     if (location != -1) {
         glUniform1i(location, (int)value);
@@ -87,7 +87,7 @@ void Shader::setBool(const std::string &name, bool value) const {
     }
 }
 
-void Shader::setInt(const std::string &name, int value) const {
+void Shader::setInt(const std::string& name, int value) const {
     GLint location = glGetUniformLocation(m_ID, name.c_str());
     if (location != -1) {
         glUniform1i(location, value);
@@ -96,7 +96,7 @@ void Shader::setInt(const std::string &name, int value) const {
     }
 }
 
-void Shader::setFloat(const std::string &name, float value) const {
+void Shader::setFloat(const std::string& name, float value) const {
     GLint location = glGetUniformLocation(m_ID, name.c_str());
     if (location != -1) {
         glUniform1f(location, value);

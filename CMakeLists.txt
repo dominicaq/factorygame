@@ -5,9 +5,10 @@ project(FactoryGame)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# Include directories for GLAD and GLFW
+# Include directories for GLAD, GLFW, and GLM
 include_directories(${CMAKE_SOURCE_DIR}/external/glad/include)
 include_directories(${CMAKE_SOURCE_DIR}/external/glfw-3.4/include)
+include_directories(${CMAKE_SOURCE_DIR}/external/glm)  # Add GLM include directory
 
 # Find OpenGL
 find_package(OpenGL REQUIRED)
