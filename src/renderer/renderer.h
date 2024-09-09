@@ -1,7 +1,8 @@
-#ifndef RENDERER_H
-#define RENDERER_H
+#pragma once
 
+#include <unordered_map>
 #include <glad/glad.h>
+
 #include "shader.h"
 #include "../resources/mesh.h"
 
@@ -11,12 +12,15 @@ public:
     ~Renderer();
 
     void init();
+    void setupMesh(const Mesh* mesh);
     void render(const Mesh* mesh, const Shader& shader);
 
 private:
-    void setupMesh(const Mesh* mesh);
+    struct MeshData {
+        GLuint VAO;
+        GLuint VBO;
+        GLuint EBO;
+    };
 
-    unsigned int VAO, VBO, EBO;
+    std::unordered_map<const Mesh*, MeshData> m_meshBuffers;
 };
-
-#endif // RENDERER_H
