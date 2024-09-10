@@ -6,11 +6,18 @@ out vec4 FragColor;
 // Input from vertex shader
 in vec3 FragPos;   // Position of the fragment in world space
 in vec3 Normal;    // Normal vector from vertex shader
+in vec2 TexCoord;  // Texture coordinates from vertex shader
+
+// Uniforms
+uniform sampler2D u_Texture;  // Texture sampler
 
 void main() {
-    // Hardcoded light and object colors
-    vec3 objectColor = vec3(1.0, 0.5, 0.31);  // Object color (orange)
+    // Sample the texture using the texture coordinates
+    vec4 textureColor = texture(u_Texture, TexCoord);
 
-    // Output the final color
-    FragColor = vec4(objectColor, 1.0);
+    // Hardcoded object color (can be multiplied with texture color if needed)
+    vec3 objectColor = vec3(1.0, 1.0, 1.0);
+
+    // Combine texture color with object color (if needed)
+    FragColor = textureColor;
 }

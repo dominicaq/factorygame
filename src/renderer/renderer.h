@@ -11,7 +11,6 @@ public:
     Renderer();
     ~Renderer();
 
-    void init();
     void setupMesh(const Mesh* mesh);
     void render(const Mesh* mesh, const Shader& shader);
 

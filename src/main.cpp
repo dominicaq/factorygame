@@ -1,6 +1,9 @@
 #include "system/window.h"
+
 #include "renderer/shader.h"
 #include "renderer/renderer.h"
+#include "renderer/texture.h"
+
 #include "resources/mesh.h"
 #include "resources/mesh_loader.h"
 
@@ -12,6 +15,10 @@
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
+
+// Future sources
+// http://alinloghin.com/articles/command_buffer.html
+// https://blog.molecular-matters.com/2014/11/06/stateless-layered-multi-threaded-rendering-part-1/
 
 /*
 * Asset paths
@@ -56,36 +63,40 @@ int main() {
         return -1;
     }
 
-    // Enable depth test
-    glEnable(GL_DEPTH_TEST);
+    // Create renderer
+    Renderer renderer;
 
     // Set up the viewport after window initialization
-    glViewport(0, 0, 800, 600);
+    glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+#pragma region GAME_OBJECT_CUBE
 
     // Load shader
     std::string vertexPath = SHADER_DIR + "default_vertex.glsl";
     std::string fragPath = SHADER_DIR + "default_fragment.glsl";
     Shader shader(vertexPath, fragPath);
 
-    // Load mesh
+    // Load texture
+    Texture texture(TEXTURE_DIR + "dice.png");
+
+    // Load mesh and send to renderer
     std::string cubePath = MODEL_DIR + "cube.obj";
     Mesh* cubeMesh = MeshLoader::loadMesh(cubePath, MeshLoader::FileType::OBJ);
     if (cubeMesh == nullptr) {
         std::cerr << "ERROR::MESHLOADER::LOADMESH::NULLPTR\n";
         return -1;
     }
-
-    // Create the renderer
-    Renderer renderer;
-    renderer.init();
     renderer.setupMesh(cubeMesh);
 
     // Set up the cube's transform
     Transform cubeTransform;
     cubeTransform.position = glm::vec3(0.0f, 0.0f, 0.0f);
-    cubeTransform.scale = glm::vec3(0.5f);  // Scale down the cube
-    cubeTransform.eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);  // No rotation initially
+    cubeTransform.scale = glm::vec3(1.0f);
+    cubeTransform.eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
 
+#pragma endregion
+
+#pragma region GAME_CAMERA
     // Set up the camera
     Camera camera;
     camera.position = glm::vec3(0.0f, 0.0f, 5.0f);
@@ -97,6 +108,7 @@ int main() {
         0.1f,
         100.0f
     );
+#pragma endregion
 
     // Variables for delta time calculation
     float deltaTime = 0.0f;
@@ -125,6 +137,10 @@ int main() {
         // Use shader and set uniforms
         shader.use();
         shader.setMat4("u_MVP", mvp);
+
+        // Bind texture
+        texture.bind(0);  // Bind to texture unit 0
+        shader.setInt("u_Texture", 0);  // Set the texture uniform to use texture unit 0
 
         // Render the cube mesh
         renderer.render(cubeMesh, shader);
