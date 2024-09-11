@@ -2,26 +2,22 @@
 #define TEXTURE_H
 
 #include <string>
-#include <glad/glad.h> // OpenGL headers
+#include <glad/glad.h>
 
 class Texture {
 public:
     Texture(const std::string& filePath);
     ~Texture();
 
-    // Binds the texture for use in shaders
+    // Texture usage
     void bind(unsigned int slot = 0) const;
-
-    // Unbind the texture
     void unbind() const;
 
-    // Returns the texture ID
-    unsigned int getID() const;
+    // Properties
+    int width, height, nrChannels;
 
 private:
-    unsigned int m_textureID;  // OpenGL texture ID
-    int m_width, m_height, m_nrChannels;  // Texture properties
-    std::string m_filePath;  // Path to the image file
+    unsigned int m_textureID;
 };
 
 #endif

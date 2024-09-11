@@ -25,7 +25,6 @@ private:
 
     unsigned int compileShader(unsigned int type, const char* source, int *status);
     void linkProgram(unsigned int vertexShader, unsigned int fragmentShader, int *status);
-    int loadShaderSource(const std::string& path, std::string& sourceCode);
 };
 
 #endif

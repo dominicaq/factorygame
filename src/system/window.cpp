@@ -13,7 +13,7 @@ Window::~Window() {
  */
 bool Window::init() {
     if (!glfwInit()) {
-        std::cerr << "Failed to initialize GLFW" << std::endl;
+        std::cerr << "Failed to initialize GLFW" << "\n";
         return false;
     }
 
@@ -27,7 +27,7 @@ bool Window::init() {
 
     m_window = glfwCreateWindow(width, height, title, NULL, NULL);
     if (!m_window) {
-        std::cerr << "Failed to create GLFW window" << std::endl;
+        std::cerr << "Failed to create GLFW window" << "\n";
         glfwTerminate();
         return false;
     }
@@ -36,7 +36,7 @@ bool Window::init() {
     glfwSetFramebufferSizeCallback(m_window, framebufferSizeCallback);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-        std::cerr << "Failed to initialize GLAD" << std::endl;
+        std::cerr << "Failed to initialize GLAD" << "\n";
         return false;
     }
 

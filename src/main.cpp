@@ -5,7 +5,7 @@
 #include "renderer/texture.h"
 
 #include "resources/mesh.h"
-#include "resources/mesh_loader.h"
+#include "resources/resource_loader.h"
 
 #include "glm.hpp"
 #include "gtc/matrix_transform.hpp"
@@ -80,8 +80,7 @@ int main() {
     Texture texture(TEXTURE_DIR + "dice.png");
 
     // Load mesh and send to renderer
-    std::string cubePath = MODEL_DIR + "cube.obj";
-    Mesh* cubeMesh = MeshLoader::loadMesh(cubePath, MeshLoader::FileType::OBJ);
+    Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
     if (cubeMesh == nullptr) {
         std::cerr << "ERROR::MESHLOADER::LOADMESH::NULLPTR\n";
         return -1;
