@@ -87,6 +87,6 @@ void Window::getSize(int &width, int &height) const {
 }
 
 // Static callback for when the window is resized
-void Window::framebufferSizeCallback(GLFWwindow *window, int width, int height) {
+void Window::framebufferSizeCallback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
 }

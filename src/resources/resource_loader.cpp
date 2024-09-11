@@ -7,8 +7,8 @@
 #include <iostream>
 
 // Forward declarations
-static Mesh* loadOBJ(const std::string& filepath); // Declare the loadOBJ function
-static void parseOBJLine(const std::string& line, Mesh& mesh); // Declare the parseOBJLine function
+static Mesh* loadOBJ(const std::string& filepath);
+static void parseOBJLine(const std::string& line, Mesh& mesh);
 
 /*
 * System

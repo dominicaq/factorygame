@@ -5,6 +5,7 @@
 #include "renderer/texture.h"
 
 #include "resources/mesh.h"
+#include "resources/meshgen.h"
 #include "resources/resource_loader.h"
 
 #include "glm.hpp"
@@ -64,33 +65,31 @@ int main() {
     }
 
     // Create renderer
-    Renderer renderer;
-
-    // Set up the viewport after window initialization
-    glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    Renderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT);
 
 #pragma region GAME_OBJECT_CUBE
 
-    // Load shader
-    std::string vertexPath = SHADER_DIR + "default_vertex.glsl";
-    std::string fragPath = SHADER_DIR + "default_fragment.glsl";
+    // Create shader on GPU
+    std::string vertexPath = SHADER_DIR + "default.vs";
+    std::string fragPath = SHADER_DIR + "default.fs";
     Shader shader(vertexPath, fragPath);
 
     // Load texture
     Texture texture(TEXTURE_DIR + "dice.png");
 
     // Load mesh and send to renderer
-    Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
+    // Mesh* cubeMesh = MeshGen::createCube();
+    Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
     if (cubeMesh == nullptr) {
         std::cerr << "ERROR::MESHLOADER::LOADMESH::NULLPTR\n";
         return -1;
     }
-    renderer.setupMesh(cubeMesh);
+    renderer.initMeshBuffers(cubeMesh);
 
     // Set up the cube's transform
     Transform cubeTransform;
-    cubeTransform.position = glm::vec3(0.0f, 0.0f, 0.0f);
-    cubeTransform.scale = glm::vec3(1.0f);
+    cubeTransform.position = glm::vec3(0.0f, -0.7f, 0.0f);
+    cubeTransform.scale = glm::vec3(7.0f);
     cubeTransform.eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
 
 #pragma endregion
@@ -100,13 +99,13 @@ int main() {
     Camera camera;
     camera.position = glm::vec3(0.0f, 0.0f, 5.0f);
 
-    // Set up projection matrix
     glm::mat4 projection = glm::perspective(
         glm::radians(45.0f),
         float(SCREEN_WIDTH) / float(SCREEN_HEIGHT),
         0.1f,
         100.0f
     );
+
 #pragma endregion
 
     // Variables for delta time calculation
@@ -126,26 +125,24 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Rotate the cube over time
-        cubeTransform.eulerAngles.y += deltaTime * 50.0f;  // Rotate around y-axis
+        cubeTransform.eulerAngles.y += deltaTime * 25.0f;
 
         // Get the updated matrices
         glm::mat4 model = cubeTransform.getModelMatrix();
         glm::mat4 view = camera.getViewMatrix();
-        glm::mat4 mvp = projection * view * model;
 
-        // Use shader and set uniforms
+        // Use the shader and set uniforms for model, view, and projection
         shader.use();
-        shader.setMat4("u_MVP", mvp);
-
-        // Bind texture
-        texture.bind(0);  // Bind to texture unit 0
-        shader.setInt("u_Texture", 0);  // Set the texture uniform to use texture unit 0
+        shader.setMat4("u_Model", model);
+        shader.setMat4("u_View", view);
+        shader.setMat4("u_Projection", projection);
 
         // Render the cube mesh
-        renderer.render(cubeMesh, shader);
+        renderer.draw(cubeMesh, shader);
 
         window.swapBuffersAndPollEvents();
     }
+
 
     return 0;
 }
