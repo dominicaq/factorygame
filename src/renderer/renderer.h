@@ -17,8 +17,9 @@ public:
     void deleteMeshBuffer(const Mesh* mesh);
 
     /*
-    * GBuffer passes
+    * G-Buffer
     */
+    void resizeGBuffer(unsigned int width, unsigned int height);
     void geometryPass(const Shader& geometryShader);
 
 private:
@@ -41,4 +42,5 @@ private:
     // Mesh generation helpers
     void generateNormals(const Mesh* mesh, std::vector<glm::vec3>& normals, const std::vector<unsigned int>& indices);
     void generateUVs(const Mesh* mesh, std::vector<glm::vec2>& uvs);
+
 };

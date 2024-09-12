@@ -34,7 +34,6 @@ Renderer::~Renderer() {
     glDeleteRenderbuffers(1, &m_rboDepth);
 }
 
-
 void Renderer::initOpenGLState() {
     glEnable(GL_DEPTH_TEST);
 
@@ -47,13 +46,16 @@ void Renderer::initOpenGLState() {
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 }
 
+/*
+* GBuffer management
+*/
 void Renderer::initGBuffer(unsigned int width, unsigned int height) {
     // Create the G-buffer FBO
     glGenFramebuffers(1, &m_gBuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer);
 
     // Position color buffer
-    glActiveTexture(GL_TEXTURE0);  // Explicitly activate texture unit 0
+    glActiveTexture(GL_TEXTURE0);
     glGenTextures(1, &m_gPosition);
     glBindTexture(GL_TEXTURE_2D, m_gPosition);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
@@ -80,7 +82,10 @@ void Renderer::initGBuffer(unsigned int width, unsigned int height) {
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_gAlbedo, 0);
 
     // Set the list of draw buffers
-    GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    GLuint attachments[3] = {
+        GL_COLOR_ATTACHMENT0,
+        GL_COLOR_ATTACHMENT1,
+        GL_COLOR_ATTACHMENT2 };
     glDrawBuffers(3, attachments);
 
     // Create and attach depth buffer
@@ -92,27 +97,51 @@ void Renderer::initGBuffer(unsigned int width, unsigned int height) {
     // Check framebuffer status
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
         std::cerr << "Framebuffer not complete!" << std::endl;
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        return;
     }
 
     // Unbind the framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void Renderer::resizeGBuffer(unsigned int newWidth, unsigned int newHeight) {
+    // Delete existing G-buffer textures and depth buffer
+    glDeleteTextures(1, &m_gPosition);
+    glDeleteTextures(1, &m_gNormal);
+    glDeleteTextures(1, &m_gAlbedo);
+    glDeleteRenderbuffers(1, &m_rboDepth);
+
+    // Re-initialize the G-buffer with new size
+    initGBuffer(newWidth, newHeight);
+}
+
 void Renderer::geometryPass(const Shader& geometryShader) {
+    // Bind the gbuffer
     glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Render all the meshes into the G-buffer
     for (const auto& entry : m_meshBuffers) {
         const Mesh* mesh = entry.first;
+
         draw(mesh, geometryShader);
     }
 
+    // Unbind the framebuffer after the pass
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // Check for OpenGL errors
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) {
+        std::cerr << "OpenGL error: " << error << std::endl;
+    }
 }
 
+/*
+* Mesh buffer management
+*/
 void Renderer::draw(const Mesh* mesh, const Shader& shader) {
-    shader.use();
+    // shader.use();
 
     // Load and bind the mesh buffer
     const MeshData& targetMesh = m_meshBuffers.at(mesh);
@@ -213,6 +242,9 @@ void Renderer::deleteMeshBuffer(const Mesh* mesh) {
     }
 }
 
+/*
+* Mesh data generators
+*/
 void Renderer::generateNormals(const Mesh* mesh, std::vector<glm::vec3>& normals, const std::vector<unsigned int>& indices) {
     normals.clear();
     normals.resize(mesh->vertices.size(), glm::vec3(0.0f));

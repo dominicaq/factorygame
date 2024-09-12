@@ -62,6 +62,7 @@ int main() {
 
     // Create renderer
     Renderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT);
+    window.setRenderer(&renderer);
 
 #pragma region GAME_OBJECT_CUBE
 
@@ -109,15 +110,14 @@ int main() {
 
     // Render loop
     while (!window.shouldClose()) {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         // Calculate delta time
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
         window.processInput();
-
-        // Clear screen and depth buffer (for geometry pass)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Rotate the object over time
         cubeTransform.eulerAngles.y += deltaTime * 25.0f;
@@ -126,17 +126,15 @@ int main() {
         glm::mat4 model = cubeTransform.getModelMatrix();
         glm::mat4 view = camera.getViewMatrix();
 
-        // Render to G-buffer
-        renderer.geometryPass(geometryShader);
-
         // Use the geometry shader and set the uniforms
         geometryShader.use();
         geometryShader.setMat4("u_Model", model);
         geometryShader.setMat4("u_View", view);
         geometryShader.setMat4("u_Projection", projection);
 
-        // Render the cube mesh (writes data to G-buffer)
-        renderer.draw(cubeMesh, geometryShader);
+        // Render to G-buffer (this will handle drawing the cube)
+        renderer.geometryPass(geometryShader);
+        // renderer.draw(cubeMesh, geometryShader);
 
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();
