@@ -17,10 +17,6 @@
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
 
-// Future sources
-// http://alinloghin.com/articles/command_buffer.html
-// https://blog.molecular-matters.com/2014/11/06/stateless-layered-multi-threaded-rendering-part-1/
-
 /*
 * Asset paths
 */
@@ -69,16 +65,15 @@ int main() {
 
 #pragma region GAME_OBJECT_CUBE
 
-    // Create shader on GPU
-    std::string vertexPath = SHADER_DIR + "default.vs";
-    std::string fragPath = SHADER_DIR + "default.fs";
-    Shader shader(vertexPath, fragPath);
+    // Geometry Pass Shader (for writing to G-buffer)
+    std::string geometryVertexPath = SHADER_DIR + "deferred/geometry.vs";
+    std::string geometryFragPath = SHADER_DIR + "deferred/geometry.fs";
+    Shader geometryShader(geometryVertexPath, geometryFragPath);
 
-    // Load texture
+    // Load texture (optional, depends on your deferred shader setup)
     Texture texture(TEXTURE_DIR + "dice.png");
 
     // Load mesh and send to renderer
-    // Mesh* cubeMesh = MeshGen::createCube();
     Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
     if (cubeMesh == nullptr) {
         std::cerr << "ERROR::MESHLOADER::LOADMESH::NULLPTR\n";
@@ -121,7 +116,7 @@ int main() {
 
         window.processInput();
 
-        // Clear screen and depth buffer
+        // Clear screen and depth buffer (for geometry pass)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Rotate the cube over time
@@ -131,18 +126,23 @@ int main() {
         glm::mat4 model = cubeTransform.getModelMatrix();
         glm::mat4 view = camera.getViewMatrix();
 
-        // Use the shader and set uniforms for model, view, and projection
-        shader.use();
-        shader.setMat4("u_Model", model);
-        shader.setMat4("u_View", view);
-        shader.setMat4("u_Projection", projection);
+        // =============================
+        // 1. Geometry Pass: Render to G-buffer
+        // =============================
+        renderer.performGeometryPass(geometryShader);
 
-        // Render the cube mesh
-        renderer.draw(cubeMesh, shader);
+        // Use the geometry shader and set the uniforms
+        geometryShader.use();
+        geometryShader.setMat4("u_Model", model);
+        geometryShader.setMat4("u_View", view);
+        geometryShader.setMat4("u_Projection", projection);
 
+        // Render the cube mesh (writes data to G-buffer)
+        renderer.draw(cubeMesh, geometryShader);
+
+        // Swap buffers and poll events
         window.swapBuffersAndPollEvents();
     }
-
 
     return 0;
 }

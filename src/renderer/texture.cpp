@@ -8,40 +8,55 @@ Texture::Texture(const std::string& filePath) : m_textureID(0), width(0), height
     unsigned char* data = ResourceLoader::loadImage(filePath, &width, &height, &nrChannels);
 
     if (data) {
+        // Determine the correct format based on the number of channels
         GLenum format;
-        if (nrChannels == 1)
-            // Handle in fragment shader
+        GLenum internalFormat;
+        if (nrChannels == 1) {
             format = GL_RED;
-        else if (nrChannels == 3)
+            internalFormat = GL_R8;
+        } else if (nrChannels == 3) {
             format = GL_RGB;
-        else if (nrChannels == 4)
+            internalFormat = GL_RGB8;
+        } else if (nrChannels == 4) {
             format = GL_RGBA;
-        else
+            internalFormat = GL_RGBA8;
+        } else {
+            std::cerr << "ERROR::TEXTURE::Unsupported number of channels: " << nrChannels << "\n";
             format = GL_RGB;
+            internalFormat = GL_RGB8;
+        }
 
         // Generate an OpenGL texture
         glGenTextures(1, &m_textureID);
         glBindTexture(GL_TEXTURE_2D, m_textureID);
 
-        // Set texture parameters
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);    // Repeat wrapping mode
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);    // Repeat wrapping mode
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // Linear filtering with mipmaps
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); // Linear filtering
+        // Set texture parameters (repeat wrapping)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+        // Set texture filtering parameters to NEAREST
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
         // Upload the texture data to the GPU
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, data);
 
-        // Generate mipmaps
+        // Generate mipmaps for the texture
         glGenerateMipmap(GL_TEXTURE_2D);
 
-        // Unbind texture to avoid accidentally modifying it
+        // Unbind the texture
         glBindTexture(GL_TEXTURE_2D, 0);
+
+        // Error checking
+        GLenum error = glGetError();
+        if (error != GL_NO_ERROR) {
+            std::cerr << "ERROR::TEXTURE::OpenGL error during texture creation: " << error << "\n";
+        }
     } else {
         std::cerr << "ERROR::TEXTURE::Failed to load texture: " << filePath << "\n";
     }
 
-    // Free image data after uploading to GPU
+    // Free image data after uploading to the GPU
     ResourceLoader::freeImage(data);
 }
 
@@ -50,10 +65,35 @@ Texture::~Texture() {
 }
 
 void Texture::bind(unsigned int slot) const {
+    // Ensure the texture slot is within the allowed range
+    int maxTextureUnits;
+    glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &maxTextureUnits);
+
+    // Ensure the slot is valid and within the maximum allowed texture units
+    if (slot >= static_cast<unsigned int>(maxTextureUnits)) {
+        std::cerr << "ERROR::TEXTURE::Texture slot exceeds max allowed texture units: " << slot << "\n";
+        return;
+    }
+
+    // Activate the specified texture slot
     glActiveTexture(GL_TEXTURE0 + slot);
+
+    // Bind the texture to the specified texture slot
     glBindTexture(GL_TEXTURE_2D, m_textureID);
+
+    // Error checking: ensure no OpenGL errors occurred during texture binding
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) {
+        std::cerr << "ERROR::TEXTURE::OpenGL error during texture binding: " << error << "\n";
+    }
 }
 
 void Texture::unbind() const {
     glBindTexture(GL_TEXTURE_2D, 0);
+
+    // Error checking: ensure no OpenGL errors occurred during unbinding
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) {
+        std::cerr << "ERROR::TEXTURE::OpenGL error during texture unbinding: " << error << "\n";
+    }
 }

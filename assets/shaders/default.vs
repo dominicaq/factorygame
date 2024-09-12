@@ -19,8 +19,8 @@ void main() {
     // Transform the vertex position to world space
     FragPos = vec3(u_Model * vec4(aPos, 1.0));
 
-    // Correctly transform the normal to world space (using transpose of the inverse of the model matrix)
-    Normal = aNormal;
+    // Transform the normal to world space (using transpose of the inverse of the model matrix)
+    Normal = mat3(transpose(inverse(u_Model))) * aNormal;
 
     // Pass texture coordinates unchanged
     TexCoord = aTexCoord;

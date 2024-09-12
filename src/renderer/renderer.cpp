@@ -3,6 +3,7 @@
 
 Renderer::Renderer(unsigned int width, unsigned int height) {
     initOpenGLState();
+    initGBuffer(width, height);
 }
 
 Renderer::~Renderer() {
@@ -24,117 +25,75 @@ void Renderer::initOpenGLState() {
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 }
 
-/*
-* Meshbuffers
-*/
-void Renderer::initMeshBuffers(const Mesh* mesh) {
-    // Check if the mesh has already been set up
-    if (m_meshBuffers.find(mesh) != m_meshBuffers.end()) {
-        return;
+void Renderer::initGBuffer(unsigned int width, unsigned int height) {
+    // Create the G-buffer FBO
+    glGenFramebuffers(1, &gBuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+
+    // Position color buffer
+    glActiveTexture(GL_TEXTURE0);  // Explicitly activate texture unit 0
+    glGenTextures(1, &gPosition);
+    glBindTexture(GL_TEXTURE_2D, gPosition);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPosition, 0);
+
+    // Normal color buffer
+    glActiveTexture(GL_TEXTURE1);  // Explicitly activate texture unit 1
+    glGenTextures(1, &gNormal);
+    glBindTexture(GL_TEXTURE_2D, gNormal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNormal, 0);
+
+    // Albedo color buffer
+    glActiveTexture(GL_TEXTURE2);  // Explicitly activate texture unit 2
+    glGenTextures(1, &gAlbedo);
+    glBindTexture(GL_TEXTURE_2D, gAlbedo);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gAlbedo, 0);
+
+    // Tell OpenGL which color attachments we'll use (of this framebuffer) for rendering
+    GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    glDrawBuffers(3, attachments);
+
+    // Create and attach depth buffer (renderbuffer)
+    glGenRenderbuffers(1, &rboDepth);
+    glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
+
+    // Check framebuffer status
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "Framebuffer not complete!" << std::endl;
     }
 
-    // Generate and bind VAO, VBO, and EBO for the mesh
-    MeshData data;
-    glGenVertexArrays(1, &data.VAO);
-    glBindVertexArray(data.VAO);
-
-    // Prepare buffer for vertex data (positions, uvs, normals)
-    std::vector<float> bufferData;
-
-    // Prepare normals
-    const std::vector<glm::vec3>* normalsToUse = &mesh->normals;
-    std::vector<glm::vec3> generatedNormals(mesh->vertices.size(), glm::vec3(0.0f));
-    if (mesh->normals.empty() && !mesh->indices.empty()) {
-        generateNormals(mesh, generatedNormals, mesh->indices);
-        normalsToUse = &generatedNormals;
-    }
-
-    // Prepare UVs
-    const std::vector<glm::vec2>* uvsToUse = &mesh->uvs;
-    std::vector<glm::vec2> generatedUVs;
-    if (mesh->uvs.empty()) {
-        generateUVs(mesh, generatedUVs);
-        uvsToUse = &generatedUVs;
-    }
-
-    // Populate buffer data (positions, uvs, normals)
-    for (size_t i = 0; i < mesh->vertices.size(); ++i) {
-        // Position
-        bufferData.push_back(mesh->vertices[i].x);
-        bufferData.push_back(mesh->vertices[i].y);
-        bufferData.push_back(mesh->vertices[i].z);
-
-        // Use generated or provided UVs
-        bufferData.push_back((*uvsToUse)[i].x);
-        bufferData.push_back((*uvsToUse)[i].y);
-
-        // Normals (use calculated normals if they weren't provided)
-        bufferData.push_back((*normalsToUse)[i].x);
-        bufferData.push_back((*normalsToUse)[i].y);
-        bufferData.push_back((*normalsToUse)[i].z);
-    }
-
-    // Generate and bind VBO
-    glGenBuffers(1, &data.VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, data.VBO);
-    glBufferData(GL_ARRAY_BUFFER, bufferData.size() * sizeof(float), bufferData.data(), GL_STATIC_DRAW);
-
-    // Generate and bind EBO for indices
-    if (!mesh->indices.empty()) {
-        glGenBuffers(1, &data.EBO);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, data.EBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->indices.size() * sizeof(unsigned int), mesh->indices.data(), GL_STATIC_DRAW);
-    }
-
-    // Set vertex attribute pointers
-    // Positions (location = 0, 3 floats)
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-
-    // Normals (location = 1, 3 floats)
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
-
-    // UVs (location = 2, 2 floats)
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-
-    // Unbind VAO for now
-    glBindVertexArray(0);
-
-    // Store the mesh data in the map
-    m_meshBuffers[mesh] = data;
+    // Unbind the framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void Renderer::deleteMeshBuffer(const Mesh* mesh) {
-    // Check if the mesh is in the buffer map
-    auto it = m_meshBuffers.find(mesh);
-    if (it != m_meshBuffers.end()) {
-        const MeshData& target = it->second;
+void Renderer::performGeometryPass(const Shader& geometryShader) {
+    glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Delete the OpenGL buffers
-        if (target.VAO) {
-            glDeleteVertexArrays(1, &target.VAO);
-        }
-        if (target.VBO) {
-            glDeleteBuffers(1, &target.VBO);
-        }
-        if (target.EBO) {
-            glDeleteBuffers(1, &target.EBO);
-        }
-
-        // Remove the mesh from the map
-        m_meshBuffers.erase(it);
-    } else {
-        std::cerr << "ERROR: Mesh buffer not found.\n";
+    // Render all the meshes into the G-buffer
+    for (const auto& entry : m_meshBuffers) {
+        const Mesh* mesh = entry.first;
+        draw(mesh, geometryShader);
     }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Renderer::draw(const Mesh* mesh, const Shader& shader) {
-    // Bind the shader to this call
+    // Bind the shader to this draw call
     shader.use();
 
-    // Load and bind mesh buffer
+    // Load and bind the mesh buffer
     const MeshData& targetMesh = m_meshBuffers[mesh];
     glBindVertexArray(targetMesh.VAO);
 
@@ -153,18 +112,84 @@ void Renderer::draw(const Mesh* mesh, const Shader& shader) {
     glBindVertexArray(0);
 }
 
-/*
- * Missing mesh data generation
- */
-void Renderer::generateNormals(const Mesh* mesh, std::vector<glm::vec3>& normals, const std::vector<unsigned int>& indices) {
-    // Generating smooth normals
+void Renderer::initMeshBuffers(const Mesh* mesh) {
+    if (m_meshBuffers.find(mesh) != m_meshBuffers.end()) {
+        return;
+    }
 
+    MeshData data;
+    glGenVertexArrays(1, &data.VAO);
+    glBindVertexArray(data.VAO);
+
+    std::vector<float> bufferData;
+    const std::vector<glm::vec3>* normalsToUse = &mesh->normals;
+    std::vector<glm::vec3> generatedNormals(mesh->vertices.size(), glm::vec3(0.0f));
+    if (mesh->normals.empty() && !mesh->indices.empty()) {
+        generateNormals(mesh, generatedNormals, mesh->indices);
+        normalsToUse = &generatedNormals;
+    }
+
+    const std::vector<glm::vec2>* uvsToUse = &mesh->uvs;
+    std::vector<glm::vec2> generatedUVs;
+    if (mesh->uvs.empty()) {
+        generateUVs(mesh, generatedUVs);
+        uvsToUse = &generatedUVs;
+    }
+
+    for (size_t i = 0; i < mesh->vertices.size(); ++i) {
+        bufferData.push_back(mesh->vertices[i].x);
+        bufferData.push_back(mesh->vertices[i].y);
+        bufferData.push_back(mesh->vertices[i].z);
+
+        bufferData.push_back((*uvsToUse)[i].x);
+        bufferData.push_back((*uvsToUse)[i].y);
+
+        bufferData.push_back((*normalsToUse)[i].x);
+        bufferData.push_back((*normalsToUse)[i].y);
+        bufferData.push_back((*normalsToUse)[i].z);
+    }
+
+    glGenBuffers(1, &data.VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, data.VBO);
+    glBufferData(GL_ARRAY_BUFFER, bufferData.size() * sizeof(float), bufferData.data(), GL_STATIC_DRAW);
+
+    if (!mesh->indices.empty()) {
+        glGenBuffers(1, &data.EBO);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, data.EBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->indices.size() * sizeof(unsigned int), mesh->indices.data(), GL_STATIC_DRAW);
+    }
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
+
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+
+    glBindVertexArray(0);
+    m_meshBuffers[mesh] = data;
+}
+
+void Renderer::deleteMeshBuffer(const Mesh* mesh) {
+    auto it = m_meshBuffers.find(mesh);
+    if (it != m_meshBuffers.end()) {
+        const MeshData& target = it->second;
+        if (target.VAO) glDeleteVertexArrays(1, &target.VAO);
+        if (target.VBO) glDeleteBuffers(1, &target.VBO);
+        if (target.EBO) glDeleteBuffers(1, &target.EBO);
+        m_meshBuffers.erase(it);
+    } else {
+        std::cerr << "ERROR: Mesh buffer not found.\n";
+    }
+}
+
+void Renderer::generateNormals(const Mesh* mesh, std::vector<glm::vec3>& normals, const std::vector<unsigned int>& indices) {
     normals.clear();
     normals.resize(mesh->vertices.size(), glm::vec3(0.0f));
 
-    // Iterate over triangles
     for (size_t i = 0; i < indices.size(); i += 3) {
-        // Get the vertices of the triangle
         unsigned int index0 = indices[i];
         unsigned int index1 = indices[i + 1];
         unsigned int index2 = indices[i + 2];
@@ -173,20 +198,15 @@ void Renderer::generateNormals(const Mesh* mesh, std::vector<glm::vec3>& normals
         glm::vec3 v1 = mesh->vertices[index1];
         glm::vec3 v2 = mesh->vertices[index2];
 
-        // Calculate the two edges of the triangle
         glm::vec3 edge1 = v1 - v0;
         glm::vec3 edge2 = v2 - v0;
-
-        // Calculate the face normal
         glm::vec3 faceNormal = glm::normalize(glm::cross(edge1, edge2));
 
-        // Accumulate the face normal for each vertex of the triangle
         normals[index0] += faceNormal;
         normals[index1] += faceNormal;
         normals[index2] += faceNormal;
     }
 
-    // Normalize the accumulated vertex normals
     for (size_t i = 0; i < normals.size(); ++i) {
         normals[i] = glm::normalize(normals[i]);
     }
@@ -194,14 +214,9 @@ void Renderer::generateNormals(const Mesh* mesh, std::vector<glm::vec3>& normals
 
 void Renderer::generateUVs(const Mesh* mesh, std::vector<glm::vec2>& uvs) {
     uvs.reserve(mesh->vertices.size());
-
-    // Simple Planar Projection: map vertex positions (x, y) to UVs
     for (const auto& vertex : mesh->vertices) {
-        // Generate UVs using planar projection onto the XY plane
-        float u = (vertex.x + 1.0f) * 0.5f; // Normalize x to [0, 1]
-        float v = (vertex.y + 1.0f) * 0.5f; // Normalize y to [0, 1]
-
-        // Add the generated UV to the uvs vector
+        float u = (vertex.x + 1.0f) * 0.5f;
+        float v = (vertex.y + 1.0f) * 0.5f;
         uvs.push_back(glm::vec2(u, v));
     }
 }

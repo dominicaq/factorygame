@@ -2,33 +2,39 @@
 
 #include <unordered_map>
 #include <glad/glad.h>
-
 #include "shader.h"
 #include "../resources/mesh.h"
-
 #include <memory>
+#include <map>
 
 class Renderer {
 public:
     Renderer(unsigned int width, unsigned int height);
     ~Renderer();
 
-    // Mesh bufers
+    void draw(const Mesh* mesh, const Shader& shader);
     void initMeshBuffers(const Mesh* mesh);
     void deleteMeshBuffer(const Mesh* mesh);
-    void draw(const Mesh* mesh, const Shader& shader);
+    void performGeometryPass(const Shader& geometryShader);
 
 private:
+    void initOpenGLState();
+    void initGBuffer(unsigned int width, unsigned int height);
+
+    // G-buffer
+    unsigned int gBuffer;
+    unsigned int gPosition, gNormal, gAlbedo;
+    unsigned int rboDepth;
+
+    // MeshData structure
     struct MeshData {
-        GLuint VAO;
-        GLuint VBO;
-        GLuint EBO;
+        unsigned int VAO, VBO, EBO;
     };
 
-    // Generate missing mesh data
+    // Store mesh buffers
+    std::map<const Mesh*, MeshData> m_meshBuffers;
+
+    // Mesh generation helpers
     void generateNormals(const Mesh* mesh, std::vector<glm::vec3>& normals, const std::vector<unsigned int>& indices);
     void generateUVs(const Mesh* mesh, std::vector<glm::vec2>& uvs);
-
-    std::unordered_map<const Mesh*, MeshData> m_meshBuffers;
-    void initOpenGLState();
 };
