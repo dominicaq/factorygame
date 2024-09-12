@@ -13,7 +13,7 @@
 */
 class Renderer {
 public:
-    Renderer(unsigned int width, unsigned int height);
+    Renderer(int width, int height);
     ~Renderer();
 
     /*
@@ -30,7 +30,7 @@ public:
     /*
     * G-Buffer management for deferred rendering
     */
-    void resizeGBuffer(unsigned int width, unsigned int height);
+    void resizeGBuffer(int width, int height);
     void geometryPass(const Shader& geometryShader);
 
     /*
@@ -46,7 +46,7 @@ public:
 
 private:
     void initOpenGLState();
-    void initGBuffer(unsigned int width, unsigned int height);
+    void initGBuffer(int width, int height);
 
     /*
     * G-buffer resources

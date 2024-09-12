@@ -8,12 +8,9 @@
 class Window {
 public:
     // Constructor and Destructor
-    Window(const char *title, unsigned int width, unsigned int height);
+    Window(const char *title, int width, int height);
     ~Window();
 
-    /*
-     * Initialization
-     */
     bool init();
 
     /*
@@ -34,9 +31,7 @@ public:
     /*
      * Window Management
      */
-    void setTitle(const char *newTitle);
-    void resize(unsigned int newWidth, unsigned int newHeight);
-    void getSize(int &width, int &height) const;
+    void resize(int newWidth, int newHeight);
 
     /*
      * Attach a renderer for G-buffer resizing
@@ -48,9 +43,9 @@ private:
     GLFWwindow* m_window;
 
     // Window settings
-    const char* title;
-    unsigned int width;
-    unsigned int height;
+    const char* m_title;
+    int m_width;
+    int m_height;
 
     // Renderer associated with this window (for resizing G-buffer)
     void* m_renderer;

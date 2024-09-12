@@ -4,7 +4,7 @@
 /*
 * Constructor/Destructor
 */
-Renderer::Renderer(unsigned int width, unsigned int height) {
+Renderer::Renderer(int width, int height) {
     initOpenGLState();
     initGBuffer(width, height);
     initQuad();
@@ -53,7 +53,7 @@ void Renderer::initOpenGLState() {
 /*
 * G-buffer Management
 */
-void Renderer::initGBuffer(unsigned int width, unsigned int height) {
+void Renderer::initGBuffer(int width, int height) {
     // Create the G-buffer FBO
     glGenFramebuffers(1, &m_gBuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer);
@@ -111,7 +111,7 @@ void Renderer::initGBuffer(unsigned int width, unsigned int height) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void Renderer::resizeGBuffer(unsigned int width, unsigned int height) {
+void Renderer::resizeGBuffer(int width, int height) {
     // Delete existing G-buffer textures and depth buffer
     glDeleteTextures(1, &m_gPosition);
     glDeleteTextures(1, &m_gNormal);

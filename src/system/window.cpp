@@ -2,8 +2,8 @@
 #include "../renderer/renderer.h"
 
 // Constructor and Destructor
-Window::Window(const char *title, unsigned int width, unsigned int height)
-    : title(title), width(width), height(height), m_window(nullptr), m_renderer(nullptr) {}
+Window::Window(const char *title, int width, int height)
+    : m_title(title), m_width(width), m_height(height), m_window(nullptr), m_renderer(nullptr) {}
 
 Window::~Window() {
     glfwTerminate();
@@ -27,7 +27,8 @@ bool Window::init() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-    m_window = glfwCreateWindow(width, height, title, NULL, NULL);
+    // Create a windowed mode window and its OpenGL context
+    m_window = glfwCreateWindow(m_width, m_height, m_title, NULL, NULL);
     if (!m_window) {
         std::cerr << "Failed to create GLFW window" << "\n";
         glfwTerminate();
@@ -46,12 +47,6 @@ bool Window::init() {
         std::cerr << "Failed to initialize GLAD" << "\n";
         return false;
     }
-
-    // Set the initial OpenGL viewport size
-    glViewport(0, 0, width, height);
-
-    // Manually trigger the framebuffer size callback to ensure proper G-buffer resizing
-    framebufferSizeCallback(m_window, width, height);
 
     return true;
 }
@@ -83,26 +78,23 @@ void Window::swapBuffersAndPollEvents() {
 /*
  * Window Management
  */
-void Window::setTitle(const char *newTitle) {
-    title = newTitle;
-    glfwSetWindowTitle(m_window, title);
-}
+void Window::resize(int newWidth, int newHeight) {
+    m_width = newWidth;
+    m_height = newHeight;
+    glfwSetWindowSize(m_window, m_width, m_height);
 
-void Window::resize(unsigned int newWidth, unsigned int newHeight) {
-    width = newWidth;
-    height = newHeight;
-    glfwSetWindowSize(m_window, width, height);
-    glViewport(0, 0, width, height);
+    // Get the framebuffer size (in pixels) instead of using the window size
+    int framebufferWidth, framebufferHeight;
+    glfwGetFramebufferSize(m_window, &framebufferWidth, &framebufferHeight);
 
-    // Notify the renderer about the window resize to adjust the G-buffer
+    // Set the OpenGL viewport based on framebuffer size
+    glViewport(0, 0, framebufferWidth, framebufferHeight);
+
+    // Notify the renderer about the framebuffer resize to adjust the G-buffer
     if (m_renderer) {
         Renderer* renderer = static_cast<Renderer*>(m_renderer);
-        renderer->resizeGBuffer(width, height);
+        renderer->resizeGBuffer(framebufferWidth, framebufferHeight);
     }
-}
-
-void Window::getSize(int &width, int &height) const {
-    glfwGetWindowSize(m_window, &width, &height);
 }
 
 /*
@@ -110,16 +102,17 @@ void Window::getSize(int &width, int &height) const {
  */
 void Window::setRenderer(void* renderer) {
     m_renderer = renderer;
+    // Ensure the G-buffer is set up when the renderer is attached
+    resize(m_width, m_height);
 }
 
 // Static callback for when the window is resized
 void Window::framebufferSizeCallback(GLFWwindow* window, int width, int height) {
-    // Update OpenGL viewport
+    // Update OpenGL viewport using the framebuffer size
     glViewport(0, 0, width, height);
 
     // Get the window pointer associated with this callback
     Window* windowPtr = static_cast<Window*>(glfwGetWindowUserPointer(window));
-    // Ensure the window pointer is valid and resize the G-buffer if the renderer is set
     if (windowPtr && windowPtr->m_renderer) {
         Renderer* renderer = static_cast<Renderer*>(windowPtr->m_renderer);
         renderer->resizeGBuffer(width, height);
