@@ -83,7 +83,7 @@ int main() {
 
     // Set up the cube's transform
     Transform cubeTransform;
-    cubeTransform.position = glm::vec3(0.0f, -0.7f, 0.0f);
+    cubeTransform.position = glm::vec3(2.0f, -0.7f, 0.0f);
     cubeTransform.scale = glm::vec3(7.0f);
     cubeTransform.eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
 
@@ -119,17 +119,15 @@ int main() {
         // Clear screen and depth buffer (for geometry pass)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Rotate the cube over time
+        // Rotate the object over time
         cubeTransform.eulerAngles.y += deltaTime * 25.0f;
 
         // Get the updated matrices
         glm::mat4 model = cubeTransform.getModelMatrix();
         glm::mat4 view = camera.getViewMatrix();
 
-        // =============================
-        // 1. Geometry Pass: Render to G-buffer
-        // =============================
-        renderer.performGeometryPass(geometryShader);
+        // Render to G-buffer
+        renderer.geometryPass(geometryShader);
 
         // Use the geometry shader and set the uniforms
         geometryShader.use();

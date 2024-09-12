@@ -15,16 +15,20 @@ public:
     void draw(const Mesh* mesh, const Shader& shader);
     void initMeshBuffers(const Mesh* mesh);
     void deleteMeshBuffer(const Mesh* mesh);
-    void performGeometryPass(const Shader& geometryShader);
+
+    /*
+    * GBuffer passes
+    */
+    void geometryPass(const Shader& geometryShader);
 
 private:
     void initOpenGLState();
     void initGBuffer(unsigned int width, unsigned int height);
 
     // G-buffer
-    unsigned int gBuffer;
-    unsigned int gPosition, gNormal, gAlbedo;
-    unsigned int rboDepth;
+    unsigned int m_gBuffer;
+    unsigned int m_gPosition, m_gNormal, m_gAlbedo;
+    unsigned int m_rboDepth;
 
     // MeshData structure
     struct MeshData {
