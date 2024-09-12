@@ -31,6 +31,34 @@ Mesh* MeshGen::createCube() {
     return cubeMesh;
 }
 
+Mesh* MeshGen::createQuad(float scale = 1.0f) {
+    Mesh* quadMesh = new Mesh();
+
+    // Positions for the quad (a flat square in the XY plane, scaled)
+    quadMesh->vertices = {
+        { -0.5f * scale, -0.5f * scale, 0.0f }, // Bottom-left
+        {  0.5f * scale, -0.5f * scale, 0.0f }, // Bottom-right
+        {  0.5f * scale,  0.5f * scale, 0.0f }, // Top-right
+        { -0.5f * scale,  0.5f * scale, 0.0f }  // Top-left
+    };
+
+    // UVs for the quad (optional, used for texture mapping)
+    quadMesh->uvs = {
+        { 0.0f, 0.0f }, // Bottom-left
+        { 1.0f, 0.0f }, // Bottom-right
+        { 1.0f, 1.0f }, // Top-right
+        { 0.0f, 1.0f }  // Top-left
+    };
+
+    // Indices for the quad (two triangles)
+    quadMesh->indices = {
+        0, 1, 2, // First triangle
+        2, 3, 0  // Second triangle
+    };
+
+    return quadMesh;
+}
+
 Mesh* MeshGen::createSphere(float radius, int sectors, int stacks) {
     Mesh* sphere = new Mesh();
 

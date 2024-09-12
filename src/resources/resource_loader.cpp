@@ -59,7 +59,9 @@ Mesh* ResourceLoader::loadMesh(const std::string& filepath) {
     std::string extension = filepath.substr(dotPos + 1);
 
     // Convert extension to lowercase for comparison
-    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+    for (char& c : extension) {
+        c = std::tolower(c);
+    }
 
     // Determine the appropriate function based on the extension
     if (extension == "obj") {

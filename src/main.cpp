@@ -67,9 +67,9 @@ int main() {
 #pragma region GAME_OBJECT_CUBE
 
     // Geometry Pass Shader (for writing to G-buffer)
-    std::string geometryVertexPath = SHADER_DIR + "deferred/geometry.vs";
-    std::string geometryFragPath = SHADER_DIR + "deferred/geometry.fs";
-    Shader geometryShader(geometryVertexPath, geometryFragPath);
+    std::string gBufferVertexPath = SHADER_DIR + "deferred/gbuff.vs";
+    std::string gBufferFragmentPath = SHADER_DIR + "deferred/gbuff.fs";
+    Shader gBufferShader(gBufferVertexPath, gBufferFragmentPath);
 
     // Load texture (optional, depends on your deferred shader setup)
     Texture texture(TEXTURE_DIR + "dice.png");
@@ -84,8 +84,8 @@ int main() {
 
     // Set up the cube's transform
     Transform cubeTransform;
-    cubeTransform.position = glm::vec3(2.0f, -0.7f, 0.0f);
-    cubeTransform.scale = glm::vec3(7.0f);
+    cubeTransform.position = glm::vec3(0.0f, -0.9f, 0.0f);
+    cubeTransform.scale = glm::vec3(9.0f);
     cubeTransform.eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
 
 #pragma endregion
@@ -104,14 +104,17 @@ int main() {
 
 #pragma endregion
 
+    // Debug Pass Shader (for visualizing G-buffer)
+    std::string debugVertexPath = SHADER_DIR + "deferred/quad.vs";
+    std::string debugFragmentPath = SHADER_DIR + "deferred/quad.fs";
+    Shader debugShader(debugVertexPath, debugFragmentPath);
+
     // Variables for delta time calculation
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
 
     // Render loop
     while (!window.shouldClose()) {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
         // Calculate delta time
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
@@ -119,22 +122,21 @@ int main() {
 
         window.processInput();
 
-        // Rotate the object over time
-        cubeTransform.eulerAngles.y += deltaTime * 25.0f;
+        cubeTransform.eulerAngles.x += deltaTime * 10.0f;
 
-        // Get the updated matrices
+        // Update transformations and matrices
         glm::mat4 model = cubeTransform.getModelMatrix();
         glm::mat4 view = camera.getViewMatrix();
 
-        // Use the geometry shader and set the uniforms
-        geometryShader.use();
-        geometryShader.setMat4("u_Model", model);
-        geometryShader.setMat4("u_View", view);
-        geometryShader.setMat4("u_Projection", projection);
+        // Geometry pass (write to G-buffer)
+        gBufferShader.use();
+        gBufferShader.setMat4("u_Model", model);
+        gBufferShader.setMat4("u_View", view);
+        gBufferShader.setMat4("u_Projection", projection);
+        renderer.geometryPass(gBufferShader);
 
-        // Render to G-buffer (this will handle drawing the cube)
-        renderer.geometryPass(geometryShader);
-        // renderer.draw(cubeMesh, geometryShader);
+        // Debug pass (render the G-buffer)
+        renderer.debugGBuffer(debugShader, 1);
 
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();

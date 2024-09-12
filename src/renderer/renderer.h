@@ -7,40 +7,70 @@
 #include <memory>
 #include <map>
 
+/*
+* The Renderer class is responsible for handling OpenGL rendering, including
+* G-buffer management for deferred rendering and mesh rendering.
+*/
 class Renderer {
 public:
     Renderer(unsigned int width, unsigned int height);
     ~Renderer();
 
-    void draw(const Mesh* mesh, const Shader& shader);
+    /*
+    * Render mesh using its buffers
+    */
+    void draw(const Mesh* mesh);
+
+    /*
+    * Initialize and manage mesh buffers
+    */
     void initMeshBuffers(const Mesh* mesh);
     void deleteMeshBuffer(const Mesh* mesh);
 
     /*
-    * G-Buffer
+    * G-Buffer management for deferred rendering
     */
     void resizeGBuffer(unsigned int width, unsigned int height);
     void geometryPass(const Shader& geometryShader);
+
+    /*
+    * Quad rendering (used for post-processing, G-buffer display, etc.)
+    */
+    void drawQuad();
+    void initQuad();
+
+    /*
+    * Debugging: Display G-buffer textures (e.g., Position, Normal, Albedo)
+    */
+    void debugGBuffer(const Shader& debugShader, int debugMode);
 
 private:
     void initOpenGLState();
     void initGBuffer(unsigned int width, unsigned int height);
 
-    // G-buffer
+    /*
+    * G-buffer resources
+    */
     unsigned int m_gBuffer;
     unsigned int m_gPosition, m_gNormal, m_gAlbedo;
     unsigned int m_rboDepth;
 
-    // MeshData structure
+    /*
+    * Screen-aligned quad for G-buffer rendering and post-processing
+    */
+    unsigned int m_quadVAO;
+
+    /*
+    * Mesh buffer storage (mapping each Mesh* to its respective MeshData)
+    */
     struct MeshData {
         unsigned int VAO, VBO, EBO;
     };
-
-    // Store mesh buffers
     std::map<const Mesh*, MeshData> m_meshBuffers;
 
-    // Mesh generation helpers
+    /*
+    * Mesh attribute generation helpers
+    */
     void generateNormals(const Mesh* mesh, std::vector<glm::vec3>& normals, const std::vector<unsigned int>& indices);
     void generateUVs(const Mesh* mesh, std::vector<glm::vec2>& uvs);
-
 };

@@ -1,9 +1,13 @@
 #include "renderer.h"
 #include <iostream>
 
+/*
+* Constructor/Destructor
+*/
 Renderer::Renderer(unsigned int width, unsigned int height) {
     initOpenGLState();
     initGBuffer(width, height);
+    initQuad();
 }
 
 Renderer::~Renderer() {
@@ -34,6 +38,9 @@ Renderer::~Renderer() {
     glDeleteRenderbuffers(1, &m_rboDepth);
 }
 
+/*
+* OpenGL State Initialization
+*/
 void Renderer::initOpenGLState() {
     glEnable(GL_DEPTH_TEST);
 
@@ -41,13 +48,10 @@ void Renderer::initOpenGLState() {
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
-
-    // Clear color
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 }
 
 /*
-* GBuffer management
+* G-buffer Management
 */
 void Renderer::initGBuffer(unsigned int width, unsigned int height) {
     // Create the G-buffer FBO
@@ -85,18 +89,20 @@ void Renderer::initGBuffer(unsigned int width, unsigned int height) {
     GLuint attachments[3] = {
         GL_COLOR_ATTACHMENT0,
         GL_COLOR_ATTACHMENT1,
-        GL_COLOR_ATTACHMENT2 };
+        GL_COLOR_ATTACHMENT2
+    };
     glDrawBuffers(3, attachments);
 
     // Create and attach depth buffer
     glGenRenderbuffers(1, &m_rboDepth);
     glBindRenderbuffer(GL_RENDERBUFFER, m_rboDepth);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_rboDepth);
 
-    // Check framebuffer status
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        std::cerr << "Framebuffer not complete!" << std::endl;
+    // Check framebuffer status with more detailed error output
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "Framebuffer not complete! Status: " << status << std::endl;
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         return;
     }
@@ -105,7 +111,7 @@ void Renderer::initGBuffer(unsigned int width, unsigned int height) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void Renderer::resizeGBuffer(unsigned int newWidth, unsigned int newHeight) {
+void Renderer::resizeGBuffer(unsigned int width, unsigned int height) {
     // Delete existing G-buffer textures and depth buffer
     glDeleteTextures(1, &m_gPosition);
     glDeleteTextures(1, &m_gNormal);
@@ -113,36 +119,33 @@ void Renderer::resizeGBuffer(unsigned int newWidth, unsigned int newHeight) {
     glDeleteRenderbuffers(1, &m_rboDepth);
 
     // Re-initialize the G-buffer with new size
-    initGBuffer(newWidth, newHeight);
+    initGBuffer(width, height);
 }
 
-void Renderer::geometryPass(const Shader& geometryShader) {
-    // Bind the gbuffer
+void Renderer::geometryPass(const Shader& shader) {
+    // Clear G-buffer before drawing
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Bind the G-buffer for the geometry pass
     glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer);
 
-    // Render all the meshes into the G-buffer
-    for (const auto& entry : m_meshBuffers) {
-        const Mesh* mesh = entry.first;
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        draw(mesh, geometryShader);
+    // Render all the meshes into the G-buffer textures
+    for (const auto& entry : m_meshBuffers) {
+        shader.use();
+        draw(entry.first);
     }
 
     // Unbind the framebuffer after the pass
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    // Check for OpenGL errors
-    GLenum error = glGetError();
-    if (error != GL_NO_ERROR) {
-        std::cerr << "OpenGL error: " << error << std::endl;
-    }
 }
 
 /*
-* Mesh buffer management
+* Mesh Management
 */
-void Renderer::draw(const Mesh* mesh, const Shader& shader) {
-    // shader.use();
-
+void Renderer::draw(const Mesh* mesh) {
     // Load and bind the mesh buffer
     const MeshData& targetMesh = m_meshBuffers.at(mesh);
     glBindVertexArray(targetMesh.VAO);
@@ -243,7 +246,7 @@ void Renderer::deleteMeshBuffer(const Mesh* mesh) {
 }
 
 /*
-* Mesh data generators
+* Mesh Attribute Generation
 */
 void Renderer::generateNormals(const Mesh* mesh, std::vector<glm::vec3>& normals, const std::vector<unsigned int>& indices) {
     normals.clear();
@@ -279,4 +282,78 @@ void Renderer::generateUVs(const Mesh* mesh, std::vector<glm::vec2>& uvs) {
         float v = (vertex.y + 1.0f) * 0.5f;
         uvs.push_back(glm::vec2(u, v));
     }
+}
+
+/*
+* Deferred Rendering Quad
+*/
+void Renderer::initQuad() {
+    // Vertices for a screen-aligned quad (NDC space)
+    float quadVertices[] = {
+        // positions        // uvs
+        -1.0f,  1.0f, 0.0f,  0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f,  0.0f, 0.0f,
+         1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
+         1.0f,  1.0f, 0.0f,  1.0f, 1.0f
+    };
+
+    unsigned int quadIndices[] = {
+        0, 1, 2,
+        2, 3, 0
+    };
+
+    // Generate and bind VAO
+    glGenVertexArrays(1, &m_quadVAO);
+    glBindVertexArray(m_quadVAO);
+
+    // Generate and bind VBO
+    unsigned int VBO, EBO;
+    glGenBuffers(1, &VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+
+    // Generate and bind EBO (Element Buffer Object for indices)
+    glGenBuffers(1, &EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quadIndices), &quadIndices, GL_STATIC_DRAW);
+
+    // Position attribute (location = 0)
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+
+    // UV attribute (location = 1)
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+
+    // Unbind VAO
+    glBindVertexArray(0);
+}
+
+void Renderer::drawQuad() {
+    glBindVertexArray(m_quadVAO);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+}
+
+/*
+* G-Buffer Debugging
+*/
+void Renderer::debugGBuffer(const Shader& debugShader, int debugMode) {
+    // Bind the G-buffer textures to texture units
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_gPosition);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, m_gNormal);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, m_gAlbedo);
+
+    // Use the debug shader
+    debugShader.use();
+    debugShader.setInt("gPosition", 0);
+    debugShader.setInt("gNormal", 1);
+    debugShader.setInt("gAlbedo", 2);
+    debugShader.setInt("debugMode", debugMode);
+
+    // Draw the quad (screen aligned)
+    drawQuad();
 }

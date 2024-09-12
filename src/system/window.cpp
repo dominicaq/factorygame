@@ -18,6 +18,7 @@ bool Window::init() {
         return false;
     }
 
+    // Set GLFW window hints for OpenGL version and profile
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -33,17 +34,24 @@ bool Window::init() {
         return false;
     }
 
+    // Make the window's context current
     glfwMakeContextCurrent(m_window);
+    glfwSetFramebufferSizeCallback(m_window, framebufferSizeCallback);
 
     // Set this Window object as the user pointer for the GLFW window
     glfwSetWindowUserPointer(m_window, this);
 
-    glfwSetFramebufferSizeCallback(m_window, framebufferSizeCallback);
-
+    // Load all OpenGL function pointers with GLAD
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         std::cerr << "Failed to initialize GLAD" << "\n";
         return false;
     }
+
+    // Set the initial OpenGL viewport size
+    glViewport(0, 0, width, height);
+
+    // Manually trigger the framebuffer size callback to ensure proper G-buffer resizing
+    framebufferSizeCallback(m_window, width, height);
 
     return true;
 }
