@@ -1,7 +1,11 @@
-#pragma once
+#ifndef RENDERER_H
+#define RENDERER_H
 
 #include <unordered_map>
 #include <glad/glad.h>
+
+#include "../transform.h"
+
 #include "shader.h"
 #include "../resources/mesh.h"
 #include <memory>
@@ -31,7 +35,7 @@ public:
     * G-Buffer management for deferred rendering
     */
     void resizeGBuffer(int width, int height);
-    void geometryPass(const Shader& geometryShader);
+    void geometryPass(const Shader& shader, const std::vector<Mesh*>& meshes, const std::vector<Transform>& transforms);
 
     /*
     * Quad rendering (used for post-processing, G-buffer display, etc.)
@@ -74,3 +78,5 @@ private:
     void generateNormals(const Mesh* mesh, std::vector<glm::vec3>& normals, const std::vector<unsigned int>& indices);
     void generateUVs(const Mesh* mesh, std::vector<glm::vec2>& uvs);
 };
+
+#endif

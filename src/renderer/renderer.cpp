@@ -122,20 +122,25 @@ void Renderer::resizeGBuffer(int width, int height) {
     initGBuffer(width, height);
 }
 
-void Renderer::geometryPass(const Shader& shader) {
+void Renderer::geometryPass(const Shader& shader, const std::vector<Mesh*>& meshes, const std::vector<Transform>& transforms) {
     // Clear G-buffer before drawing
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Bind the G-buffer for the geometry pass
     glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer);
-
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Render all the meshes into the G-buffer textures
-    for (const auto& entry : m_meshBuffers) {
-        shader.use();
-        draw(entry.first);
+    for (size_t i = 0; i < meshes.size(); ++i) {
+        const Mesh* mesh = meshes[i];
+        const Transform& transform = transforms[i];
+
+        // Set transformation matrices
+        glm::mat4 model = transform.getModelMatrix();
+        shader.setMat4("u_Model", model);
+
+        // Draw the mesh
+        draw(mesh);
     }
 
     // Unbind the framebuffer after the pass
@@ -246,45 +251,6 @@ void Renderer::deleteMeshBuffer(const Mesh* mesh) {
 }
 
 /*
-* Mesh Attribute Generation
-*/
-void Renderer::generateNormals(const Mesh* mesh, std::vector<glm::vec3>& normals, const std::vector<unsigned int>& indices) {
-    normals.clear();
-    normals.resize(mesh->vertices.size(), glm::vec3(0.0f));
-
-    for (size_t i = 0; i < indices.size(); i += 3) {
-        unsigned int index0 = indices[i];
-        unsigned int index1 = indices[i + 1];
-        unsigned int index2 = indices[i + 2];
-
-        glm::vec3 v0 = mesh->vertices[index0];
-        glm::vec3 v1 = mesh->vertices[index1];
-        glm::vec3 v2 = mesh->vertices[index2];
-
-        glm::vec3 edge1 = v1 - v0;
-        glm::vec3 edge2 = v2 - v0;
-        glm::vec3 faceNormal = glm::normalize(glm::cross(edge1, edge2));
-
-        normals[index0] += faceNormal;
-        normals[index1] += faceNormal;
-        normals[index2] += faceNormal;
-    }
-
-    for (size_t i = 0; i < normals.size(); ++i) {
-        normals[i] = glm::normalize(normals[i]);
-    }
-}
-
-void Renderer::generateUVs(const Mesh* mesh, std::vector<glm::vec2>& uvs) {
-    uvs.reserve(mesh->vertices.size());
-    for (const auto& vertex : mesh->vertices) {
-        float u = (vertex.x + 1.0f) * 0.5f;
-        float v = (vertex.y + 1.0f) * 0.5f;
-        uvs.push_back(glm::vec2(u, v));
-    }
-}
-
-/*
 * Deferred Rendering Quad
 */
 void Renderer::initQuad() {
@@ -356,4 +322,43 @@ void Renderer::debugGBuffer(const Shader& debugShader, int debugMode) {
 
     // Draw the quad (screen aligned)
     drawQuad();
+}
+
+/*
+* Mesh Attribute Generation
+*/
+void Renderer::generateNormals(const Mesh* mesh, std::vector<glm::vec3>& normals, const std::vector<unsigned int>& indices) {
+    normals.clear();
+    normals.resize(mesh->vertices.size(), glm::vec3(0.0f));
+
+    for (size_t i = 0; i < indices.size(); i += 3) {
+        unsigned int index0 = indices[i];
+        unsigned int index1 = indices[i + 1];
+        unsigned int index2 = indices[i + 2];
+
+        glm::vec3 v0 = mesh->vertices[index0];
+        glm::vec3 v1 = mesh->vertices[index1];
+        glm::vec3 v2 = mesh->vertices[index2];
+
+        glm::vec3 edge1 = v1 - v0;
+        glm::vec3 edge2 = v2 - v0;
+        glm::vec3 faceNormal = glm::normalize(glm::cross(edge1, edge2));
+
+        normals[index0] += faceNormal;
+        normals[index1] += faceNormal;
+        normals[index2] += faceNormal;
+    }
+
+    for (size_t i = 0; i < normals.size(); ++i) {
+        normals[i] = glm::normalize(normals[i]);
+    }
+}
+
+void Renderer::generateUVs(const Mesh* mesh, std::vector<glm::vec2>& uvs) {
+    uvs.reserve(mesh->vertices.size());
+    for (const auto& vertex : mesh->vertices) {
+        float u = (vertex.x + 1.0f) * 0.5f;
+        float v = (vertex.y + 1.0f) * 0.5f;
+        uvs.push_back(glm::vec2(u, v));
+    }
 }
