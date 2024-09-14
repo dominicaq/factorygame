@@ -1,9 +1,6 @@
 #include "renderer.h"
 #include <iostream>
 
-/*
-* Constructor/Destructor
-*/
 Renderer::Renderer(int width, int height) {
     initOpenGLState();
     initGBuffer(width, height);
@@ -11,31 +8,22 @@ Renderer::Renderer(int width, int height) {
 }
 
 Renderer::~Renderer() {
-    // Iterate over the map and delete all mesh buffers
-    for (auto it = m_meshBuffers.begin(); it != m_meshBuffers.end(); ) {
-        const MeshData& target = it->second;
-
-        // Delete VAO, VBO, and EBO if they exist
-        if (target.VAO) {
-            glDeleteVertexArrays(1, &target.VAO);
-        }
-        if (target.VBO) {
-            glDeleteBuffers(1, &target.VBO);
-        }
-        if (target.EBO) {
-            glDeleteBuffers(1, &target.EBO);
-        }
-
-        // Erase the mesh entry from the map and move the iterator forward
-        it = m_meshBuffers.erase(it);
-    }
-
-    // Delete G-buffer resources
+    // Clean up G-buffer
     glDeleteFramebuffers(1, &m_gBuffer);
     glDeleteTextures(1, &m_gPosition);
     glDeleteTextures(1, &m_gNormal);
     glDeleteTextures(1, &m_gAlbedo);
     glDeleteRenderbuffers(1, &m_rboDepth);
+
+    // Clean up mesh buffers
+    for (auto& data : m_meshData) {
+        if (data.VAO) glDeleteVertexArrays(1, &data.VAO);
+        if (data.VBO) glDeleteBuffers(1, &data.VBO);
+        if (data.EBO) glDeleteBuffers(1, &data.EBO);
+    }
+
+    // Clean up quad
+    if (m_quadVAO) glDeleteVertexArrays(1, &m_quadVAO);
 }
 
 /*
@@ -59,7 +47,6 @@ void Renderer::initGBuffer(int width, int height) {
     glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer);
 
     // Position color buffer
-    glActiveTexture(GL_TEXTURE0);
     glGenTextures(1, &m_gPosition);
     glBindTexture(GL_TEXTURE_2D, m_gPosition);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
@@ -68,7 +55,6 @@ void Renderer::initGBuffer(int width, int height) {
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_gPosition, 0);
 
     // Normal color buffer
-    glActiveTexture(GL_TEXTURE1);
     glGenTextures(1, &m_gNormal);
     glBindTexture(GL_TEXTURE_2D, m_gNormal);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
@@ -77,7 +63,6 @@ void Renderer::initGBuffer(int width, int height) {
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, m_gNormal, 0);
 
     // Albedo color buffer
-    glActiveTexture(GL_TEXTURE2);
     glGenTextures(1, &m_gAlbedo);
     glBindTexture(GL_TEXTURE_2D, m_gAlbedo);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
@@ -102,7 +87,7 @@ void Renderer::initGBuffer(int width, int height) {
     // Check framebuffer status with more detailed error output
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
-        std::cerr << "Framebuffer not complete! Status: " << status << std::endl;
+        std::cerr << "Framebuffer not complete! Status: " << status << "\n";
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         return;
     }
@@ -123,19 +108,17 @@ void Renderer::resizeGBuffer(int width, int height) {
 }
 
 void Renderer::geometryPass(const Shader& shader, const std::vector<Mesh*>& meshes, const std::vector<Transform>& transforms) {
-    // Clear G-buffer before drawing
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // Bind the G-buffer for the geometry pass
+    // Bind and clear framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Render all the meshes into the G-buffer textures
+    shader.use();
+
     for (size_t i = 0; i < meshes.size(); ++i) {
         const Mesh* mesh = meshes[i];
         const Transform& transform = transforms[i];
 
-        // Set transformation matrices
+        // Set model matrix
         glm::mat4 model = transform.getModelMatrix();
         shader.setMat4("u_Model", model);
 
@@ -143,61 +126,69 @@ void Renderer::geometryPass(const Shader& shader, const std::vector<Mesh*>& mesh
         draw(mesh);
     }
 
-    // Unbind the framebuffer after the pass
+    // Unbind and clear framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 /*
 * Mesh Management
 */
 void Renderer::draw(const Mesh* mesh) {
-    // Load and bind the mesh buffer
-    const MeshData& targetMesh = m_meshBuffers.at(mesh);
-    glBindVertexArray(targetMesh.VAO);
-
-    if (!mesh->indices.empty()) {
-        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(mesh->indices.size()), GL_UNSIGNED_INT, 0);
-    } else {
-        glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(mesh->vertices.size()));
-    }
-
-    glBindVertexArray(0);
-}
-
-void Renderer::initMeshBuffers(const Mesh* mesh) {
-    // Mesh buffer already created
-    if (m_meshBuffers.find(mesh) != m_meshBuffers.end()) {
+    size_t index = mesh->id;
+    if (index >= m_meshData.size() || m_meshData[index].VAO == 0) {
+        std::cerr << "ERROR::RENDERER::DRAW::Mesh buffer not found.\n";
         return;
     }
 
-    MeshData data;
+    const MeshData& data = m_meshData[index];
+
+    // Bind buffers
+    glBindVertexArray(data.VAO);
+
+    if (data.EBO != 0) {
+        glDrawElements(GL_TRIANGLES, data.indexCount, GL_UNSIGNED_INT, 0);
+    } else {
+        glDrawArrays(GL_TRIANGLES, 0, data.vertexCount);
+    }
+
+    // Unbind buffers
+    glBindVertexArray(0);
+}
+
+void Renderer::initMeshBuffers(Mesh* mesh) {
+    if (mesh->uvs.size() == 0 || mesh->normals.size() == 0) {
+        std::cerr << "ERROR::RENDERER::INIT_MESH_BUFFERS::UVs and normals must be provided for all vertices.\n";
+        return;
+    }
+
+    // Assign an ID if not already assigned
+    if (mesh->id == SIZE_MAX) {
+        mesh->id = m_meshData.size();
+    }
+
+    MeshData data = {};
     glGenVertexArrays(1, &data.VAO);
     glBindVertexArray(data.VAO);
 
-    const std::vector<glm::vec3>* normalsToUse = &mesh->normals;
-    std::vector<glm::vec3> generatedNormals(mesh->vertices.size(), glm::vec3(0.0f));
-    if (mesh->normals.empty() && !mesh->indices.empty()) {
-        generateNormals(mesh, generatedNormals, mesh->indices);
-        normalsToUse = &generatedNormals;
-    }
-
-    const std::vector<glm::vec2>* uvsToUse = &mesh->uvs;
-    std::vector<glm::vec2> generatedUVs;
-    if (mesh->uvs.empty()) {
-        generateUVs(mesh, generatedUVs);
-        uvsToUse = &generatedUVs;
-    }
-
+    // Build mesh buffer data (8 floats per vertex)
     std::vector<float> bufferData;
-    for (size_t i = 0; i < mesh->vertices.size(); ++i) {
-        bufferData.push_back(mesh->vertices[i].x);
-        bufferData.push_back(mesh->vertices[i].y);
-        bufferData.push_back(mesh->vertices[i].z);
-        bufferData.push_back((*uvsToUse)[i].x);
-        bufferData.push_back((*uvsToUse)[i].y);
-        bufferData.push_back((*normalsToUse)[i].x);
-        bufferData.push_back((*normalsToUse)[i].y);
-        bufferData.push_back((*normalsToUse)[i].z);
+    size_t numVertices = mesh->vertices.size();
+    bufferData.resize(numVertices * 8);
+
+    float* ptr = bufferData.data();
+    for (size_t i = 0; i < numVertices; ++i) {
+        // Positions
+        *ptr++ = mesh->vertices[i].x;
+        *ptr++ = mesh->vertices[i].y;
+        *ptr++ = mesh->vertices[i].z;
+        // UVs
+        *ptr++ = mesh->uvs[i].x;
+        *ptr++ = mesh->uvs[i].y;
+        // Normals
+        *ptr++ = mesh->normals[i].x;
+        *ptr++ = mesh->normals[i].y;
+        *ptr++ = mesh->normals[i].z;
     }
 
     glGenBuffers(1, &data.VBO);
@@ -208,46 +199,79 @@ void Renderer::initMeshBuffers(const Mesh* mesh) {
         glGenBuffers(1, &data.EBO);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, data.EBO);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->indices.size() * sizeof(unsigned int), mesh->indices.data(), GL_STATIC_DRAW);
+        data.indexCount = static_cast<GLsizei>(mesh->indices.size());
+        data.vertexCount = 0;
+    } else {
+        // No indices
+        data.EBO = 0;
+        data.indexCount = 0;
+        data.vertexCount = static_cast<GLsizei>(mesh->vertices.size());
     }
 
-    // Vertex positions
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    // Vertex attribute pointers
 
-    // UVs
+    // Vertex positions (location = 0)
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(0));
+
+    // UVs (location = 1)
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
 
-    // Normals
+    // Normals (location = 2)
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
 
+    // Unbind buffers
     glBindVertexArray(0);
-    m_meshBuffers[mesh] = data;
+
+    // Find the first available spot in the mesh data vector
+    bool inserted = false;
+    for (size_t i = 0; i < m_meshData.size(); ++i) {
+        if (m_meshData[i].VAO == 0) {
+            m_meshData[i] = data;
+            mesh->id = i;
+            inserted = true;
+            break;
+        }
+    }
+
+    // If all slots were full, append to end
+    if (!inserted) {
+        m_meshData.push_back(data);
+        mesh->id = m_meshData.size() - 1;
+    }
+
+    // Clear CPU-side mesh data
+    mesh->clearData();
 }
 
 void Renderer::deleteMeshBuffer(const Mesh* mesh) {
-    auto it = m_meshBuffers.find(mesh);
-    if (it != m_meshBuffers.end()) {
-        // Access MeshData directly from the iterator
-        const MeshData& target = it->second;
-
-        // Delete VAO, VBO, and EBO if they exist
-        if (target.VAO) {
-            glDeleteVertexArrays(1, &target.VAO);
-        }
-        if (target.VBO) {
-            glDeleteBuffers(1, &target.VBO);
-        }
-        if (target.EBO) {
-            glDeleteBuffers(1, &target.EBO);
-        }
-
-        // Erase the mesh entry from the map
-        m_meshBuffers.erase(it);
-    } else {
-        std::cerr << "ERROR: Mesh buffer not found." << std::endl;
+    size_t index = mesh->id;
+    if (index >= m_meshData.size() || m_meshData[index].VAO == 0) {
+        std::cerr << "ERROR::RENDERER::DELETE_MESH_BUFFER::Mesh buffer not found.\n";
+        return;
     }
+
+    MeshData& data = m_meshData[index];
+
+    // Delete mesh resources
+    if (data.VAO) {
+        glDeleteVertexArrays(1, &data.VAO);
+        data.VAO = 0;
+    }
+    if (data.VBO) {
+        glDeleteBuffers(1, &data.VBO);
+        data.VBO = 0;
+    }
+    if (data.EBO) {
+        glDeleteBuffers(1, &data.EBO);
+        data.EBO = 0;
+    }
+
+    // Reset counts
+    data.indexCount = 0;
+    data.vertexCount = 0;
 }
 
 /*
@@ -322,43 +346,4 @@ void Renderer::debugGBuffer(const Shader& debugShader, int debugMode) {
 
     // Draw the quad (screen aligned)
     drawQuad();
-}
-
-/*
-* Mesh Attribute Generation
-*/
-void Renderer::generateNormals(const Mesh* mesh, std::vector<glm::vec3>& normals, const std::vector<unsigned int>& indices) {
-    normals.clear();
-    normals.resize(mesh->vertices.size(), glm::vec3(0.0f));
-
-    for (size_t i = 0; i < indices.size(); i += 3) {
-        unsigned int index0 = indices[i];
-        unsigned int index1 = indices[i + 1];
-        unsigned int index2 = indices[i + 2];
-
-        glm::vec3 v0 = mesh->vertices[index0];
-        glm::vec3 v1 = mesh->vertices[index1];
-        glm::vec3 v2 = mesh->vertices[index2];
-
-        glm::vec3 edge1 = v1 - v0;
-        glm::vec3 edge2 = v2 - v0;
-        glm::vec3 faceNormal = glm::normalize(glm::cross(edge1, edge2));
-
-        normals[index0] += faceNormal;
-        normals[index1] += faceNormal;
-        normals[index2] += faceNormal;
-    }
-
-    for (size_t i = 0; i < normals.size(); ++i) {
-        normals[i] = glm::normalize(normals[i]);
-    }
-}
-
-void Renderer::generateUVs(const Mesh* mesh, std::vector<glm::vec2>& uvs) {
-    uvs.reserve(mesh->vertices.size());
-    for (const auto& vertex : mesh->vertices) {
-        float u = (vertex.x + 1.0f) * 0.5f;
-        float v = (vertex.y + 1.0f) * 0.5f;
-        uvs.push_back(glm::vec2(u, v));
-    }
 }

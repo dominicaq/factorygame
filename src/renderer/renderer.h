@@ -1,15 +1,14 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#include <unordered_map>
+#include "shader.h"
+#include "../transform.h"
+#include "../resources/mesh.h"
+
 #include <glad/glad.h>
 
-#include "../transform.h"
-
-#include "shader.h"
-#include "../resources/mesh.h"
 #include <memory>
-#include <map>
+#include <vector>
 
 /*
 * The Renderer class is responsible for handling OpenGL rendering, including
@@ -28,7 +27,7 @@ public:
     /*
     * Initialize and manage mesh buffers
     */
-    void initMeshBuffers(const Mesh* mesh);
+    void initMeshBuffers(Mesh* mesh);
     void deleteMeshBuffer(const Mesh* mesh);
 
     /*
@@ -65,18 +64,14 @@ private:
     unsigned int m_quadVAO;
 
     /*
-    * Mesh buffer storage (mapping each Mesh* to its respective MeshData)
+    * Mesh buffer storage
     */
     struct MeshData {
         unsigned int VAO, VBO, EBO;
+        GLsizei indexCount;
+        GLsizei vertexCount;
     };
-    std::map<const Mesh*, MeshData> m_meshBuffers;
-
-    /*
-    * Mesh attribute generation helpers
-    */
-    void generateNormals(const Mesh* mesh, std::vector<glm::vec3>& normals, const std::vector<unsigned int>& indices);
-    void generateUVs(const Mesh* mesh, std::vector<glm::vec2>& uvs);
+    std::vector<MeshData> m_meshData;
 };
 
-#endif
+#endif // RENDERER_H
