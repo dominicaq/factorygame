@@ -63,21 +63,20 @@ int main() {
     std::vector<Transform> transforms;
 
     // Load first mesh (Stanford Bunny)
-    // Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
-    // if (bunnyMesh != nullptr) {
-    //     meshes.push_back(bunnyMesh);
-    //     transforms.push_back(Transform(glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(5.0f), glm::vec3(0.0f)));
-    //     renderer.initMeshBuffers(bunnyMesh);
-    // }
+    Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
+    if (bunnyMesh != nullptr) {
+        meshes.push_back(bunnyMesh);
+        transforms.push_back(Transform(glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(5.0f), glm::vec3(0.0f)));
+        renderer.initMeshBuffers(bunnyMesh);
+    }
 
     // Load second mesh (Another Model)
-    Mesh* anotherMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
+    Mesh* anotherMesh = ResourceLoader::loadMesh(MODEL_DIR + "atlas.obj");
     if (anotherMesh != nullptr) {
         meshes.push_back(anotherMesh);
-        transforms.push_back(Transform(glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(1.0f), glm::vec3(0.0f)));
+        transforms.push_back(Transform(glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(0.1f), glm::vec3(0.0f)));
         renderer.initMeshBuffers(anotherMesh);
     }
-    // return 0;
 
     // Camera setup
     Camera camera;

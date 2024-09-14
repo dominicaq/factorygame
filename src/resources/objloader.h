@@ -1,185 +1,240 @@
-// #ifndef OBJLOADER_H
-// #define OBJLOADER_H
+#ifndef OBJLOADER_H
+#define OBJLOADER_H
 
-// #include <string>
-// #include <vector>
-// #include <iostream>
-// #include <fstream>
-// #include <sstream>
-// #include <unordered_map>
-// #include <tuple>
-// #include <glm.hpp>
-// #include "mesh.h" // Include your Mesh struct
+#include "mesh.h"
+#include <glm.hpp>
 
-// // Function to load an OBJ file and return a Mesh object
-// inline Mesh* loadOBJ(const std::string& filepath) {
-//     // Temporary storage for parsing
-//     std::vector<glm::vec3> temp_positions;
-//     std::vector<glm::vec2> temp_uvs;
-//     std::vector<glm::vec3> temp_normals;
+#include <string>
+#include <vector>
+#include <iostream>
+#include <sstream>
+#include <unordered_map>
 
-//     struct Face {
-//         unsigned int positionIndices[3];
-//         unsigned int uvIndices[3];
-//         unsigned int normalIndices[3];
-//     };
+namespace ObjLoader {
 
-//     std::vector<Face> faces;
+/*
+*  Struct and Hashing
+*/
+struct VertexIdx {
+    unsigned int vertex_idx;
+    int uv_idx;
+    int normal_idx;
 
-//     // Read the OBJ file content
-//     std::ifstream file(filepath);
-//     if (!file.is_open()) {
-//         std::cerr << "ERROR::OBJLOADER::Failed to read OBJ file: " << filepath << "\n";
-//         return nullptr;
-//     }
+    bool operator==(const VertexIdx& other) const {
+        return vertex_idx == other.vertex_idx &&
+               uv_idx == other.uv_idx &&
+               normal_idx == other.normal_idx;
+    }
+};
 
-//     std::string line;
-//     while (std::getline(file, line)) {
-//         if (line.empty()) {
-//             continue;
-//         }
+struct VertexIdxHash {
+    size_t operator()(const VertexIdx& vi) const {
+        return ((std::hash<unsigned int>()(vi.vertex_idx) ^
+                (std::hash<int>()(vi.uv_idx) << 1)) >> 1) ^
+               (std::hash<int>()(vi.normal_idx) << 1);
+    }
+};
 
-//         // Parse each line
-//         std::istringstream sstream(line);
-//         std::string type;
-//         sstream >> type;
+/*
+* Parsing context that holds temporary data and maps for OBJ parsing
+*/
+struct OBJParseCtx {
+    Mesh& mesh;
+    std::vector<glm::vec3> temp_vertices;
+    std::vector<glm::vec2> temp_uvs;
+    std::vector<glm::vec3> temp_normals;
+    std::unordered_map<VertexIdx, unsigned int, VertexIdxHash> vertexMap;
 
-//         if (type == "v") {
-//             // Vertex position
-//             glm::vec3 vertex;
-//             sstream >> vertex.x >> vertex.y >> vertex.z;
-//             temp_positions.push_back(vertex);
-//         } else if (type == "vt") {
-//             // Texture coordinates (UVs)
-//             glm::vec2 uv;
-//             sstream >> uv.x >> uv.y;
-//             temp_uvs.push_back(uv);
-//         } else if (type == "vn") {
-//             // Vertex normal
-//             glm::vec3 normal;
-//             sstream >> normal.x >> normal.y >> normal.z;
-//             temp_normals.push_back(normal);
-//         } else if (type == "f") {
-//             // Face
-//             Face face;
-//             std::string vertexData;
+    OBJParseCtx(Mesh& m)
+        : mesh(m) {}
+};
 
-//             // Process the 3 vertices that make up a triangle face
-//             for (int i = 0; i < 3; i++) {
-//                 if (!(sstream >> vertexData)) {
-//                     std::cerr << "ERROR::OBJLOADER::Invalid face data in file: " << filepath << "\n";
-//                     // delete mesh;
-//                     return nullptr;
-//                 }
+/*
+*  Forward Declarations
+*/
+static void parseVertexString(const std::string& vertex_string, unsigned int& vertex_idx, int& uv_idx, int& normal_idx);
+static unsigned int processVertex(VertexIdx& vi, OBJParseCtx& ctx);
+static void parseOBJLine(const std::string& line, OBJParseCtx& ctx);
+inline void generateNormals(Mesh* mesh);
+inline void generateUVs(Mesh* mesh);
 
-//                 std::stringstream faceStream(vertexData);
-//                 std::string indexToken;
-//                 int count = 0;
+/*
+*  Main OBJ Loading
+*/
+static Mesh* loadOBJ(const std::string& fileContent) {
+    if (fileContent.empty()) {
+        std::cerr << "ERROR::OBJ_LOADER::File content is empty\n";
+        return nullptr;
+    }
 
-//                 // Initialize indices to max value to indicate missing data
-//                 face.positionIndices[i] = std::numeric_limits<unsigned int>::max();
-//                 face.uvIndices[i] = std::numeric_limits<unsigned int>::max();
-//                 face.normalIndices[i] = std::numeric_limits<unsigned int>::max();
+    Mesh* mesh = new Mesh();
+    OBJParseCtx ctx(*mesh);
 
-//                 // Parse the vertex/uv/normal indices
-//                 while (std::getline(faceStream, indexToken, '/')) {
-//                     if (!indexToken.empty()) {
-//                         unsigned int index = static_cast<unsigned int>(std::stoi(indexToken)) - 1; // OBJ indices start at 1
-//                         if (count == 0)
-//                             face.positionIndices[i] = index;
-//                         else if (count == 1)
-//                             face.uvIndices[i] = index;
-//                         else if (count == 2)
-//                             face.normalIndices[i] = index;
-//                     }
-//                     count++;
-//                 }
-//             }
-//             faces.push_back(face);
-//         }
-//     }
+    std::istringstream fileStream(fileContent);
+    std::string line;
+    while (std::getline(fileStream, line)) {
+        parseOBJLine(line, ctx);
+    }
 
-//     file.close();
+    // Generate UVs and normals if they were not present in the file
+    if (mesh->uvs.empty() || mesh->uvs[0] == glm::vec2()) {
+        generateUVs(mesh);
+    }
 
-//     // Reconstruct mesh with unique vertices
-//     Mesh* mesh = new Mesh();
-//     std::unordered_map<std::tuple<unsigned int, unsigned int, unsigned int>, unsigned int> vertexToIndex;
+    if (mesh->normals.empty() || mesh->normals[0] == glm::vec3()) {
+        generateNormals(mesh);
+    }
 
-//     for (const auto& face : faces) {
-//         for (int i = 0; i < 3; i++) {
-//             unsigned int positionIndex = face.positionIndices[i];
-//             unsigned int uvIndex = face.uvIndices[i];
-//             unsigned int normalIndex = face.normalIndices[i];
+    return mesh;
+}
 
-//             // Create a key for the vertex combination
-//             auto key = std::make_tuple(positionIndex, uvIndex, normalIndex);
+/*
+*  Parsing
+*/
+static void parseVertexString(const std::string& vertex_string, unsigned int& vertex_idx, int& uv_idx, int& normal_idx) {
+    std::istringstream vertex_stream(vertex_string);
 
-//             auto it = vertexToIndex.find(key);
-//             if (it != vertexToIndex.end()) {
-//                 // Vertex already exists
-//                 mesh->indices.push_back(it->second);
-//             } else {
-//                 // New unique vertex
-//                 glm::vec3 position = (positionIndex != std::numeric_limits<unsigned int>::max() && positionIndex < temp_positions.size())
-//                     ? temp_positions[positionIndex]
-//                     : glm::vec3(0.0f);
+    vertex_stream >> vertex_idx;
 
-//                 glm::vec2 uv = (uvIndex != std::numeric_limits<unsigned int>::max() && uvIndex < temp_uvs.size())
-//                     ? temp_uvs[uvIndex]
-//                     : glm::vec2(0.0f);
+    if (vertex_string.find('/') != std::string::npos) {
+        char delimiter;
+        vertex_stream >> delimiter;
 
-//                 glm::vec3 normal = (normalIndex != std::numeric_limits<unsigned int>::max() && normalIndex < temp_normals.size())
-//                     ? temp_normals[normalIndex]
-//                     : glm::vec3(0.0f);
+        if (vertex_stream.peek() != '/') {
+            vertex_stream >> uv_idx;
+        }
 
-//                 mesh->vertices.push_back(position);
-//                 mesh->uvs.push_back(uv);
-//                 mesh->normals.push_back(normal);
+        if (vertex_stream.peek() == '/') {
+            vertex_stream >> delimiter;  // Move to normal if present
+            vertex_stream >> normal_idx;
+        }
+    }
+}
 
-//                 unsigned int newIndex = static_cast<unsigned int>(mesh->vertices.size()) - 1;
-//                 mesh->indices.push_back(newIndex);
-//                 vertexToIndex[key] = newIndex;
-//             }
-//         }
-//     }
+/*
+* Function to handle a parsed vertex and add it to the mesh if it's new
+*/
+static unsigned int processVertex(VertexIdx& vi, OBJParseCtx& ctx) {
+    // Check if this vertex has already been processed
+    if (ctx.vertexMap.find(vi) != ctx.vertexMap.end()) {
+        return ctx.vertexMap[vi];
+    }
 
-//     return mesh;
-// }
+    // Add new vertex
+    ctx.mesh.vertices.push_back(ctx.temp_vertices[vi.vertex_idx]);
 
-// /*
-// * Generator functions
-// */
-// inline void generateNormals(Mesh* mesh) {
-//     for (size_t i = 0; i < mesh->indices.size(); i += 3) {
-//         unsigned int index0 = mesh->indices[i];
-//         unsigned int index1 = mesh->indices[i + 1];
-//         unsigned int index2 = mesh->indices[i + 2];
+    // If UVs are present, reserve space but don't assign default values
+    if (vi.uv_idx >= 0 && vi.uv_idx < static_cast<int>(ctx.temp_uvs.size())) {
+        ctx.mesh.uvs.push_back(ctx.temp_uvs[vi.uv_idx]);
+    } else {
+        ctx.mesh.uvs.push_back(glm::vec2()); // UVs will be generated later
+    }
 
-//         glm::vec3& v0 = mesh->vertices[index0];
-//         glm::vec3& v1 = mesh->vertices[index1];
-//         glm::vec3& v2 = mesh->vertices[index2];
+    // If normals are present, reserve space but don't assign default values
+    if (vi.normal_idx >= 0 && vi.normal_idx < static_cast<int>(ctx.temp_normals.size())) {
+        ctx.mesh.normals.push_back(ctx.temp_normals[vi.normal_idx]);
+    } else {
+        ctx.mesh.normals.push_back(glm::vec3()); // Normals will be generated later
+    }
 
-//         glm::vec3 edge1 = v1 - v0;
-//         glm::vec3 edge2 = v2 - v0;
-//         glm::vec3 faceNormal = glm::normalize(glm::cross(edge1, edge2));
+    unsigned int new_idx = static_cast<unsigned int>(ctx.mesh.vertices.size() - 1);
+    ctx.vertexMap[vi] = new_idx;
 
-//         mesh->normals[index0] += faceNormal;
-//         mesh->normals[index1] += faceNormal;
-//         mesh->normals[index2] += faceNormal;
-//     }
+    return new_idx;
+}
 
-//     // Normalize the normals
-//     for (size_t i = 0; i < mesh->normals.size(); ++i) {
-//         mesh->normals[i] = glm::normalize(mesh->normals[i]);
-//     }
-// }
+static void parseOBJLine(const std::string& line, OBJParseCtx& ctx) {
+    std::istringstream s(line);
+    std::string token;
+    s >> token;
 
-// inline void generateUVs(Mesh* mesh) {
-//     for (size_t i = 0; i < mesh->vertices.size(); ++i) {
-//         float u = (mesh->vertices[i].x + 1.0f) * 0.5f;
-//         float v = (mesh->vertices[i].y + 1.0f) * 0.5f;
-//         mesh->uvs[i] = glm::vec2(u, v);
-//     }
-// }
+    if (token == "v") {
+        // Vertex position
+        glm::vec3 vertex;
+        s >> vertex.x >> vertex.y >> vertex.z;
+        ctx.temp_vertices.push_back(vertex);
+    } else if (token == "vt") {
+        // Texture coordinate
+        glm::vec2 uv;
+        s >> uv.x >> uv.y;
+        ctx.temp_uvs.push_back(uv);
+    } else if (token == "vn") {
+        // Vertex normal
+        glm::vec3 normal;
+        s >> normal.x >> normal.y >> normal.z;
+        ctx.temp_normals.push_back(normal);
+    } else if (token == "f") {
+        // Face
+        std::string vertex_string;
+        std::vector<unsigned int> face_indices;
 
-// #endif // OBJLOADER_H
+        while (s >> vertex_string) {
+            unsigned int vertex_idx = 0;
+            int uv_idx = -1;
+            int normal_idx = -1;
+
+            parseVertexString(vertex_string, vertex_idx, uv_idx, normal_idx);
+
+            // Adjust indices to be zero-based
+            VertexIdx vi = {
+                vertex_idx - 1,
+                uv_idx - 1,
+                normal_idx - 1
+            };
+
+            unsigned int idx = processVertex(vi, ctx);
+            face_indices.push_back(idx);
+        }
+
+        // Triangulate face
+        for (size_t i = 1; i + 1 < face_indices.size(); i++) {
+            ctx.mesh.indices.push_back(face_indices[0]);
+            ctx.mesh.indices.push_back(face_indices[i]);
+            ctx.mesh.indices.push_back(face_indices[i + 1]);
+        }
+    }
+}
+
+/*
+*  Mesh data generators
+*/
+inline void generateNormals(Mesh* mesh) {
+    mesh->normals.resize(mesh->vertices.size(), glm::vec3(0.0f));
+
+    for (size_t i = 0; i < mesh->indices.size(); i += 3) {
+        unsigned int idx0 = mesh->indices[i];
+        unsigned int idx1 = mesh->indices[i + 1];
+        unsigned int idx2 = mesh->indices[i + 2];
+
+        glm::vec3& v0 = mesh->vertices[idx0];
+        glm::vec3& v1 = mesh->vertices[idx1];
+        glm::vec3& v2 = mesh->vertices[idx2];
+
+        glm::vec3 edge1 = v1 - v0;
+        glm::vec3 edge2 = v2 - v0;
+        glm::vec3 faceNormal = glm::normalize(glm::cross(edge1, edge2));
+
+        mesh->normals[idx0] += faceNormal;
+        mesh->normals[idx1] += faceNormal;
+        mesh->normals[idx2] += faceNormal;
+    }
+
+    // Normalize the normals
+    for (size_t i = 0; i < mesh->normals.size(); ++i) {
+        mesh->normals[i] = glm::normalize(mesh->normals[i]);
+    }
+}
+
+inline void generateUVs(Mesh* mesh) {
+    mesh->uvs.resize(mesh->vertices.size());
+
+    for (size_t i = 0; i < mesh->vertices.size(); ++i) {
+        float u = (mesh->vertices[i].x + 1.0f) * 0.5f;
+        float v = (mesh->vertices[i].y + 1.0f) * 0.5f;
+        mesh->uvs[i] = glm::vec2(u, v);
+    }
+}
+
+} // namespace ObjLoader
+
+#endif // OBJLOADER_H
