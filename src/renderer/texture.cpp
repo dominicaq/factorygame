@@ -11,9 +11,12 @@ Texture::Texture(const std::string& filePath) : m_textureID(0), width(0), height
         // Determine the correct format based on the number of channels
         GLenum format;
         GLenum internalFormat;
+        bool isGrayscale = false;
+
         if (nrChannels == 1) {
             format = GL_RED;
             internalFormat = GL_R8;
+            isGrayscale = true;
         } else if (nrChannels == 3) {
             format = GL_RGB;
             internalFormat = GL_RGB8;
@@ -34,12 +37,18 @@ Texture::Texture(const std::string& filePath) : m_textureID(0), width(0), height
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-        // Set texture filtering parameters to NEAREST
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        // Set texture filtering parameters
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);  // Use linear filtering for better quality
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         // Upload the texture data to the GPU
         glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+
+        // If the texture is grayscale, set texture swizzle parameters to replicate the red channel to RGB
+        if (isGrayscale) {
+            GLint swizzleMask[] = {GL_RED, GL_RED, GL_RED, GL_ONE};
+            glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, swizzleMask);
+        }
 
         // Generate mipmaps for the texture
         glGenerateMipmap(GL_TEXTURE_2D);

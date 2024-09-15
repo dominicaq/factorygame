@@ -1,36 +1,39 @@
-// Material.h
-#pragma once
-#include <glm/glm.hpp>
+#ifndef MATERIAL_H
+#define MATERIAL_H
+
 #include "shader.h"
 #include "texture.h"
 
-struct Material {
-    std::shared_ptr<Shader> shader;
-    glm::vec3 diffuseColor;
-    glm::vec3 specularColor;
-    float shininess;
-    Texture* diffuseTexture;
-    Texture* specularTexture;
+#include <glm.hpp>
+#include <memory>
 
-    Material(std::shared_ptr<Shader> shader)
-        : shader(shader), diffuseColor(1.0f), specularColor(1.0f), shininess(32.0f) {}
+struct Material {
+    Shader* shader = nullptr;
+
+    // Diffuse
+    Texture* albedoTexture = nullptr;
+    glm::vec3 albedoColor = glm::vec3(1.0f);
+
+    // Specular
+    float shininess = 32.0f;
+    Texture* specularTexture = nullptr;
+    glm::vec3 specularColor = glm::vec3(1.0f);
+
+    Material(Shader* shader) : shader(shader) {}
 
     void bind() const {
-        shader->use();
-        shader->setVec3("u_DiffuseColor", diffuseColor);
-        shader->setVec3("u_SpecularColor", specularColor);
-        shader->setFloat("u_Shininess", shininess);
+        shader->use();  // Ensure the shader is active
 
-        // Bind the diffuse texture if available
-        if (diffuseTexture) {
-            shader->setInt("u_DiffuseTexture", 0);  // Texture unit 0
-            diffuseTexture->bind(0);
-        }
+        // Bind the albedo color uniform
+        shader->setVec3("u_AlbedoColor", albedoColor);  // Ensure the uniform name matches
 
-        // Bind the specular texture if available
-        if (specularTexture) {
-            shader->setInt("u_SpecularTexture", 1);  // Texture unit 1
-            specularTexture->bind(1);
+        // Bind the albedo texture if it exists
+        if (albedoTexture) {
+            shader->setInt("u_AlbedoTexture", 0);
+            albedoTexture->bind(0);
         }
     }
+
 };
+
+#endif // MATERIAL_H

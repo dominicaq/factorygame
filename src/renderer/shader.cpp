@@ -66,6 +66,11 @@ Shader::~Shader() {
 * Shader management
 */
 void Shader::use() const {
+    if (m_ID == 0) {
+        std::cerr << "ERROR::SHADER::USE_FAILED: Shader program is not initialized\n";
+        return;
+    }
+
     if (glIsProgram(m_ID)) {
         glUseProgram(m_ID);
     } else {

@@ -1,8 +1,8 @@
 #version 330 core
 
-layout (location = 0) in vec3 aPos;   // Vertex position
-layout (location = 1) in vec2 aTexCoords; // Texture coordinates
-layout (location = 2) in vec3 aNormal; // Vertex normal
+layout (location = 0) in vec3 aPos;        // Vertex position
+layout (location = 1) in vec3 aNormal;     // Vertex normal
+layout (location = 2) in vec2 aTexCoords;  // Texture coordinates
 
 out vec3 FragPos;
 out vec2 TexCoords;

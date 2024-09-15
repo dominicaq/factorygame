@@ -1,15 +1,20 @@
 #ifndef MESH_H
 #define MESH_H
 
-#include <vector>
 #include <glm.hpp>
+#include "../renderer/material.h"
+
+#include <vector>
 
 struct Mesh {
+    // Mesh data
     size_t id = SIZE_MAX;
     std::vector<glm::vec3> vertices;
     std::vector<glm::vec2> uvs;
     std::vector<glm::vec3> normals;
     std::vector<unsigned int> indices;
+
+    Material* material = nullptr;
 
     // Method to clear CPU-side mesh data
     void clearData() {

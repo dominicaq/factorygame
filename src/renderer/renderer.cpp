@@ -122,6 +122,20 @@ void Renderer::geometryPass(const Shader& shader, const std::vector<Mesh*>& mesh
         glm::mat4 model = transform.getModelMatrix();
         shader.setMat4("u_Model", model);
 
+        // Create Material map(s)
+        if (mesh->material) {
+            // Set the albedo color
+            shader.setVec3("u_AlbedoColor", mesh->material->albedoColor);
+
+            // Set the texture unit to 0 for the shader's sampler uniform
+            shader.setInt("u_AlbedoTexture", 0);
+
+            // Bind the albedo texture to texture unit 0
+            if (mesh->material->albedoTexture) {
+                mesh->material->albedoTexture->bind(0);
+            }
+        }
+
         // Draw the mesh
         draw(mesh);
     }
@@ -214,13 +228,13 @@ void Renderer::initMeshBuffers(Mesh* mesh) {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(0));
 
-    // UVs (location = 1)
+    // Normals (location = 1)
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
 
-    // Normals (location = 2)
+    // UVs (location = 2)
     glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
 
     // Unbind buffers
     glBindVertexArray(0);
@@ -269,9 +283,8 @@ void Renderer::deleteMeshBuffer(const Mesh* mesh) {
         data.EBO = 0;
     }
 
-    // Reset counts
-    data.indexCount = 0;
-    data.vertexCount = 0;
+    // Reset mesh at index (this will leave a hole in the array)
+    m_meshData[index] = MeshData{};
 }
 
 /*

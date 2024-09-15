@@ -52,15 +52,6 @@ bool Window::init() {
 }
 
 /*
- * Input Handling
- */
-void Window::processInput() {
-    if (glfwGetKey(m_window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-        glfwSetWindowShouldClose(m_window, true);
-    }
-}
-
-/*
  * Window State
  */
 bool Window::shouldClose() const {
@@ -95,6 +86,10 @@ void Window::resize(int newWidth, int newHeight) {
         Renderer* renderer = static_cast<Renderer*>(m_renderer);
         renderer->resizeGBuffer(framebufferWidth, framebufferHeight);
     }
+}
+
+GLFWwindow* Window::getGLFWwindow() {
+    return m_window;
 }
 
 /*

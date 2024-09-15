@@ -42,6 +42,53 @@ struct Camera {
     }
 };
 
+void loadScene(std::vector<Mesh*>& meshes, std::vector<Transform>& transforms, Renderer* renderer) {
+    // Create shader for both models
+    std::string vertexPath = SHADER_DIR + "default.vs";
+    std::string fragmentPath = SHADER_DIR + "default.fs";
+    Shader* basicShader = new Shader(vertexPath, fragmentPath);
+
+    // --------------------- Stanford Bunny Model ---------------------
+
+    // Create material for the Stanford Bunny
+    Material* bunnyMaterial = new Material(basicShader);
+    bunnyMaterial->albedoColor = glm::vec3(1.0f, 0.5f, 0.31f);
+
+    // Load diffuse texture for the Stanford Bunny
+    std::string bunnyTexturePath = TEXTURE_DIR + "uv_map.jpg";
+    Texture* bunnyAlbedoTexture = new Texture(bunnyTexturePath);
+    bunnyMaterial->albedoTexture = bunnyAlbedoTexture;
+
+    // Load Stanford Bunny mesh
+    Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
+    if (bunnyMesh != nullptr) {
+        bunnyMesh->material = bunnyMaterial;
+        meshes.push_back(bunnyMesh);
+        transforms.push_back(Transform(glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(5.0f), glm::vec3(0.0f)));
+        renderer->initMeshBuffers(bunnyMesh);
+    }
+
+    // --------------------- Atlas Model ---------------------
+
+    // Create material for the Atlas model
+    Material* atlasMaterial = new Material(basicShader);
+    atlasMaterial->albedoColor = glm::vec3(0.7f, 0.7f, 0.7f);
+
+    // Load diffuse texture for the Atlas model
+    std::string atlasTexturePath = TEXTURE_DIR + "uv_map.jpg";
+    Texture* atlasAlbedoTexture = new Texture(atlasTexturePath);
+    atlasMaterial->albedoTexture = atlasAlbedoTexture;
+
+    // Load Atlas mesh
+    Mesh* atlasMesh = ResourceLoader::loadMesh(MODEL_DIR + "atlas.obj");
+    if (atlasMesh != nullptr) {
+        atlasMesh->material = atlasMaterial;
+        meshes.push_back(atlasMesh);
+        transforms.push_back(Transform(glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(0.1f), glm::vec3(0.0f)));
+        renderer->initMeshBuffers(atlasMesh);
+    }
+}
+
 int main() {
     // Initialize window
     Window window("Factory Game", SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -61,22 +108,7 @@ int main() {
     // Load meshes and store them in a vector
     std::vector<Mesh*> meshes;
     std::vector<Transform> transforms;
-
-    // Load first mesh (Stanford Bunny)
-    Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
-    if (bunnyMesh != nullptr) {
-        meshes.push_back(bunnyMesh);
-        transforms.push_back(Transform(glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(5.0f), glm::vec3(0.0f)));
-        renderer.initMeshBuffers(bunnyMesh);
-    }
-
-    // Load second mesh (Another Model)
-    Mesh* anotherMesh = ResourceLoader::loadMesh(MODEL_DIR + "atlas.obj");
-    if (anotherMesh != nullptr) {
-        meshes.push_back(anotherMesh);
-        transforms.push_back(Transform(glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(0.1f), glm::vec3(0.0f)));
-        renderer.initMeshBuffers(anotherMesh);
-    }
+    loadScene(meshes, transforms, &renderer);
 
     // Camera setup
     Camera camera;
@@ -98,6 +130,7 @@ int main() {
     float lastFrame = 0.0f;
 
     // Main render loop
+    int debugMode = 0;
     while (!window.shouldClose()) {
         // Calculate delta time
         float currentFrame = glfwGetTime();
@@ -105,26 +138,39 @@ int main() {
         lastFrame = currentFrame;
 
         // Process input
-        window.processInput();
+        GLFWwindow* glfwWindow = window.getGLFWwindow();
+        if (glfwGetKey(glfwWindow, GLFW_KEY_1) == GLFW_PRESS) {
+            debugMode = 0;
+        }
+        if (glfwGetKey(glfwWindow, GLFW_KEY_2) == GLFW_PRESS) {
+            debugMode = 1;
+        }
+        if (glfwGetKey(glfwWindow, GLFW_KEY_3) == GLFW_PRESS) {
+            debugMode = 2;
+        }
+        if (glfwGetKey(glfwWindow, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+            glfwSetWindowShouldClose(glfwWindow, true);
+        }
 
         // Rotate all meshes in the Y axis based on delta time
-        for (auto& transform : transforms) {
+        for (Transform& transform : transforms) {
             transform.eulerAngles.y += deltaTime * 10.0f;
         }
 
         // Get view matrix from the camera
         glm::mat4 view = camera.getViewMatrix();
 
-        // Geometry pass (write to G-buffer)
+        // Render passes
         gBufferShader.use();
         gBufferShader.setMat4("u_View", view);
         gBufferShader.setMat4("u_Projection", projection);
         renderer.geometryPass(gBufferShader, meshes, transforms);
 
-        // Debug pass (render the G-buffer)
-        renderer.debugGBuffer(debugShader, 1);
+        // TODO: Lighting pass
 
-        // Swap buffers and poll events
+        // Final pass (draw to screen)
+        renderer.debugGBuffer(debugShader, debugMode);
+
         window.swapBuffersAndPollEvents();
     }
 

@@ -14,11 +14,6 @@ public:
     bool init();
 
     /*
-     * Input Handling
-     */
-    void processInput();
-
-    /*
      * Window State
      */
     bool shouldClose() const;
@@ -32,6 +27,7 @@ public:
      * Window Management
      */
     void resize(int newWidth, int newHeight);
+    GLFWwindow* getGLFWwindow();
 
     /*
      * Attach a renderer for G-buffer resizing
