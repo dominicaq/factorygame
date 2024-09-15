@@ -100,11 +100,6 @@ int main() {
     Renderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT);
     window.setRenderer(&renderer);
 
-    // Geometry Pass Shader (for writing to G-buffer)
-    std::string gBufferVertexPath = SHADER_DIR + "deferred/gbuff.vs";
-    std::string gBufferFragmentPath = SHADER_DIR + "deferred/gbuff.fs";
-    Shader gBufferShader(gBufferVertexPath, gBufferFragmentPath);
-
     // Load meshes and store them in a vector
     std::vector<Mesh*> meshes;
     std::vector<Transform> transforms;
@@ -161,10 +156,7 @@ int main() {
         glm::mat4 view = camera.getViewMatrix();
 
         // Render passes
-        gBufferShader.use();
-        gBufferShader.setMat4("u_View", view);
-        gBufferShader.setMat4("u_Projection", projection);
-        renderer.geometryPass(gBufferShader, meshes, transforms);
+        renderer.geometryPass(meshes, transforms, view, projection);
 
         // TODO: Lighting pass
 

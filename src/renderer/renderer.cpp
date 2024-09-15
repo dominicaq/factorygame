@@ -3,7 +3,16 @@
 
 Renderer::Renderer(int width, int height) {
     initOpenGLState();
+
     initGBuffer(width, height);
+    // Geometry Pass Shader (Expecting this to be fixed, so will be created here)
+    std::string gBufferVertexPath = ASSET_DIR "shaders/deferred/gbuff.vs";
+    std::string gBufferFragmentPath = ASSET_DIR "shaders/deferred/gbuff.fs";
+    bool shaderStatus = m_gBufferShader.load(gBufferVertexPath, gBufferFragmentPath);
+    if (shaderStatus == false) {
+        std::cerr << "Failed to create gBufferShader!\n";
+    }
+
     initQuad();
 }
 
@@ -107,12 +116,18 @@ void Renderer::resizeGBuffer(int width, int height) {
     initGBuffer(width, height);
 }
 
-void Renderer::geometryPass(const Shader& shader, const std::vector<Mesh*>& meshes, const std::vector<Transform>& transforms) {
+void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
+    const std::vector<Transform>& transforms,
+    const glm::mat4& view,
+    const glm::mat4& projection)
+{
     // Bind and clear framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    shader.use();
+    m_gBufferShader.use();
+    m_gBufferShader.setMat4("u_View", view);
+    m_gBufferShader.setMat4("u_Projection", projection);
 
     for (size_t i = 0; i < meshes.size(); ++i) {
         const Mesh* mesh = meshes[i];
@@ -120,17 +135,15 @@ void Renderer::geometryPass(const Shader& shader, const std::vector<Mesh*>& mesh
 
         // Set model matrix
         glm::mat4 model = transform.getModelMatrix();
-        shader.setMat4("u_Model", model);
+        m_gBufferShader.setMat4("u_Model", model);
 
         // Create Material map(s)
         if (mesh->material) {
             // Set the albedo color
-            shader.setVec3("u_AlbedoColor", mesh->material->albedoColor);
+            m_gBufferShader.setVec3("u_AlbedoColor", mesh->material->albedoColor);
 
             // Set the texture unit to 0 for the shader's sampler uniform
-            shader.setInt("u_AlbedoTexture", 0);
-
-            // Bind the albedo texture to texture unit 0
+            m_gBufferShader.setInt("u_AlbedoTexture", 0);
             if (mesh->material->albedoTexture) {
                 mesh->material->albedoTexture->bind(0);
             }

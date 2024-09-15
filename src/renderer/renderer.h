@@ -34,7 +34,10 @@ public:
     * G-Buffer management for deferred rendering
     */
     void resizeGBuffer(int width, int height);
-    void geometryPass(const Shader& shader, const std::vector<Mesh*>& meshes, const std::vector<Transform>& transforms);
+    void geometryPass(const std::vector<Mesh*>& meshes,
+        const std::vector<Transform>& transforms,
+        const glm::mat4& view,
+        const glm::mat4& projection);
 
     /*
     * Quad rendering (used for post-processing, G-buffer display, etc.)
@@ -52,16 +55,20 @@ private:
     void initGBuffer(int width, int height);
 
     /*
+    * Render Quad
+    */
+    unsigned int m_quadVAO;
+
+    /*
     * G-buffer resources
     */
     unsigned int m_gBuffer;
-    unsigned int m_gPosition, m_gNormal, m_gAlbedo;
+    unsigned int m_gPosition;
+    unsigned int m_gNormal;
+    unsigned int m_gAlbedo;
     unsigned int m_rboDepth;
 
-    /*
-    * Screen-aligned quad for G-buffer rendering and post-processing
-    */
-    unsigned int m_quadVAO;
+    Shader m_gBufferShader;
 
     /*
     * Mesh buffer storage
@@ -71,6 +78,7 @@ private:
         GLsizei indexCount;
         GLsizei vertexCount;
     };
+
     std::vector<MeshData> m_meshData;
 };
 
