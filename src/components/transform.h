@@ -1,5 +1,6 @@
 // TEMPORARY IMPLEMENTATION
-#pragma once
+#ifndef TRANSFORM_H
+#define TRANSFORM_H
 
 #include "glm.hpp"
 #include "gtc/matrix_transform.hpp"
@@ -30,3 +31,5 @@ public:
         return model;
     }
 };
+
+#endif // TRANSFORM_H

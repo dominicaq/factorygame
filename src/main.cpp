@@ -1,19 +1,23 @@
 #include "system/window.h"
 
-#include "renderer/shader.h"
-#include "renderer/renderer.h"
-#include "renderer/texture.h"
-
-#include "resources/mesh.h"
-#include "resources/meshgen.h"
-#include "resources/resource_loader.h"
-
+// Math
 #include "glm.hpp"
 #include "gtc/matrix_transform.hpp"
 #include "gtc/type_ptr.hpp"
 
-// TEMPORARY
-#include "transform.h"
+// Renderer
+#include "renderer/shader.h"
+#include "renderer/renderer.h"
+#include "renderer/texture.h"
+
+// Components
+#include "components/mesh.h"
+#include "components/transform.h"
+#include "components/light.h"
+
+// Resources
+#include "resources/meshgen.h"
+#include "resources/resource_loader.h"
 
 #include <string>
 #include <vector>
@@ -64,15 +68,15 @@ void processCameraInput(GLFWwindow* window, Camera& camera, float deltaTime) {
     front.z = sin(glm::radians(camera.eulerAngles.y)) * cos(glm::radians(camera.eulerAngles.x));
     front = glm::normalize(front);
 
-    glm::vec3 right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))); // Right vector
-    glm::vec3 up = glm::normalize(glm::cross(right, front));                           // Up vector
+    glm::vec3 right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
+    glm::vec3 up = glm::normalize(glm::cross(right, front));
 
     // Get the current mouse position once on startup
     static bool firstMouse = true;
     static double lastX, lastY;
 
     if (firstMouse) {
-        glfwGetCursorPos(window, &lastX, &lastY);  // Initialize to the current mouse position
+        glfwGetCursorPos(window, &lastX, &lastY);
         firstMouse = false;
     }
 
@@ -95,15 +99,15 @@ void processCameraInput(GLFWwindow* window, Camera& camera, float deltaTime) {
     glfwGetCursorPos(window, &mouseX, &mouseY);
 
     float xOffset = (mouseX - lastX) * sensitivity;
-    float yOffset = (lastY - mouseY) * sensitivity;  // Inverted for typical FPS controls
+    float yOffset = (lastY - mouseY) * sensitivity;
 
     lastX = mouseX;
     lastY = mouseY;
 
     // Apply only if there is movement
     if (glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED) {
-        camera.eulerAngles.y += xOffset;  // Yaw (left/right rotation)
-        camera.eulerAngles.x += yOffset;  // Pitch (up/down rotation)
+        camera.eulerAngles.y += xOffset;
+        camera.eulerAngles.x += yOffset;
 
         // Constrain the pitch to avoid gimbal lock
         if (camera.eulerAngles.x > 89.0f) {
@@ -115,24 +119,24 @@ void processCameraInput(GLFWwindow* window, Camera& camera, float deltaTime) {
     }
 }
 
-void loadScene(std::vector<Mesh*>& meshes, std::vector<Transform>& transforms, Renderer* renderer) {
+void loadScene(std::vector<Mesh*>& meshes,
+               std::vector<Transform>& transforms,
+               Renderer* renderer,
+               LightSystem& lightSystem)
+{
     // Create shader for both models
     std::string vertexPath = SHADER_DIR + "default.vs";
     std::string fragmentPath = SHADER_DIR + "default.fs";
     Shader* basicShader = new Shader(vertexPath, fragmentPath);
 
     // --------------------- Stanford Bunny Model ---------------------
-
-    // Create material for the Stanford Bunny
     Material* bunnyMaterial = new Material(basicShader);
     bunnyMaterial->albedoColor = glm::vec3(1.0f, 0.5f, 0.31f);
 
-    // Load diffuse texture for the Stanford Bunny
     std::string bunnyTexturePath = TEXTURE_DIR + "uv_map.jpg";
     Texture* bunnyAlbedoTexture = new Texture(bunnyTexturePath);
     bunnyMaterial->albedoTexture = bunnyAlbedoTexture;
 
-    // Load Stanford Bunny mesh
     Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
     if (bunnyMesh != nullptr) {
         bunnyMesh->material = bunnyMaterial;
@@ -141,24 +145,72 @@ void loadScene(std::vector<Mesh*>& meshes, std::vector<Transform>& transforms, R
         renderer->initMeshBuffers(bunnyMesh);
     }
 
-    // --------------------- Atlas Model ---------------------
+    // --------------------- Diablo Model ---------------------
+    Material* diabloMaterial = new Material(basicShader);
+    diabloMaterial->albedoColor = glm::vec3(0.7f, 0.7f, 0.7f);
 
-    // Create material for the Atlas model
-    Material* atlasMaterial = new Material(basicShader);
-    atlasMaterial->albedoColor = glm::vec3(0.7f, 0.7f, 0.7f);
+    std::string diabloTexturePath = TEXTURE_DIR + "diablo/diablo3_pose_diffuse.tga";
+    Texture* diabloTexture = new Texture(diabloTexturePath);
+    diabloMaterial->albedoTexture = diabloTexture;
 
-    // Load diffuse texture for the Atlas model
-    std::string atlasTexturePath = TEXTURE_DIR + "uv_map.jpg";
-    Texture* atlasAlbedoTexture = new Texture(atlasTexturePath);
-    atlasMaterial->albedoTexture = atlasAlbedoTexture;
+    Mesh* diabloModel = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
+    if (diabloModel != nullptr) {
+        diabloModel->material = diabloMaterial;
+        meshes.push_back(diabloModel);
+        transforms.push_back(Transform(glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(2.0f), glm::vec3(0.0f)));
+        renderer->initMeshBuffers(diabloModel);
+    }
 
-    // Load Atlas mesh
-    Mesh* atlasMesh = ResourceLoader::loadMesh(MODEL_DIR + "atlas.obj");
-    if (atlasMesh != nullptr) {
-        atlasMesh->material = atlasMaterial;
-        meshes.push_back(atlasMesh);
-        transforms.push_back(Transform(glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(0.1f), glm::vec3(0.0f)));
-        renderer->initMeshBuffers(atlasMesh);
+    // --------------------- Light System ---------------------
+
+    // Light 1: Point Light
+    lightSystem.addLight(
+        glm::vec3(0.0f, 5.0f, 0.0f),  // Position the light above the models
+        glm::vec3(0.2, 0.2, 0.2),     // Grayish White color
+        10.0f,                        // Light radius
+        4.0f,                         // Light intensity
+        false,                        // No shadows
+        false                         // Point light
+    );
+
+    // Light 2: Point Light
+    lightSystem.addLight(
+        glm::vec3(-2.0f, 2.5f, 2.0f), // Position for a point light
+        glm::vec3(0.0f, 1.0f, 0.0f),  // Green light color
+        10.0f,                        // Light radius
+        1.0f,                         // Light intensity
+        false,                        // No shadows
+        false                         // Point light
+    );
+
+    // See lights being
+    bool seeLightData = false;
+    if (!seeLightData) {
+        return;
+    }
+
+    for (unsigned short i = 0; i < lightSystem.size; ++i) {
+        // Access light data
+        const glm::vec3& position = lightSystem.positions[i];
+        const glm::vec3& direction = lightSystem.directions[i];
+        const glm::vec3& color = lightSystem.colors[i];
+        float radius = lightSystem.radii[i];
+        float intensity = lightSystem.lightIntensities[i];
+        bool shadowsEnabled = lightSystem.shadowsEnabled[i];
+        const glm::mat4& shadowTransform = lightSystem.shadowTransforms[i];
+        unsigned int shadowMap = lightSystem.shadowMaps[i];
+        bool isDirectional = lightSystem.directionalFlags[i];
+
+        // Example processing: Print light information
+        std::cout << "Light ID: " << i << std::endl;
+        std::cout << "Position: " << position.x << ", " << position.y << ", " << position.z << std::endl;
+        std::cout << "Direction: " << direction.x << ", " << direction.y << ", " << direction.z << std::endl;
+        std::cout << "Color: " << color.x << ", " << color.y << ", " << color.z << std::endl;
+        std::cout << "Radius: " << radius << std::endl;
+        std::cout << "Intensity: " << intensity << std::endl;
+        std::cout << "Shadows Enabled: " << (shadowsEnabled ? "Yes" : "No") << std::endl;
+        std::cout << "Directional: " << (isDirectional ? "Yes" : "No") << std::endl;
+        std::cout << "---------------------------------" << std::endl;
     }
 }
 
@@ -173,10 +225,12 @@ int main() {
     Renderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT);
     window.setRenderer(&renderer);
 
+    LightSystem lightSystem;
+
     // Load meshes and store them in a vector
     std::vector<Mesh*> meshes;
     std::vector<Transform> transforms;
-    loadScene(meshes, transforms, &renderer);
+    loadScene(meshes, transforms, &renderer, lightSystem);
 
     // Camera setup
     Camera camera;
@@ -211,6 +265,7 @@ int main() {
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
+#pragma region GAME_CODE
         // Process input
         GLFWwindow* glfwWindow = window.getGLFWwindow();
         processCameraInput(glfwWindow, camera, deltaTime);
@@ -232,17 +287,17 @@ int main() {
         for (Transform& transform : transforms) {
             transform.eulerAngles.y += deltaTime * 10.0f;
         }
+#pragma endregion
 
         // Get view matrix from the camera
         glm::mat4 view = camera.getViewMatrix();
 
         // Render passes
         renderer.geometryPass(meshes, transforms, view, projection);
+        renderer.lightPass(camera.position, lightSystem);
 
-        // TODO: Lighting pass
-
-        // Final pass (draw to screen)
-        renderer.debugGBuffer(debugShader, debugMode);
+        // Draw gbuffer to screen
+        // renderer.debugGBuffer(debugShader, debugMode);
 
         window.swapBuffersAndPollEvents();
     }

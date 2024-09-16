@@ -1,7 +1,7 @@
 #ifndef RESOURCE_LOADER_H
 #define RESOURCE_LOADER_H
 
-#include "mesh.h"
+#include "../components/mesh.h"
 
 #include <string>
 

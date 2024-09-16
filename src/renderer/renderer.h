@@ -2,8 +2,9 @@
 #define RENDERER_H
 
 #include "shader.h"
-#include "../transform.h"
-#include "../resources/mesh.h"
+#include "../components/transform.h"
+#include "../components/mesh.h"
+#include "../components/light.h"
 
 #include <glad/glad.h>
 
@@ -27,23 +28,34 @@ public:
     /*
     * Initialize and manage mesh buffers
     */
-    void initMeshBuffers(Mesh* mesh);
+    void initMeshBuffers(Mesh* mesh, bool isStatic = true);
     void deleteMeshBuffer(const Mesh* mesh);
 
     /*
-    * G-Buffer management for deferred rendering
+    * Forward rendering
     */
-    void resizeGBuffer(int width, int height);
-    void geometryPass(const std::vector<Mesh*>& meshes,
+   void forwardPass(const std::vector<Mesh*>& meshes,
         const std::vector<Transform>& transforms,
         const glm::mat4& view,
         const glm::mat4& projection);
 
     /*
+    * G-Buffer management for deferred rendering
+    */
+    void resizeGBuffer(int width, int height);
+
+    void geometryPass(const std::vector<Mesh*>& meshes,
+        const std::vector<Transform>& transforms,
+        const glm::mat4& view,
+        const glm::mat4& projection);
+
+    void lightPass(const glm::vec3& cameraPosition, const LightSystem& lightSystem);
+
+    /*
     * Quad rendering (used for post-processing, G-buffer display, etc.)
     */
-    void drawQuad();
-    void initQuad();
+    void drawScreenQuad();
+    void initScreenQuad();
 
     /*
     * Debugging: Display G-buffer textures (e.g., Position, Normal, Albedo)
@@ -69,6 +81,7 @@ private:
     unsigned int m_rboDepth;
 
     Shader m_gBufferShader;
+    Shader m_lightPassShader;
 
     /*
     * Mesh buffer storage

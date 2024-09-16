@@ -1,7 +1,7 @@
 #ifndef OBJLOADER_H
 #define OBJLOADER_H
 
-#include "mesh.h"
+#include "../components/mesh.h"
 #include <glm.hpp>
 
 #include <string>

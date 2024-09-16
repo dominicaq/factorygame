@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mesh.h"
+#include "../components/mesh.h"
 
 // Generate primitive shapes
 namespace MeshGen {

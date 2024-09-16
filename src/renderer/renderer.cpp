@@ -5,15 +5,23 @@ Renderer::Renderer(int width, int height) {
     initOpenGLState();
 
     initGBuffer(width, height);
+
     // Geometry Pass Shader (Expecting this to be fixed, so will be created here)
     std::string gBufferVertexPath = ASSET_DIR "shaders/deferred/gbuff.vs";
     std::string gBufferFragmentPath = ASSET_DIR "shaders/deferred/gbuff.fs";
-    bool shaderStatus = m_gBufferShader.load(gBufferVertexPath, gBufferFragmentPath);
-    if (shaderStatus == false) {
+    if (!m_gBufferShader.load(gBufferVertexPath, gBufferFragmentPath)) {
         std::cerr << "Failed to create gBufferShader!\n";
     }
 
-    initQuad();
+    // Light Pass Shader (Expecting this to be fixed, so will be created here)
+    std::string lightVertexPath = ASSET_DIR "shaders/deferred/lighting.vs";
+    std::string lightFragmentPath = ASSET_DIR "shaders/deferred/lighting.fs";
+    if (!m_lightPassShader.load(lightVertexPath, lightFragmentPath)) {
+        std::cerr << "Failed to create light shader!\n";
+    }
+
+    // Create VAO for screen quad
+    initScreenQuad();
 }
 
 Renderer::~Renderer() {
@@ -45,6 +53,53 @@ void Renderer::initOpenGLState() {
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
+}
+
+/*
+* Forward Rendering
+*/
+void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
+                           const std::vector<Transform>& transforms,
+                           const glm::mat4& view,
+                           const glm::mat4& projection)
+{
+    // Clear the color and depth buffers
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    for (size_t i = 0; i < meshes.size(); ++i) {
+        const Mesh* mesh = meshes[i];
+        const Transform& transform = transforms[i];
+
+        // Each mesh has its own shader
+        Shader* shader = mesh->material->shader;
+        if (!shader) {
+            std::cerr << "ERROR::RENDERER::FORWARD_PASS::Mesh does not have a shader!\n";
+            continue;
+        }
+
+        // Use the mesh's shader
+        shader->use();
+        shader->setMat4("u_View", view);
+        shader->setMat4("u_Projection", projection);
+
+        // Set model matrix for the mesh
+        glm::mat4 model = transform.getModelMatrix();
+        shader->setMat4("u_Model", model);
+
+        // Set material properties (e.g., albedo color or textures)
+        if (mesh->material) {
+            shader->setVec3("u_AlbedoColor", mesh->material->albedoColor);
+
+            // Set the texture unit to 0 for the shader's sampler uniform
+            shader->setInt("u_AlbedoTexture", 0);
+            if (mesh->material->albedoTexture) {
+                mesh->material->albedoTexture->bind(0);
+            }
+        }
+
+        // Draw the mesh
+        draw(mesh);
+    }
 }
 
 /*
@@ -116,6 +171,9 @@ void Renderer::resizeGBuffer(int width, int height) {
     initGBuffer(width, height);
 }
 
+/*
+* Render Passes
+*/
 void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
     const std::vector<Transform>& transforms,
     const glm::mat4& view,
@@ -158,6 +216,53 @@ void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
+void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lightSystem) {
+    // Bind the default framebuffer to render the final image
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Use the light pass shader (for a single light)
+    m_lightPassShader.use();
+    m_lightPassShader.setVec3("u_CameraPosition", cameraPosition);
+
+    // Bind G-buffer textures for the light pass
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_gPosition);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, m_gNormal);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, m_gAlbedo);
+
+    m_lightPassShader.setInt("gPosition", 0);
+    m_lightPassShader.setInt("gNormal", 1);
+    m_lightPassShader.setInt("gAlbedo", 2);
+
+    // Use the first light from the LightSystem (for simplicity)
+    const glm::vec3& position = lightSystem.positions[0];
+    const glm::vec3& direction = lightSystem.directions[0];
+    const glm::vec3& color = lightSystem.colors[0];
+    float intensity = lightSystem.lightIntensities[0];
+    bool isDirectional = lightSystem.directionalFlags[0];
+
+    // Pass the light's properties to the shader
+    m_lightPassShader.setVec3("u_LightColor", color);
+    m_lightPassShader.setFloat("u_LightIntensity", intensity);
+
+    if (isDirectional) {
+        m_lightPassShader.setVec3("u_LightDirection", direction);
+        m_lightPassShader.setBool("u_IsDirectional", true);
+    } else {
+        m_lightPassShader.setVec3("u_LightPosition", position);
+        m_lightPassShader.setBool("u_IsDirectional", false);
+    }
+
+    // Draw the screen-aligned quad once
+    drawScreenQuad();
+
+    // Unbind framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 /*
 * Mesh Management
 */
@@ -183,7 +288,7 @@ void Renderer::draw(const Mesh* mesh) {
     glBindVertexArray(0);
 }
 
-void Renderer::initMeshBuffers(Mesh* mesh) {
+void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic) {
     if (mesh->uvs.size() == 0 || mesh->normals.size() == 0) {
         std::cerr << "ERROR::RENDERER::INIT_MESH_BUFFERS::UVs and normals must be provided for all vertices.\n";
         return;
@@ -269,8 +374,10 @@ void Renderer::initMeshBuffers(Mesh* mesh) {
         mesh->id = m_meshData.size() - 1;
     }
 
-    // Clear CPU-side mesh data
-    mesh->clearData();
+    // Clear CPU-side mesh data if possible
+    if (isStatic) {
+        mesh->clearData();
+    }
 }
 
 void Renderer::deleteMeshBuffer(const Mesh* mesh) {
@@ -301,9 +408,9 @@ void Renderer::deleteMeshBuffer(const Mesh* mesh) {
 }
 
 /*
-* Deferred Rendering Quad
+* Screen quad deferred rending target output
 */
-void Renderer::initQuad() {
+void Renderer::initScreenQuad() {
     // Vertices for a screen-aligned quad (NDC space)
     float quadVertices[] = {
         // positions        // uvs
@@ -345,7 +452,7 @@ void Renderer::initQuad() {
     glBindVertexArray(0);
 }
 
-void Renderer::drawQuad() {
+void Renderer::drawScreenQuad() {
     glBindVertexArray(m_quadVAO);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
@@ -371,5 +478,5 @@ void Renderer::debugGBuffer(const Shader& debugShader, int debugMode) {
     debugShader.setInt("debugMode", debugMode);
 
     // Draw the quad (screen aligned)
-    drawQuad();
+    drawScreenQuad();
 }
