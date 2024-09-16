@@ -33,14 +33,87 @@ struct Camera {
     glm::vec3 eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
 
     glm::mat4 getViewMatrix() const {
-        glm::mat4 view = glm::mat4(1.0f);
-        view = glm::rotate(view, glm::radians(eulerAngles.x), glm::vec3(1.0f, 0.0f, 0.0f));
-        view = glm::rotate(view, glm::radians(eulerAngles.y), glm::vec3(0.0f, 1.0f, 0.0f));
-        view = glm::rotate(view, glm::radians(eulerAngles.z), glm::vec3(0.0f, 0.0f, 1.0f));
-        view = glm::translate(view, -position);
-        return view;
+        glm::vec3 front;
+        front.x = cos(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
+        front.y = sin(glm::radians(eulerAngles.x)); // Pitch controls vertical rotation
+        front.z = sin(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
+        front = glm::normalize(front);
+
+        // The world up vector for an FPS camera is always (0, 1, 0)
+        glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+
+        // The right vector is always perpendicular to the front and up vector
+        glm::vec3 right = glm::normalize(glm::cross(front, up));
+
+        // Recompute the up vector (it could be tilted slightly)
+        up = glm::normalize(glm::cross(right, front));
+
+        return glm::lookAt(position, position + front, up);
     }
 };
+
+void processCameraInput(GLFWwindow* window, Camera& camera, float deltaTime) {
+    // Camera speed
+    const float cameraSpeed = 2.5f * deltaTime;
+    const float sensitivity = 0.1f;
+
+    // Calculate camera front vector based on Euler angles
+    glm::vec3 front;
+    front.x = cos(glm::radians(camera.eulerAngles.y)) * cos(glm::radians(camera.eulerAngles.x));
+    front.y = sin(glm::radians(camera.eulerAngles.x));
+    front.z = sin(glm::radians(camera.eulerAngles.y)) * cos(glm::radians(camera.eulerAngles.x));
+    front = glm::normalize(front);
+
+    glm::vec3 right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))); // Right vector
+    glm::vec3 up = glm::normalize(glm::cross(right, front));                           // Up vector
+
+    // Get the current mouse position once on startup
+    static bool firstMouse = true;
+    static double lastX, lastY;
+
+    if (firstMouse) {
+        glfwGetCursorPos(window, &lastX, &lastY);  // Initialize to the current mouse position
+        firstMouse = false;
+    }
+
+    // Keyboard input for movement (WASD)
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        camera.position += cameraSpeed * front;
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        camera.position -= cameraSpeed * front;
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        camera.position -= right * cameraSpeed;
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        camera.position += right * cameraSpeed;
+    }
+
+    // Mouse input for look rotation
+    double mouseX, mouseY;
+    glfwGetCursorPos(window, &mouseX, &mouseY);
+
+    float xOffset = (mouseX - lastX) * sensitivity;
+    float yOffset = (lastY - mouseY) * sensitivity;  // Inverted for typical FPS controls
+
+    lastX = mouseX;
+    lastY = mouseY;
+
+    // Apply only if there is movement
+    if (glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED) {
+        camera.eulerAngles.y += xOffset;  // Yaw (left/right rotation)
+        camera.eulerAngles.x += yOffset;  // Pitch (up/down rotation)
+
+        // Constrain the pitch to avoid gimbal lock
+        if (camera.eulerAngles.x > 89.0f) {
+            camera.eulerAngles.x = 89.0f;
+        }
+        if (camera.eulerAngles.x < -89.0f) {
+            camera.eulerAngles.x = -89.0f;
+        }
+    }
+}
 
 void loadScene(std::vector<Mesh*>& meshes, std::vector<Transform>& transforms, Renderer* renderer) {
     // Create shader for both models
@@ -107,7 +180,10 @@ int main() {
 
     // Camera setup
     Camera camera;
-    camera.position = glm::vec3(0.0f, 0.0f, 5.0f);
+    // Set camera position at (0,0,0)
+    camera.position = glm::vec3(4.0f, 0.21f, 4.04f);
+    camera.eulerAngles = glm::vec3(-2.38f, 239.0f, 0.0f);
+
     glm::mat4 projection = glm::perspective(
         glm::radians(45.0f),
         float(SCREEN_WIDTH) / float(SCREEN_HEIGHT),
@@ -124,6 +200,9 @@ int main() {
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
 
+    // Hide and capture the cursor for free camera movement
+    glfwSetInputMode(window.getGLFWwindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
     // Main render loop
     int debugMode = 0;
     while (!window.shouldClose()) {
@@ -134,6 +213,8 @@ int main() {
 
         // Process input
         GLFWwindow* glfwWindow = window.getGLFWwindow();
+        processCameraInput(glfwWindow, camera, deltaTime);
+
         if (glfwGetKey(glfwWindow, GLFW_KEY_1) == GLFW_PRESS) {
             debugMode = 0;
         }

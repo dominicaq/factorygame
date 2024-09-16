@@ -17,8 +17,7 @@ namespace ObjLoader {
 */
 struct VertexIdx {
     unsigned int vertex_idx;
-    int uv_idx;
-    int normal_idx;
+    int uv_idx, normal_idx;
 
     bool operator==(const VertexIdx& other) const {
         return vertex_idx == other.vertex_idx &&
@@ -38,14 +37,14 @@ struct VertexIdxHash {
 /*
 * Parsing context that holds temporary data and maps for OBJ parsing
 */
-struct OBJParseCtx {
+struct OBJParseContext {
     Mesh& mesh;
     std::vector<glm::vec3> temp_vertices;
     std::vector<glm::vec2> temp_uvs;
     std::vector<glm::vec3> temp_normals;
     std::unordered_map<VertexIdx, unsigned int, VertexIdxHash> vertexMap;
 
-    OBJParseCtx(Mesh& m)
+    OBJParseContext(Mesh& m)
         : mesh(m) {}
 };
 
@@ -53,8 +52,8 @@ struct OBJParseCtx {
 *  Forward Declarations
 */
 static void parseVertexString(const std::string& vertex_string, unsigned int& vertex_idx, int& uv_idx, int& normal_idx);
-static unsigned int processVertex(VertexIdx& vi, OBJParseCtx& ctx);
-static void parseOBJLine(const std::string& line, OBJParseCtx& ctx);
+static unsigned int processVertex(VertexIdx& vi, OBJParseContext& ctx);
+static void parseOBJLine(const std::string& line, OBJParseContext& ctx);
 inline void generateNormals(Mesh* mesh);
 inline void generateUVs(Mesh* mesh);
 
@@ -68,7 +67,7 @@ static Mesh* loadOBJ(const std::string& fileContent) {
     }
 
     Mesh* mesh = new Mesh();
-    OBJParseCtx ctx(*mesh);
+    OBJParseContext ctx(*mesh);
 
     std::istringstream fileStream(fileContent);
     std::string line;
@@ -114,7 +113,7 @@ static void parseVertexString(const std::string& vertex_string, unsigned int& ve
 /*
 * Function to handle a parsed vertex and add it to the mesh if it's new
 */
-static unsigned int processVertex(VertexIdx& vi, OBJParseCtx& ctx) {
+static unsigned int processVertex(VertexIdx& vi, OBJParseContext& ctx) {
     // Check if this vertex has already been processed
     if (ctx.vertexMap.find(vi) != ctx.vertexMap.end()) {
         return ctx.vertexMap[vi];
@@ -143,7 +142,7 @@ static unsigned int processVertex(VertexIdx& vi, OBJParseCtx& ctx) {
     return new_idx;
 }
 
-static void parseOBJLine(const std::string& line, OBJParseCtx& ctx) {
+static void parseOBJLine(const std::string& line, OBJParseContext& ctx) {
     std::istringstream s(line);
     std::string token;
     s >> token;
