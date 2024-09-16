@@ -75,10 +75,10 @@ private:
     * G-buffer resources
     */
     unsigned int m_gBuffer;
-    unsigned int m_gPosition;
-    unsigned int m_gNormal;
-    unsigned int m_gAlbedo;
     unsigned int m_rboDepth;
+
+    // Store G-buffer textures in a vector
+    std::vector<unsigned int> m_gTextures;
 
     Shader m_gBufferShader;
     Shader m_lightPassShader;

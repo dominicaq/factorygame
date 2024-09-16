@@ -23,7 +23,7 @@ void main()
 {
     // Retrieve data from G-buffer
     vec3 FragPos = texture(gPosition, TexCoords).rgb;
-    vec3 Normal = normalize(texture(gNormal, TexCoords).rgb);
+    vec3 Normal = texture(gNormal, TexCoords).rgb;
     vec3 Albedo = texture(gAlbedo, TexCoords).rgb;
 
     // Ambient component (slightly reduced to emphasize lighting and texture)
@@ -46,7 +46,7 @@ void main()
     // Specular lighting
     vec3 viewDir = normalize(u_CameraPosition - FragPos);
     vec3 reflectDir = reflect(-lightDir, Normal);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 512.0);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
     vec3 specular = u_LightColor * spec * u_LightIntensity * 0.5;
 
     // Final color (combine albedo and lighting)

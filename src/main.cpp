@@ -134,8 +134,8 @@ void loadScene(std::vector<Mesh*>& meshes,
     bunnyMaterial->albedoColor = glm::vec3(1.0f, 0.5f, 0.31f);
 
     std::string bunnyTexturePath = TEXTURE_DIR + "uv_map.jpg";
-    Texture* bunnyAlbedoTexture = new Texture(bunnyTexturePath);
-    bunnyMaterial->albedoTexture = bunnyAlbedoTexture;
+    Texture* bunnyAlbedoMap = new Texture(bunnyTexturePath);
+    bunnyMaterial->albedoMap = bunnyAlbedoMap;
 
     Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
     if (bunnyMesh != nullptr) {
@@ -151,7 +151,12 @@ void loadScene(std::vector<Mesh*>& meshes,
 
     std::string diabloTexturePath = TEXTURE_DIR + "diablo/diablo3_pose_diffuse.tga";
     Texture* diabloTexture = new Texture(diabloTexturePath);
-    diabloMaterial->albedoTexture = diabloTexture;
+    diabloMaterial->albedoMap = diabloTexture;
+
+    // Load the normal map for the Diablo model
+    std::string diabloNormalMapPath = TEXTURE_DIR + "diablo/diablo3_pose_nm.tga";
+    Texture* diabloNormalMap = new Texture(diabloNormalMapPath);
+    diabloMaterial->normalMap = diabloNormalMap;
 
     Mesh* diabloModel = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
     if (diabloModel != nullptr) {
@@ -165,12 +170,12 @@ void loadScene(std::vector<Mesh*>& meshes,
 
     // Light 1: Point Light
     lightSystem.addLight(
-        glm::vec3(0.0f, 5.0f, 0.0f),  // Position the light above the models
-        glm::vec3(0.2, 0.2, 0.2),     // Grayish White color
-        10.0f,                        // Light radius
-        4.0f,                         // Light intensity
-        false,                        // No shadows
-        false                         // Point light
+        glm::vec3(-10.0f, 3.0f, 0.0f),  // Middle-left side
+        glm::vec3(0.2f, 0.2f, 0.2f),    // Grayish White color
+        10.0f,                          // Light radius
+        4.0f,                           // Light intensity
+        false,                          // No shadows
+        false                           // Point light
     );
 
     // Light 2: Point Light

@@ -10,14 +10,17 @@
 struct Material {
     Shader* shader = nullptr;
 
-    // Diffuse
-    Texture* albedoTexture = nullptr;
-    glm::vec3 albedoColor = glm::vec3(1.0f);
+    // Textures
+    Texture* albedoMap = nullptr;
+    Texture* specularMap = nullptr;
+    Texture* normalMap = nullptr;
 
-    // Specular
-    float shininess = 32.0f;
-    Texture* specularTexture = nullptr;
+    // Colors
+    glm::vec3 albedoColor = glm::vec3(1.0f);
     glm::vec3 specularColor = glm::vec3(1.0f);
+
+    // Scalars
+    float shininess = 32.0f;
 
     Material(Shader* shader) : shader(shader) {}
 
@@ -25,15 +28,24 @@ struct Material {
         shader->use();  // Ensure the shader is active
 
         // Bind the albedo color uniform
-        shader->setVec3("u_AlbedoColor", albedoColor);  // Ensure the uniform name matches
+        shader->setVec3("u_AlbedoColor", albedoColor);
 
-        // Bind the albedo texture if it exists
-        if (albedoTexture) {
-            shader->setInt("u_AlbedoTexture", 0);
-            albedoTexture->bind(0);
+        // Add material maps for sampling if they exist
+        if (albedoMap) {
+            shader->setInt("u_AlbedoMap", 0);
+            albedoMap->bind(0);
+        }
+
+        if (specularMap) {
+            shader->setInt("u_SpecularMap", 1);
+            specularMap->bind(1);
+        }
+
+        if (normalMap) {
+            shader->setInt("u_NormalMap", 2);
+            normalMap->bind(2);
         }
     }
-
 };
 
 #endif // MATERIAL_H

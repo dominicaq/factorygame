@@ -1,6 +1,8 @@
 #include "renderer.h"
 #include <iostream>
 
+#define NUM_ATTACHMENTS 3
+
 Renderer::Renderer(int width, int height) {
     initOpenGLState();
 
@@ -27,9 +29,9 @@ Renderer::Renderer(int width, int height) {
 Renderer::~Renderer() {
     // Clean up G-buffer
     glDeleteFramebuffers(1, &m_gBuffer);
-    glDeleteTextures(1, &m_gPosition);
-    glDeleteTextures(1, &m_gNormal);
-    glDeleteTextures(1, &m_gAlbedo);
+    for (auto& texture : m_gTextures) {
+        glDeleteTextures(1, &texture);
+    }
     glDeleteRenderbuffers(1, &m_rboDepth);
 
     // Clean up mesh buffers
@@ -88,12 +90,27 @@ void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
 
         // Set material properties (e.g., albedo color or textures)
         if (mesh->material) {
+            // Bind the albedo map
+            shader->setInt("u_AlbedoMap", 0);
+            mesh->material->albedoMap->bind(0);
             shader->setVec3("u_AlbedoColor", mesh->material->albedoColor);
 
-            // Set the texture unit to 0 for the shader's sampler uniform
-            shader->setInt("u_AlbedoTexture", 0);
-            if (mesh->material->albedoTexture) {
-                mesh->material->albedoTexture->bind(0);
+            // Bind normal map if available
+            if (mesh->material->normalMap) {
+                shader->setBool("u_HasNormalMap", true);
+                mesh->material->normalMap->bind(1);
+                shader->setInt("u_NormalMap", 1);
+            } else {
+                shader->setBool("u_HasNormalMap", false);
+            }
+
+            // Bind specular map if available
+            if (mesh->material->specularMap) {
+                shader->setBool("u_HasSpecularMap", true);
+                mesh->material->specularMap->bind(2);
+                shader->setInt("u_SpecularMap", 2);
+            } else {
+                shader->setBool("hasSpecularMap", false);
             }
         }
 
@@ -110,37 +127,49 @@ void Renderer::initGBuffer(int width, int height) {
     glGenFramebuffers(1, &m_gBuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer);
 
-    // Position color buffer
-    glGenTextures(1, &m_gPosition);
-    glBindTexture(GL_TEXTURE_2D, m_gPosition);
+    // Resize the vector to store NUM_ATTACHMENTS
+    m_gTextures.resize(NUM_ATTACHMENTS);
+
+    // Initialize position texture
+    glGenTextures(1, &m_gTextures[0]);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[0]);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_gPosition, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_gTextures[0], 0); // Position
 
-    // Normal color buffer
-    glGenTextures(1, &m_gNormal);
-    glBindTexture(GL_TEXTURE_2D, m_gNormal);
+    // Initialize normal texture
+    glGenTextures(1, &m_gTextures[1]);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[1]);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, m_gNormal, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, m_gTextures[1], 0); // Normal
 
-    // Albedo color buffer
-    glGenTextures(1, &m_gAlbedo);
-    glBindTexture(GL_TEXTURE_2D, m_gAlbedo);
+    // Initialize albedo texture
+    glGenTextures(1, &m_gTextures[2]);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[2]);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_gAlbedo, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_gTextures[2], 0); // Albedo
+
+    // Initialize any additional G-buffer textures
+    for (int i = 3; i < NUM_ATTACHMENTS; ++i) {
+        glGenTextures(1, &m_gTextures[i]);
+        glBindTexture(GL_TEXTURE_2D, m_gTextures[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3 + (i - 3), GL_TEXTURE_2D, m_gTextures[i], 0);
+    }
 
     // Set the list of draw buffers
-    GLuint attachments[3] = {
-        GL_COLOR_ATTACHMENT0,
-        GL_COLOR_ATTACHMENT1,
-        GL_COLOR_ATTACHMENT2
-    };
-    glDrawBuffers(3, attachments);
+    GLuint attachments[NUM_ATTACHMENTS];
+    for (int i = 0; i < NUM_ATTACHMENTS; ++i) {
+        attachments[i] = GL_COLOR_ATTACHMENT0 + i;
+    }
+    glDrawBuffers(NUM_ATTACHMENTS, attachments);
 
     // Create and attach depth buffer
     glGenRenderbuffers(1, &m_rboDepth);
@@ -148,12 +177,9 @@ void Renderer::initGBuffer(int width, int height) {
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_rboDepth);
 
-    // Check framebuffer status with more detailed error output
-    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    if (status != GL_FRAMEBUFFER_COMPLETE) {
-        std::cerr << "Framebuffer not complete! Status: " << status << "\n";
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        return;
+    // Check framebuffer status
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "Framebuffer not complete!\n";
     }
 
     // Unbind the framebuffer
@@ -161,13 +187,15 @@ void Renderer::initGBuffer(int width, int height) {
 }
 
 void Renderer::resizeGBuffer(int width, int height) {
-    // Delete existing G-buffer textures and depth buffer
-    glDeleteTextures(1, &m_gPosition);
-    glDeleteTextures(1, &m_gNormal);
-    glDeleteTextures(1, &m_gAlbedo);
+    // Delete existing G-buffer textures
+    for (unsigned int texture : m_gTextures) {
+        glDeleteTextures(1, &texture);
+    }
+
+    // Delete depth renderbuffer
     glDeleteRenderbuffers(1, &m_rboDepth);
 
-    // Re-initialize the G-buffer with new size
+    // Re-initialize the G-buffer with the new size
     initGBuffer(width, height);
 }
 
@@ -175,9 +203,9 @@ void Renderer::resizeGBuffer(int width, int height) {
 * Render Passes
 */
 void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
-    const std::vector<Transform>& transforms,
-    const glm::mat4& view,
-    const glm::mat4& projection)
+                            const std::vector<Transform>& transforms,
+                            const glm::mat4& view,
+                            const glm::mat4& projection)
 {
     // Bind and clear framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer);
@@ -195,23 +223,36 @@ void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
         glm::mat4 model = transform.getModelMatrix();
         m_gBufferShader.setMat4("u_Model", model);
 
-        // Create Material map(s)
+        // Set material properties (e.g., albedo color or textures)
         if (mesh->material) {
-            // Set the albedo color
+            // Bind the albedo map (required)
             m_gBufferShader.setVec3("u_AlbedoColor", mesh->material->albedoColor);
+            mesh->material->albedoMap->bind(0);
+            m_gBufferShader.setInt("u_AlbedoMap", 0);
 
-            // Set the texture unit to 0 for the shader's sampler uniform
-            m_gBufferShader.setInt("u_AlbedoTexture", 0);
-            if (mesh->material->albedoTexture) {
-                mesh->material->albedoTexture->bind(0);
+            // Check and bind normal map if available
+            if (mesh->material->normalMap) {
+                mesh->material->normalMap->bind(1);
+                m_gBufferShader.setInt("u_NormalMap", 1);
+                m_gBufferShader.setBool("u_HasNormalMap", true);
+            } else {
+                m_gBufferShader.setBool("u_HasNormalMap", false);
             }
+
+            // Check and bind specular map if available
+            // if (mesh->material->specularMap) {
+            //     mesh->material->specularMap->bind(2);
+            //     m_gBufferShader.setInt("u_SpecularMap", 2);
+            //     m_gBufferShader.setBool("u_HasSpecularMap", true);
+            // } else {
+            //     m_gBufferShader.setBool("u_HasSpecularMap", false);
+            // }
         }
 
         // Draw the mesh
         draw(mesh);
     }
 
-    // Unbind and clear framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
@@ -221,42 +262,49 @@ void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lig
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Use the light pass shader (for a single light)
+    // Use the light pass shader
     m_lightPassShader.use();
+
+    // Set camera position (for specular calculation)
     m_lightPassShader.setVec3("u_CameraPosition", cameraPosition);
+
+    // Set light properties (assuming you have at least one light in the system)
+    const glm::vec3& lightPos = lightSystem.positions[0];
+    const glm::vec3& lightColor = lightSystem.colors[0];
+    float lightIntensity = lightSystem.lightIntensities[0];
+    bool isDirectional = lightSystem.directionalFlags[0];
+    const glm::vec3& lightDir = lightSystem.directions[0];
+
+    // Pass light properties to the shader
+    m_lightPassShader.setVec3("u_LightPosition", lightPos);
+    m_lightPassShader.setVec3("u_LightColor", lightColor);
+    m_lightPassShader.setFloat("u_LightIntensity", lightIntensity);
+    m_lightPassShader.setBool("u_IsDirectional", isDirectional);
+    if (isDirectional) {
+        m_lightPassShader.setVec3("u_LightDirection", lightDir);
+    }
 
     // Bind G-buffer textures for the light pass
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_gPosition);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, m_gNormal);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, m_gAlbedo);
-
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[0]);
     m_lightPassShader.setInt("gPosition", 0);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[1]);
     m_lightPassShader.setInt("gNormal", 1);
+
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[2]);
     m_lightPassShader.setInt("gAlbedo", 2);
 
-    // Use the first light from the LightSystem (for simplicity)
-    const glm::vec3& position = lightSystem.positions[0];
-    const glm::vec3& direction = lightSystem.directions[0];
-    const glm::vec3& color = lightSystem.colors[0];
-    float intensity = lightSystem.lightIntensities[0];
-    bool isDirectional = lightSystem.directionalFlags[0];
-
-    // Pass the light's properties to the shader
-    m_lightPassShader.setVec3("u_LightColor", color);
-    m_lightPassShader.setFloat("u_LightIntensity", intensity);
-
-    if (isDirectional) {
-        m_lightPassShader.setVec3("u_LightDirection", direction);
-        m_lightPassShader.setBool("u_IsDirectional", true);
-    } else {
-        m_lightPassShader.setVec3("u_LightPosition", position);
-        m_lightPassShader.setBool("u_IsDirectional", false);
+    // If there are additional G-buffer textures
+    for (int i = 3; i < NUM_ATTACHMENTS; ++i) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        glBindTexture(GL_TEXTURE_2D, m_gTextures[i]);
+        m_lightPassShader.setInt("gExtraTexture" + std::to_string(i - 3), i);
     }
 
-    // Draw the screen-aligned quad once
+    // Draw the screen-aligned quad (for full-screen lighting)
     drawScreenQuad();
 
     // Unbind framebuffer
@@ -408,7 +456,7 @@ void Renderer::deleteMeshBuffer(const Mesh* mesh) {
 }
 
 /*
-* Screen quad deferred rending target output
+* Screen quad deferred rendering target output
 */
 void Renderer::initScreenQuad() {
     // Vertices for a screen-aligned quad (NDC space)
@@ -462,13 +510,13 @@ void Renderer::drawScreenQuad() {
 * G-Buffer Debugging
 */
 void Renderer::debugGBuffer(const Shader& debugShader, int debugMode) {
-    // Bind the G-buffer textures to texture units
+    // Bind core G-buffer textures
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_gPosition);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[0]);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, m_gNormal);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[1]);
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, m_gAlbedo);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[2]);
 
     // Use the debug shader
     debugShader.use();
@@ -476,6 +524,13 @@ void Renderer::debugGBuffer(const Shader& debugShader, int debugMode) {
     debugShader.setInt("gNormal", 1);
     debugShader.setInt("gAlbedo", 2);
     debugShader.setInt("debugMode", debugMode);
+
+    // Bind any additional G-buffer textures if they exist
+    for (int i = 3; i < NUM_ATTACHMENTS; ++i) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        glBindTexture(GL_TEXTURE_2D, m_gTextures[i]);
+        debugShader.setInt("gExtraTexture" + std::to_string(i - 3), i);
+    }
 
     // Draw the quad (screen aligned)
     drawScreenQuad();
