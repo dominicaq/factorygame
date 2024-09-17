@@ -182,7 +182,7 @@ void loadScene(std::vector<Mesh*>& meshes,
     if (cubeMesh != nullptr) {
         cubeMesh->material = cubeMaterial;
         forwardMeshes.push_back(cubeMesh);
-        forwardTransforms.push_back(Transform(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f), glm::vec3(0.0f)));
+        forwardTransforms.push_back(Transform(glm::vec3(0.0f, 2.0f, 0.0f), glm::vec3(0.1f), glm::vec3(0.0f)));
         renderer->initMeshBuffers(cubeMesh);  // Initialize the mesh for rendering
     }
 
@@ -328,7 +328,7 @@ int main() {
         renderer.lightPass(camera.position, lightSystem);
 
         // Render forward pass (draw the cube)
-        // renderer.forwardPass(forwardMeshes, forwardTransforms, view, projection);
+        renderer.forwardPass(forwardMeshes, forwardTransforms, view, projection);
 
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();

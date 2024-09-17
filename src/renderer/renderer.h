@@ -74,6 +74,11 @@ private:
     void setupGBufferTextures(Shader* shader);
 
     /*
+    * Screen dimensions
+    */
+    int m_width, m_height;
+
+    /*
     * Render Quad
     */
     unsigned int m_quadVAO;

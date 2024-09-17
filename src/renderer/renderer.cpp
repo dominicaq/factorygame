@@ -61,6 +61,9 @@ void Renderer::initOpenGLState() {
 * G-buffer Management
 */
 void Renderer::initGBuffer(int width, int height) {
+    m_width = width;
+    m_height = height;
+
     // Create the G-buffer FBO
     glGenFramebuffers(1, &m_gBuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer);
@@ -176,14 +179,12 @@ void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
         draw(mesh);
     }
 
+    // Unbind framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lightSystem) {
-    // Bind the default framebuffer to render the final image
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Use the light pass shader
     m_lightPassShader.use();
@@ -213,26 +214,19 @@ void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lig
 
     // Draw the screen-aligned quad (for full-screen lighting)
     drawScreenQuad();
-
-    // Unbind framebuffer
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
                            const std::vector<Transform>& transforms,
                            const glm::mat4& view,
                            const glm::mat4& projection) {
-    // Ensure depth testing is enabled to use the preserved depth buffer
-    glEnable(GL_DEPTH_TEST);
+    // Read the gbuffer to frame buffer, then draw to default framebuffer
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, m_gBuffer);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
     // Bind the default framebuffer
+    glBlitFramebuffer(0, 0, m_width, m_height, 0, 0, m_width, m_height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    // Only clear the color buffer, keeping the depth buffer from the deferred pass
-    glClear(GL_COLOR_BUFFER_BIT);  // Do not clear the depth buffer here
-
-    // Set the correct viewport size before rendering
-    glViewport(0, 0, 800, 600);
 
     // Iterate over all forward pass meshes
     for (size_t i = 0; i < meshes.size(); ++i) {
@@ -256,7 +250,7 @@ void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
         shader->setMat4("u_Model", transform.getModelMatrix());
 
         // Set up the material (optional step, depending on your material setup)
-        // setupMaterial(shader, mesh->material);
+        setupMaterial(shader, mesh->material);
 
         // Draw the mesh
         draw(mesh);
@@ -265,8 +259,8 @@ void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
 
 void Renderer::setupMaterial(Shader* shader, const Material* material) {
     // Bind the albedo map
-    shader->setInt("u_AlbedoMap", 0);
-    material->albedoMap->bind(0);
+    // shader->setInt("u_AlbedoMap", 0);
+    // material->albedoMap->bind(0);
     shader->setVec3("u_AlbedoColor", material->albedoColor);
 
     // Bind normal map if available
