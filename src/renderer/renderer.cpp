@@ -1,28 +1,28 @@
 #include "renderer.h"
 #include <iostream>
 
-#define NUM_ATTACHMENTS 3
+// Define the number of G-buffer attachments
+#define NUM_ATTACHMENTS 4
 
-Renderer::Renderer(int width, int height) {
+Renderer::Renderer(int width, int height) : m_width(width), m_height(height) {
     initOpenGLState();
-
     initGBuffer(width, height);
 
-    // Geometry Pass Shader (Expecting this to be fixed, so will be created here)
+    // Load Geometry Pass Shader
     std::string gBufferVertexPath = ASSET_DIR "shaders/deferred/gbuff.vs";
     std::string gBufferFragmentPath = ASSET_DIR "shaders/deferred/gbuff.fs";
     if (!m_gBufferShader.load(gBufferVertexPath, gBufferFragmentPath)) {
         std::cerr << "Failed to create gBufferShader!\n";
     }
 
-    // Light Pass Shader (Expecting this to be fixed, so will be created here)
+    // Load Light Pass Shader
     std::string lightVertexPath = ASSET_DIR "shaders/deferred/lightpass.vs";
     std::string lightFragmentPath = ASSET_DIR "shaders/deferred/lightpass.fs";
     if (!m_lightPassShader.load(lightVertexPath, lightFragmentPath)) {
-        std::cerr << "Failed to create light shader!\n";
+        std::cerr << "Failed to create lightPassShader!\n";
     }
 
-    // Create VAO for screen quad
+    // Initialize Screen Quad for Deferred Passes
     initScreenQuad();
 }
 
@@ -46,81 +46,91 @@ Renderer::~Renderer() {
 }
 
 /*
-* OpenGL State Initialization
-*/
+ * OpenGL State Initialization
+ */
 void Renderer::initOpenGLState() {
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
 
-    // Culling
+    // Face Culling
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
+
+    // Disable Blending by default
+    glDisable(GL_BLEND);
 }
 
 /*
-* G-buffer Management
-*/
+ * G-buffer Management
+ */
 void Renderer::initGBuffer(int width, int height) {
     m_width = width;
     m_height = height;
 
-    // Create the G-buffer FBO
+    // Create the G-buffer Framebuffer Object (FBO)
     glGenFramebuffers(1, &m_gBuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer);
 
     // Resize the vector to store NUM_ATTACHMENTS
     m_gTextures.resize(NUM_ATTACHMENTS);
 
-    // Initialize position texture
+    // 1. Position Texture
     glGenTextures(1, &m_gTextures[0]);
     glBindTexture(GL_TEXTURE_2D, m_gTextures[0]);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_gTextures[0], 0); // Position
 
-    // Initialize normal texture
+    // 2. Normal Texture
     glGenTextures(1, &m_gTextures[1]);
     glBindTexture(GL_TEXTURE_2D, m_gTextures[1]);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, m_gTextures[1], 0); // Normal
 
-    // Initialize albedo texture
+    // 3. Albedo Texture
     glGenTextures(1, &m_gTextures[2]);
     glBindTexture(GL_TEXTURE_2D, m_gTextures[2]);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_gTextures[2], 0); // Albedo
 
-    // Initialize any additional G-buffer textures
-    for (int i = 3; i < NUM_ATTACHMENTS; ++i) {
-        glGenTextures(1, &m_gTextures[i]);
-        glBindTexture(GL_TEXTURE_2D, m_gTextures[i]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3 + (i - 3), GL_TEXTURE_2D, m_gTextures[i], 0);
+    // 4. Depth Texture
+    glGenTextures(1, &m_gTextures[3]);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[3]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+    // Set border color for depth texture
+    float borderColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+    // Depth
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_gTextures[3], 0);
+
+    // Specify the list of color attachments to draw to
+    std::vector<GLenum> attachments;
+    for (int i = 0; i < NUM_ATTACHMENTS - 1; ++i) { // Exclude depth
+        attachments.push_back(GL_COLOR_ATTACHMENT0 + i);
     }
+    glDrawBuffers(NUM_ATTACHMENTS - 1, attachments.data());
 
-    // Set the list of draw buffers
-    GLuint attachments[NUM_ATTACHMENTS];
-    for (int i = 0; i < NUM_ATTACHMENTS; ++i) {
-        attachments[i] = GL_COLOR_ATTACHMENT0 + i;
-    }
-    glDrawBuffers(NUM_ATTACHMENTS, attachments);
-
-    // Create and attach depth buffer
-    glGenRenderbuffers(1, &m_rboDepth);
-    glBindRenderbuffer(GL_RENDERBUFFER, m_rboDepth);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_rboDepth);
-
-    // Check framebuffer status
+    // Check if framebuffer is complete
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        std::cerr << "Framebuffer not complete!\n";
+        std::cerr << "G-buffer Framebuffer is not complete!\n";
     }
 
     // Unbind the framebuffer
@@ -128,6 +138,10 @@ void Renderer::initGBuffer(int width, int height) {
 }
 
 void Renderer::resizeGBuffer(int width, int height) {
+    // Update stored width and height
+    m_width = width;
+    m_height = height;
+
     // Delete existing G-buffer textures
     for (unsigned int texture : m_gTextures) {
         glDeleteTextures(1, &texture);
@@ -141,15 +155,17 @@ void Renderer::resizeGBuffer(int width, int height) {
 }
 
 /*
-* Render Passes
-*/
+ * Render Passes
+ */
 void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
                             const std::vector<Transform>& transforms,
                             const glm::mat4& view,
                             const glm::mat4& projection) {
+    // Bind G-buffer framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    // Use Geometry Pass Shader
     m_gBufferShader.use();
     m_gBufferShader.setMat4("u_View", view);
     m_gBufferShader.setMat4("u_Projection", projection);
@@ -164,9 +180,17 @@ void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
         // Set material properties
         if (mesh->material) {
             m_gBufferShader.setVec3("u_AlbedoColor", mesh->material->albedoColor);
-            mesh->material->albedoMap->bind(0);
-            m_gBufferShader.setInt("u_AlbedoMap", 0);
 
+            // Bind Albedo Map
+            if (mesh->material->albedoMap) {
+                mesh->material->albedoMap->bind(0);
+                m_gBufferShader.setInt("u_AlbedoMap", 0);
+                // m_gBufferShader.setBool("u_HasAlbedoMap", true);
+            } else {
+                // m_gBufferShader.setBool("u_HasAlbedoMap", false);
+            }
+
+            // Bind Normal Map
             if (mesh->material->normalMap) {
                 mesh->material->normalMap->bind(1);
                 m_gBufferShader.setInt("u_NormalMap", 1);
@@ -174,6 +198,15 @@ void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
             } else {
                 m_gBufferShader.setBool("u_HasNormalMap", false);
             }
+
+            // Bind Specular Map (if applicable)
+            // if (mesh->material->specularMap) {
+            //     mesh->material->specularMap->bind(2);
+            //     m_gBufferShader.setInt("u_SpecularMap", 2);
+            //     m_gBufferShader.setBool("u_HasSpecularMap", true);
+            // } else {
+            //     m_gBufferShader.setBool("u_HasSpecularMap", false);
+            // }
         }
 
         draw(mesh);
@@ -184,12 +217,14 @@ void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
 }
 
 void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lightSystem) {
+    // Bind default framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Use the light pass shader
+    // Use Light Pass Shader
     m_lightPassShader.use();
 
-    // Set camera position (for specular calculation)
+    // Set camera position
     m_lightPassShader.setVec3("u_CameraPosition", cameraPosition);
 
     // Set the number of lights
@@ -209,24 +244,39 @@ void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lig
         }
     }
 
-    // Setup G-buffer textures
+    // Setup G-buffer textures for lighting
     setupGBufferTextures(&m_lightPassShader);
 
-    // Draw the screen-aligned quad (for full-screen lighting)
+    // Enable additive blending for lighting accumulation
+    glEnable(GL_BLEND);
+    glBlendEquation(GL_FUNC_ADD);
+    glBlendFunc(GL_ONE, GL_ONE);
+
+    // Draw the screen-aligned quad for lighting
     drawScreenQuad();
+
+    // Disable blending after lighting pass
+    glDisable(GL_BLEND);
 }
 
 void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
                            const std::vector<Transform>& transforms,
                            const glm::mat4& view,
                            const glm::mat4& projection) {
-    // Read the gbuffer to frame buffer, then draw to default framebuffer
+    // Copy depth buffer from G-buffer to default framebuffer
     glBindFramebuffer(GL_READ_FRAMEBUFFER, m_gBuffer);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-
-    // Bind the default framebuffer
-    glBlitFramebuffer(0, 0, m_width, m_height, 0, 0, m_width, m_height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    glBlitFramebuffer(0, 0, m_width, m_height,
+                      0, 0, m_width, m_height,
+                      GL_DEPTH_BUFFER_BIT, GL_NEAREST);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // Enable depth testing for forward pass
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    // Disable face culling for transparent objects (if any)
+    // glDisable(GL_CULL_FACE);
 
     // Iterate over all forward pass meshes
     for (size_t i = 0; i < meshes.size(); ++i) {
@@ -242,60 +292,65 @@ void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
         // Use the forward shader
         shader->use();
 
-        // Set the view and projection matrices
+        // Set transformation matrices
         shader->setMat4("u_View", view);
         shader->setMat4("u_Projection", projection);
-
-        // Set the model matrix for the object
         shader->setMat4("u_Model", transform.getModelMatrix());
 
-        // Set up the material (optional step, depending on your material setup)
+        // Setup material properties and bind textures
         setupMaterial(shader, mesh->material);
 
         // Draw the mesh
         draw(mesh);
     }
+
+    // Re-enable face culling if it was disabled
+    // glEnable(GL_CULL_FACE);
 }
 
+/*
+ * Material Setup for Forward Pass
+ */
 void Renderer::setupMaterial(Shader* shader, const Material* material) {
-    // Bind the albedo map
-    // shader->setInt("u_AlbedoMap", 0);
-    // material->albedoMap->bind(0);
+    // Set Albedo Color
     shader->setVec3("u_AlbedoColor", material->albedoColor);
 
-    // Bind normal map if available
-    // shader->setBool("u_HasNormalMap", material->normalMap != nullptr);
-    // if (material->normalMap) {
-    //     material->normalMap->bind(1);
-    //     shader->setInt("u_NormalMap", 1);
-    // }
+    // Bind Albedo Map
+    if (material->albedoMap) {
+        glActiveTexture(GL_TEXTURE0);
+        material->albedoMap->bind(0);
+        shader->setInt("u_AlbedoMap", 0);
+        // shader->setBool("u_HasAlbedoMap", true);
+    } else {
+        // shader->setBool("u_HasAlbedoMap", false);
+    }
 
-    // // Bind specular map if available
-    // shader->setBool("u_HasSpecularMap", material->specularMap != nullptr);
+    // Bind Normal Map
+    if (material->normalMap) {
+        glActiveTexture(GL_TEXTURE1);
+        material->normalMap->bind(1);
+        shader->setInt("u_NormalMap", 1);
+        // shader->setBool("u_HasNormalMap", true);
+    } else {
+        // shader->setBool("u_HasNormalMap", false);
+    }
+
+    // Bind Specular Map
     // if (material->specularMap) {
+    //     glActiveTexture(GL_TEXTURE2);
     //     material->specularMap->bind(2);
     //     shader->setInt("u_SpecularMap", 2);
+    //     shader->setBool("u_HasSpecularMap", true);
+    // } else {
+    //     shader->setBool("u_HasSpecularMap", false);
     // }
+
+    // Additional material properties can be set here
 }
 
-void Renderer::setupLight(Shader* shader, const LightSystem& lightSystem, int index) {
-    const glm::vec3& lightPos = lightSystem.positions[index];
-    const glm::vec3& lightColor = lightSystem.colors[index];
-    float lightIntensity = lightSystem.lightIntensities[index];
-    bool isDirectional = lightSystem.directionalFlags[index];
-    const glm::vec3& lightDir = lightSystem.directions[index];
-
-    // Pass light properties to the shader
-    shader->setVec3("u_LightPosition", lightPos);
-    shader->setVec3("u_LightColor", lightColor);
-    shader->setFloat("u_LightIntensity", lightIntensity);
-    // shader->setBool("u_IsDirectional", isDirectional);
-
-    if (isDirectional) {
-        shader->setVec3("u_LightDirection", lightDir);
-    }
-}
-
+/*
+ * G-buffer Texture Setup for Shaders
+ */
 void Renderer::setupGBufferTextures(Shader* shader) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_gTextures[0]);
@@ -309,8 +364,8 @@ void Renderer::setupGBufferTextures(Shader* shader) {
     glBindTexture(GL_TEXTURE_2D, m_gTextures[2]);
     shader->setInt("gAlbedo", 2);
 
-    // Handle additional G-buffer textures
-    for (int i = 3; i < NUM_ATTACHMENTS; ++i) {
+    // Bind additional G-buffer textures if any
+    for (int i = 4; i < NUM_ATTACHMENTS; ++i) {
         glActiveTexture(GL_TEXTURE0 + i);
         glBindTexture(GL_TEXTURE_2D, m_gTextures[i]);
         shader->setInt("gExtraTexture" + std::to_string(i - 3), i);
@@ -318,8 +373,8 @@ void Renderer::setupGBufferTextures(Shader* shader) {
 }
 
 /*
-* Mesh Management
-*/
+ * Mesh Management
+ */
 void Renderer::draw(const Mesh* mesh) {
     size_t index = mesh->id;
     if (index >= m_meshData.size() || m_meshData[index].VAO == 0) {
@@ -329,21 +384,22 @@ void Renderer::draw(const Mesh* mesh) {
 
     const MeshData& data = m_meshData[index];
 
-    // Bind buffers
+    // Bind VAO
     glBindVertexArray(data.VAO);
 
+    // Draw the mesh
     if (data.EBO != 0) {
         glDrawElements(GL_TRIANGLES, data.indexCount, GL_UNSIGNED_INT, 0);
     } else {
         glDrawArrays(GL_TRIANGLES, 0, data.vertexCount);
     }
 
-    // Unbind buffers
+    // Unbind VAO
     glBindVertexArray(0);
 }
 
 void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic) {
-    if (mesh->uvs.size() == 0 || mesh->normals.size() == 0 || mesh->tangents.size() == 0 || mesh->bitangents.size() == 0) {
+    if (mesh->uvs.empty() || mesh->normals.empty() || mesh->tangents.empty() || mesh->bitangents.empty()) {
         std::cerr << "ERROR::RENDERER::INIT_MESH_BUFFERS::UVs, normals, tangents, and bitangents must be provided for all vertices.\n";
         return;
     }
@@ -357,32 +413,31 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic) {
     glGenVertexArrays(1, &data.VAO);
     glBindVertexArray(data.VAO);
 
-    // Build mesh buffer data (14 floats per vertex: 3 for position, 2 for UVs, 3 for normals, 3 for tangents, 3 for bitangents)
+    // Build mesh buffer data (14 floats per vertex)
     std::vector<float> bufferData;
     size_t numVertices = mesh->vertices.size();
-    bufferData.resize(numVertices * 14);
+    bufferData.reserve(numVertices * 14);
 
-    float* ptr = bufferData.data();
     for (size_t i = 0; i < numVertices; ++i) {
         // Positions
-        *ptr++ = mesh->vertices[i].x;
-        *ptr++ = mesh->vertices[i].y;
-        *ptr++ = mesh->vertices[i].z;
+        bufferData.push_back(mesh->vertices[i].x);
+        bufferData.push_back(mesh->vertices[i].y);
+        bufferData.push_back(mesh->vertices[i].z);
         // UVs
-        *ptr++ = mesh->uvs[i].x;
-        *ptr++ = mesh->uvs[i].y;
+        bufferData.push_back(mesh->uvs[i].x);
+        bufferData.push_back(mesh->uvs[i].y);
         // Normals
-        *ptr++ = mesh->normals[i].x;
-        *ptr++ = mesh->normals[i].y;
-        *ptr++ = mesh->normals[i].z;
+        bufferData.push_back(mesh->normals[i].x);
+        bufferData.push_back(mesh->normals[i].y);
+        bufferData.push_back(mesh->normals[i].z);
         // Tangents
-        *ptr++ = mesh->tangents[i].x;
-        *ptr++ = mesh->tangents[i].y;
-        *ptr++ = mesh->tangents[i].z;
+        bufferData.push_back(mesh->tangents[i].x);
+        bufferData.push_back(mesh->tangents[i].y);
+        bufferData.push_back(mesh->tangents[i].z);
         // Bitangents
-        *ptr++ = mesh->bitangents[i].x;
-        *ptr++ = mesh->bitangents[i].y;
-        *ptr++ = mesh->bitangents[i].z;
+        bufferData.push_back(mesh->bitangents[i].x);
+        bufferData.push_back(mesh->bitangents[i].y);
+        bufferData.push_back(mesh->bitangents[i].z);
     }
 
     glGenBuffers(1, &data.VBO);
@@ -408,13 +463,13 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic) {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)0);
 
-    // UVs (location = 2)
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(3 * sizeof(float)));
-
     // Normals (location = 1)
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(5 * sizeof(float)));
+
+    // UVs (location = 2)
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(3 * sizeof(float)));
 
     // Tangents (location = 3)
     glEnableVertexAttribArray(3);
@@ -424,7 +479,7 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic) {
     glEnableVertexAttribArray(4);
     glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
 
-    // Unbind buffers
+    // Unbind VAO
     glBindVertexArray(0);
 
     // Find the first available spot in the mesh data vector
@@ -473,13 +528,13 @@ void Renderer::deleteMeshBuffer(const Mesh* mesh) {
         data.EBO = 0;
     }
 
-    // Reset mesh at index (this will leave a hole in the array)
+    // Reset mesh at index
     m_meshData[index] = MeshData{};
 }
 
 /*
-* Screen quad deferred rendering target output
-*/
+ * Screen Quad Initialization and Drawing
+ */
 void Renderer::initScreenQuad() {
     // Vertices for a screen-aligned quad (NDC space)
     float quadVertices[] = {
@@ -505,7 +560,7 @@ void Renderer::initScreenQuad() {
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
 
-    // Generate and bind EBO (Element Buffer Object for indices)
+    // Generate and bind EBO
     glGenBuffers(1, &EBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quadIndices), &quadIndices, GL_STATIC_DRAW);
@@ -529,31 +584,49 @@ void Renderer::drawScreenQuad() {
 }
 
 /*
-* G-Buffer Debugging
-*/
+ * G-Buffer Debugging
+ */
 void Renderer::debugGBuffer(const Shader& debugShader, int debugMode) {
-    // Bind core G-buffer textures
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_gTextures[0]);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, m_gTextures[1]);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, m_gTextures[2]);
+    // Bind default framebuffer for debugging
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Use the debug shader
     debugShader.use();
+
+    // Set uniform samplers for G-buffer textures
     debugShader.setInt("gPosition", 0);
     debugShader.setInt("gNormal", 1);
     debugShader.setInt("gAlbedo", 2);
+    debugShader.setInt("gDepth", 3);
+
+    // Set debug mode (defines what to visualize)
     debugShader.setInt("debugMode", debugMode);
 
-    // Bind any additional G-buffer textures if they exist
-    for (int i = 3; i < NUM_ATTACHMENTS; ++i) {
+    // Bind G-buffer textures
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[0]); // Position
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[1]); // Normal
+
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[2]); // Albedo
+
+    // Bind Depth Texture
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[3]); // Depth
+
+    // Bind additional G-buffer textures if any (NUM_ATTACHMENTS > 4)
+    for (int i = 4; i < NUM_ATTACHMENTS; ++i) {
         glActiveTexture(GL_TEXTURE0 + i);
         glBindTexture(GL_TEXTURE_2D, m_gTextures[i]);
         debugShader.setInt("gExtraTexture" + std::to_string(i - 3), i);
     }
 
-    // Draw the quad (screen aligned)
+    // Draw the screen-aligned quad to visualize the debug information
     drawScreenQuad();
+
+    // Unbind the framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

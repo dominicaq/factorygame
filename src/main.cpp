@@ -182,8 +182,8 @@ void loadScene(std::vector<Mesh*>& meshes,
     if (cubeMesh != nullptr) {
         cubeMesh->material = cubeMaterial;
         forwardMeshes.push_back(cubeMesh);
-        forwardTransforms.push_back(Transform(glm::vec3(0.0f, 2.0f, 0.0f), glm::vec3(0.1f), glm::vec3(0.0f)));
-        renderer->initMeshBuffers(cubeMesh);  // Initialize the mesh for rendering
+        forwardTransforms.push_back(Transform(glm::vec3(0.0f, 2.0f, 0.0f), glm::vec3(0.5f), glm::vec3(0.0f)));
+        renderer->initMeshBuffers(cubeMesh);
     }
 
     // --------------------- Light System ---------------------
@@ -268,17 +268,22 @@ int main() {
     camera.position = glm::vec3(4.0f, 0.21f, 4.04f);
     camera.eulerAngles = glm::vec3(-2.38f, 239.0f, 0.0f);
 
+    float nearPlane = 0.1f;
+    float farPlane = 100.0f;
     glm::mat4 projection = glm::perspective(
         glm::radians(45.0f),
         float(SCREEN_WIDTH) / float(SCREEN_HEIGHT),
-        0.1f,
-        100.0f
+        nearPlane,
+        farPlane
     );
 
     // Debug Pass Shader (for visualizing G-buffer)
-    std::string debugVertexPath = SHADER_DIR + "deferred/quad.vs";
-    std::string debugFragmentPath = SHADER_DIR + "deferred/quad.fs";
+    std::string debugVertexPath = SHADER_DIR + "deferred/debug_gbuff.vs";
+    std::string debugFragmentPath = SHADER_DIR + "deferred/debug_gbuff.fs";
     Shader debugShader(debugVertexPath, debugFragmentPath);
+    debugShader.use();
+    debugShader.setFloat("u_Near", nearPlane);
+    debugShader.setFloat("u_Far", farPlane);
 
     // Variables for delta time calculation
     float deltaTime = 0.0f;
@@ -288,7 +293,7 @@ int main() {
     glfwSetInputMode(window.getGLFWwindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     // Main render loop
-    int debugMode = 0;
+    int debugMode = -1;
     while (!window.shouldClose()) {
         // Calculate delta time
         float currentFrame = glfwGetTime();
@@ -300,13 +305,24 @@ int main() {
         processCameraInput(glfwWindow, camera, deltaTime);
 
         if (glfwGetKey(glfwWindow, GLFW_KEY_1) == GLFW_PRESS) {
-            debugMode = 0;
+            // Turn off debug mode
+            debugMode = -1;
         }
         if (glfwGetKey(glfwWindow, GLFW_KEY_2) == GLFW_PRESS) {
-            debugMode = 1;
+            // Position
+            debugMode = 0;
         }
         if (glfwGetKey(glfwWindow, GLFW_KEY_3) == GLFW_PRESS) {
+            // Normal
+            debugMode = 1;
+        }
+        if (glfwGetKey(glfwWindow, GLFW_KEY_4) == GLFW_PRESS) {
+            // Albedo
             debugMode = 2;
+        }
+        if (glfwGetKey(glfwWindow, GLFW_KEY_5) == GLFW_PRESS) {
+            // Depth
+            debugMode = 3;
         }
         if (glfwGetKey(glfwWindow, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
             glfwSetWindowShouldClose(glfwWindow, true);
@@ -327,8 +343,12 @@ int main() {
         renderer.geometryPass(meshes, transforms, view, projection);
         renderer.lightPass(camera.position, lightSystem);
 
-        // Render forward pass (draw the cube)
-        renderer.forwardPass(forwardMeshes, forwardTransforms, view, projection);
+        if (debugMode >= 0) {
+            renderer.debugGBuffer(debugShader, debugMode);
+        } else {
+            // Render forward pass (draw the cube)
+            renderer.forwardPass(forwardMeshes, forwardTransforms, view, projection);
+        }
 
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();
