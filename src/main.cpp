@@ -122,7 +122,9 @@ void processCameraInput(GLFWwindow* window, Camera& camera, float deltaTime) {
 void loadScene(std::vector<Mesh*>& meshes,
                std::vector<Transform>& transforms,
                Renderer* renderer,
-               LightSystem& lightSystem)
+               LightSystem& lightSystem,
+               std::vector<Mesh*>& forwardMeshes,
+               std::vector<Transform>& forwardTransforms)
 {
     // Create shader for both models
     std::string vertexPath = SHADER_DIR + "default.vs";
@@ -166,6 +168,24 @@ void loadScene(std::vector<Mesh*>& meshes,
         renderer->initMeshBuffers(diabloModel);
     }
 
+    // --------------------- Cube Model (Forward Rendering) ---------------------
+    // Create a shader specifically for forward rendering
+    std::string forwardVertexPath = SHADER_DIR + "default.vs";
+    std::string forwardFragmentPath = SHADER_DIR + "default.fs";
+    Shader* forwardShader = new Shader(forwardVertexPath, forwardFragmentPath);
+
+    // Create a material for the cube
+    Material* cubeMaterial = new Material(forwardShader);
+    cubeMaterial->albedoColor = glm::vec3(0.2f, 0.7f, 0.2f);  // A greenish color
+
+    Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
+    if (cubeMesh != nullptr) {
+        cubeMesh->material = cubeMaterial;
+        forwardMeshes.push_back(cubeMesh);
+        forwardTransforms.push_back(Transform(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f), glm::vec3(0.0f)));
+        renderer->initMeshBuffers(cubeMesh);  // Initialize the mesh for rendering
+    }
+
     // --------------------- Light System ---------------------
 
     // Light 1: Point Light
@@ -181,7 +201,7 @@ void loadScene(std::vector<Mesh*>& meshes,
     // Light 2: Point Light
     lightSystem.addLight(
         glm::vec3(-2.0f, 2.5f, 2.0f), // Position for a point light
-        glm::vec3(0.0f, 1.0f, 0.0f),  // Green light color
+        glm::vec3(0.0f, 0.0f, 0.5f),  // Green light color
         10.0f,                        // Light radius
         1.0f,                         // Light intensity
         false,                        // No shadows
@@ -232,14 +252,19 @@ int main() {
 
     LightSystem lightSystem;
 
-    // Load meshes and store them in a vector
+    // Load deferred pass meshes and store them in a vector
     std::vector<Mesh*> meshes;
     std::vector<Transform> transforms;
-    loadScene(meshes, transforms, &renderer, lightSystem);
+
+    // Load forward pass meshes
+    std::vector<Mesh*> forwardMeshes;
+    std::vector<Transform> forwardTransforms;
+
+    // Load the scene including deferred and forward pass objects
+    loadScene(meshes, transforms, &renderer, lightSystem, forwardMeshes, forwardTransforms);
 
     // Camera setup
     Camera camera;
-    // Set camera position at (0,0,0)
     camera.position = glm::vec3(4.0f, 0.21f, 4.04f);
     camera.eulerAngles = glm::vec3(-2.38f, 239.0f, 0.0f);
 
@@ -270,7 +295,6 @@ int main() {
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
-#pragma region GAME_CODE
         // Process input
         GLFWwindow* glfwWindow = window.getGLFWwindow();
         processCameraInput(glfwWindow, camera, deltaTime);
@@ -296,25 +320,17 @@ int main() {
         lightSystem.positions[0].x = cos(currentFrame * speed) * radius;
         lightSystem.positions[0].z = sin(currentFrame * speed) * radius;
 
-        // Rotate all meshes in the Y axis based on delta time (optional, remove if not needed)
-        /*
-        for (Transform& transform : transforms) {
-            transform.eulerAngles.y += deltaTime * 10.0f;
-        }
-        */
-#pragma endregion
-
         // Get view matrix from the camera
         glm::mat4 view = camera.getViewMatrix();
 
-        // Render passes
+        // Render deferred pass (geometry and lighting)
         renderer.geometryPass(meshes, transforms, view, projection);
         renderer.lightPass(camera.position, lightSystem);
-        // return 0;
 
-        // Draw gbuffer to screen
-        // renderer.debugGBuffer(debugShader, debugMode);
+        // Render forward pass (draw the cube)
+        // renderer.forwardPass(forwardMeshes, forwardTransforms, view, projection);
 
+        // Swap buffers and poll events
         window.swapBuffersAndPollEvents();
     }
 

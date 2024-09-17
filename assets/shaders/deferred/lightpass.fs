@@ -11,9 +11,19 @@ uniform sampler2D gAlbedo;
 
 // Scene Data
 uniform vec3 u_CameraPosition;
-uniform vec3 u_LightPosition;
-uniform vec3 u_LightColor;
-uniform float u_LightIntensity;
+
+// Light structure
+struct Light {
+    vec3 position;
+    vec3 color;
+    float intensity;
+    bool isDirectional;
+    vec3 direction;
+};
+
+#define MAX_LIGHTS 10
+uniform int numLights;
+uniform Light lights[MAX_LIGHTS];
 
 void main() {
     // Retrieve data from G-buffer
@@ -23,20 +33,32 @@ void main() {
 
     // Ambient component
     vec3 ambient = 0.2 * Albedo;
+    vec3 lighting = ambient;
 
-    // Diffuse lighting
-    vec3 lightDir = normalize(u_LightPosition - FragPos);
-    float diff = max(dot(Normal, lightDir), 0.0);
-    vec3 diffuse = diff * u_LightColor * u_LightIntensity * 0.8;
+    // Accumulate lighting for each light (naive approach)
+    for (int i = 0; i < numLights; ++i) {
+        Light light = lights[i];
 
-    // Specular lighting
-    vec3 viewDir = normalize(u_CameraPosition - FragPos);
-    vec3 reflectDir = reflect(-lightDir, Normal);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 64.0);
-    vec3 specular = u_LightColor * spec * u_LightIntensity * 0.5;
+        vec3 lightDir;
+        if (light.isDirectional) {
+            lightDir = normalize(-light.direction);
+        } else {
+            lightDir = normalize(light.position - FragPos);
+        }
 
-    // Combine lighting components
-    vec3 lighting = ambient + diffuse + specular;
+        // Diffuse component
+        float diff = max(dot(Normal, lightDir), 0.0);
+        vec3 diffuse = diff * light.color * light.intensity * 0.8;
+
+        // Specular component
+        vec3 viewDir = normalize(u_CameraPosition - FragPos);
+        vec3 reflectDir = reflect(-lightDir, Normal);
+        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 64.0);
+        vec3 specular = light.color * spec * light.intensity * 0.5;
+
+        // Accumulate light contribution
+        lighting += diffuse + specular;
+    }
 
     // Blend albedo and lighting
     FragColor = vec4(mix(Albedo, lighting, 0.5), 1.0);

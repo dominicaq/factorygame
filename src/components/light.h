@@ -46,8 +46,7 @@ struct LightSystem {
         unsigned int shadowMap = 0)
     {
         if (size >= MAX_LIGHTS) {
-            // Handle the case where the maximum number of lights is reached
-            return MAX_LIGHTS; // or throw an exception or handle it as needed
+            return MAX_LIGHTS;
         }
 
         unsigned short index;

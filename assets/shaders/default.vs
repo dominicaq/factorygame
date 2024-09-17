@@ -1,7 +1,16 @@
 #version 330 core
+layout(location = 0) in vec3 aPos;
+layout(location = 2) in vec2 aTexCoord;
+layout(location = 1) in vec3 aNormal;
 
-layout (location = 0) in vec2 aPos;  // Vertex positions for the full-screen quad
+uniform mat4 u_Model;
+uniform mat4 u_View;
+uniform mat4 u_Projection;
 
-void main() {
-    gl_Position = vec4(aPos, 0.0, 1.0);  // Pass through the 2D quad position as a 4D clip-space position
+out vec2 TexCoords;
+
+void main()
+{
+    TexCoords = aTexCoord;
+    gl_Position = u_Projection * u_View * u_Model * vec4(aPos, 1.0);
 }

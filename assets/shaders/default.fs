@@ -1,7 +1,11 @@
 #version 330 core
-
 out vec4 FragColor;
 
-void main() {
-    FragColor = vec4(1.0, 1.0, 1.0, 1.0);  // Output pure white
+in vec2 TexCoords;
+
+uniform vec3 u_AlbedoColor;
+
+void main()
+{
+    FragColor = vec4(u_AlbedoColor, 1.0f);
 }

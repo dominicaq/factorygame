@@ -58,11 +58,6 @@ void Renderer::initOpenGLState() {
 }
 
 /*
-* Forward Rendering
-*/
-
-
-/*
 * G-buffer Management
 */
 void Renderer::initGBuffer(int width, int height) {
@@ -185,6 +180,89 @@ void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
+void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lightSystem) {
+    // Bind the default framebuffer to render the final image
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    // Use the light pass shader
+    m_lightPassShader.use();
+
+    // Set camera position (for specular calculation)
+    m_lightPassShader.setVec3("u_CameraPosition", cameraPosition);
+
+    // Set the number of lights
+    m_lightPassShader.setInt("numLights", lightSystem.size);
+
+    // Pass each light's data to the shader
+    for (int i = 0; i < lightSystem.size; ++i) {
+        std::string indexStr = "[" + std::to_string(i) + "]";
+
+        m_lightPassShader.setVec3("lights" + indexStr + ".position", lightSystem.positions[i]);
+        m_lightPassShader.setVec3("lights" + indexStr + ".color", lightSystem.colors[i]);
+        m_lightPassShader.setFloat("lights" + indexStr + ".intensity", lightSystem.lightIntensities[i]);
+        m_lightPassShader.setBool("lights" + indexStr + ".isDirectional", lightSystem.directionalFlags[i]);
+
+        if (lightSystem.directionalFlags[i]) {
+            m_lightPassShader.setVec3("lights" + indexStr + ".direction", lightSystem.directions[i]);
+        }
+    }
+
+    // Setup G-buffer textures
+    setupGBufferTextures(&m_lightPassShader);
+
+    // Draw the screen-aligned quad (for full-screen lighting)
+    drawScreenQuad();
+
+    // Unbind framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
+                           const std::vector<Transform>& transforms,
+                           const glm::mat4& view,
+                           const glm::mat4& projection) {
+    // Ensure depth testing is enabled to use the preserved depth buffer
+    glEnable(GL_DEPTH_TEST);
+
+    // Bind the default framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // Only clear the color buffer, keeping the depth buffer from the deferred pass
+    glClear(GL_COLOR_BUFFER_BIT);  // Do not clear the depth buffer here
+
+    // Set the correct viewport size before rendering
+    glViewport(0, 0, 800, 600);
+
+    // Iterate over all forward pass meshes
+    for (size_t i = 0; i < meshes.size(); ++i) {
+        const Mesh* mesh = meshes[i];
+        const Transform& transform = transforms[i];
+
+        Shader* shader = mesh->material->shader;
+        if (!shader) {
+            std::cerr << "ERROR::FORWARD_PASS::Mesh does not have a shader!\n";
+            continue;
+        }
+
+        // Use the forward shader
+        shader->use();
+
+        // Set the view and projection matrices
+        shader->setMat4("u_View", view);
+        shader->setMat4("u_Projection", projection);
+
+        // Set the model matrix for the object
+        shader->setMat4("u_Model", transform.getModelMatrix());
+
+        // Set up the material (optional step, depending on your material setup)
+        // setupMaterial(shader, mesh->material);
+
+        // Draw the mesh
+        draw(mesh);
+    }
+}
+
 void Renderer::setupMaterial(Shader* shader, const Material* material) {
     // Bind the albedo map
     shader->setInt("u_AlbedoMap", 0);
@@ -243,62 +321,6 @@ void Renderer::setupGBufferTextures(Shader* shader) {
         glBindTexture(GL_TEXTURE_2D, m_gTextures[i]);
         shader->setInt("gExtraTexture" + std::to_string(i - 3), i);
     }
-}
-
-void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
-                           const std::vector<Transform>& transforms,
-                           const glm::mat4& view,
-                           const glm::mat4& projection) {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    for (size_t i = 0; i < meshes.size(); ++i) {
-        const Mesh* mesh = meshes[i];
-        const Transform& transform = transforms[i];
-
-        Shader* shader = mesh->material->shader;
-        if (!shader) {
-            std::cerr << "ERROR::RENDERER::FORWARD_PASS::Mesh does not have a shader!\n";
-            continue;
-        }
-
-        // Use the mesh's shader and set matrices
-        shader->use();
-        shader->setMat4("u_View", view);
-        shader->setMat4("u_Projection", projection);
-        shader->setMat4("u_Model", transform.getModelMatrix());
-
-        // Setup material
-        if (mesh->material) {
-            setupMaterial(shader, mesh->material);
-        }
-
-        // Draw the mesh
-        draw(mesh);
-    }
-}
-
-void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lightSystem) {
-    // Bind the default framebuffer to render the final image
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // Use the light pass shader
-    m_lightPassShader.use();
-
-    // Set camera position (for specular calculation)
-    m_lightPassShader.setVec3("u_CameraPosition", cameraPosition);
-
-    // Setup light (assuming one light for now, can be extended)
-    setupLight(&m_lightPassShader, lightSystem, 0);
-
-    // Setup G-buffer textures
-    setupGBufferTextures(&m_lightPassShader);
-
-    // Draw the screen-aligned quad (for full-screen lighting)
-    drawScreenQuad();
-
-    // Unbind framebuffer
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 /*
