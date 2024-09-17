@@ -7,26 +7,33 @@ layout (location = 2) out vec4 gAlbedo;
 in vec3 FragPos;
 in vec2 TexCoords;
 in vec3 Normal;
-
-uniform sampler2D u_AlbedoMap;
-uniform sampler2D u_NormalMap;
+in vec3 Tangent;
+in vec3 Bitangent;
 
 uniform vec3 u_AlbedoColor;
+uniform sampler2D u_AlbedoMap;
+
 uniform bool u_HasNormalMap;
+uniform sampler2D u_NormalMap;
+
+// NOTE: Shader should only store data
 
 void main() {
     // Store the fragment position in gPosition
     gPosition = FragPos;
+    vec3 mappedNormal = normalize(Normal);
 
-    // Check if normal map is present
+    // Apply normal mapping if available
     if (u_HasNormalMap) {
-        // Sample the normal from the normal map and remap from [0,1] to [-1,1]
+        mat3 TBN = mat3(normalize(Tangent), normalize(Bitangent), normalize(Normal));
+        // Transform to world space using TBN matrix and map from [0,1] to [-1,1]
         vec3 normalMap = texture(u_NormalMap, TexCoords).rgb;
-        gNormal = normalize(normalMap * 2.0 - 1.0);  // Remap to [-1, 1] range
-    } else {
-        // Use the geometry normal if no normal map
-        gNormal = normalize(Normal);
+        normalMap = normalMap * 2.0 - 1.0;
+        mappedNormal = normalize(TBN * normalMap);
     }
+
+    // Store the world-space normal in gNormal
+    gNormal = mappedNormal;
 
     // Store the albedo color in gAlbedo
     vec3 albedo = texture(u_AlbedoMap, TexCoords).rgb * u_AlbedoColor;

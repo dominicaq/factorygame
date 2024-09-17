@@ -67,6 +67,13 @@ private:
     void initGBuffer(int width, int height);
 
     /*
+    * Helpers
+    */
+    void setupMaterial(Shader* shader, const Material* material);
+    void setupLight(Shader* shader, const LightSystem& lightSystem, int index);
+    void setupGBufferTextures(Shader* shader);
+
+    /*
     * Render Quad
     */
     unsigned int m_quadVAO;

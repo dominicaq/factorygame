@@ -154,7 +154,7 @@ void loadScene(std::vector<Mesh*>& meshes,
     diabloMaterial->albedoMap = diabloTexture;
 
     // Load the normal map for the Diablo model
-    std::string diabloNormalMapPath = TEXTURE_DIR + "diablo/diablo3_pose_nm.tga";
+    std::string diabloNormalMapPath = TEXTURE_DIR + "diablo/diablo3_pose_nm_tangent.tga";
     Texture* diabloNormalMap = new Texture(diabloNormalMapPath);
     diabloMaterial->normalMap = diabloNormalMap;
 
@@ -170,10 +170,10 @@ void loadScene(std::vector<Mesh*>& meshes,
 
     // Light 1: Point Light
     lightSystem.addLight(
-        glm::vec3(-10.0f, 3.0f, 0.0f),  // Middle-left side
+        glm::vec3(-20.0f, 0.0f, 0.0f),  // Middle-left side
         glm::vec3(0.2f, 0.2f, 0.2f),    // Grayish White color
-        10.0f,                          // Light radius
-        4.0f,                           // Light intensity
+        1.0f,                          // Light radius
+        3.0f,                           // Light intensity
         false,                          // No shadows
         false                           // Point light
     );
@@ -288,10 +288,20 @@ int main() {
             glfwSetWindowShouldClose(glfwWindow, true);
         }
 
-        // Rotate all meshes in the Y axis based on delta time
+        // Rotate the first light in a circular motion
+        float radius = 5.0f;  // Set the radius of the circular motion
+        float speed = 1.0f;   // Speed of rotation
+
+        // Calculate the new position using sine and cosine for circular motion
+        lightSystem.positions[0].x = cos(currentFrame * speed) * radius;
+        lightSystem.positions[0].z = sin(currentFrame * speed) * radius;
+
+        // Rotate all meshes in the Y axis based on delta time (optional, remove if not needed)
+        /*
         for (Transform& transform : transforms) {
             transform.eulerAngles.y += deltaTime * 10.0f;
         }
+        */
 #pragma endregion
 
         // Get view matrix from the camera
@@ -300,6 +310,7 @@ int main() {
         // Render passes
         renderer.geometryPass(meshes, transforms, view, projection);
         renderer.lightPass(camera.position, lightSystem);
+        // return 0;
 
         // Draw gbuffer to screen
         // renderer.debugGBuffer(debugShader, debugMode);

@@ -16,8 +16,8 @@ Renderer::Renderer(int width, int height) {
     }
 
     // Light Pass Shader (Expecting this to be fixed, so will be created here)
-    std::string lightVertexPath = ASSET_DIR "shaders/deferred/lighting.vs";
-    std::string lightFragmentPath = ASSET_DIR "shaders/deferred/lighting.fs";
+    std::string lightVertexPath = ASSET_DIR "shaders/deferred/lightpass.vs";
+    std::string lightFragmentPath = ASSET_DIR "shaders/deferred/lightpass.fs";
     if (!m_lightPassShader.load(lightVertexPath, lightFragmentPath)) {
         std::cerr << "Failed to create light shader!\n";
     }
@@ -60,64 +60,7 @@ void Renderer::initOpenGLState() {
 /*
 * Forward Rendering
 */
-void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
-                           const std::vector<Transform>& transforms,
-                           const glm::mat4& view,
-                           const glm::mat4& projection)
-{
-    // Clear the color and depth buffers
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    for (size_t i = 0; i < meshes.size(); ++i) {
-        const Mesh* mesh = meshes[i];
-        const Transform& transform = transforms[i];
-
-        // Each mesh has its own shader
-        Shader* shader = mesh->material->shader;
-        if (!shader) {
-            std::cerr << "ERROR::RENDERER::FORWARD_PASS::Mesh does not have a shader!\n";
-            continue;
-        }
-
-        // Use the mesh's shader
-        shader->use();
-        shader->setMat4("u_View", view);
-        shader->setMat4("u_Projection", projection);
-
-        // Set model matrix for the mesh
-        glm::mat4 model = transform.getModelMatrix();
-        shader->setMat4("u_Model", model);
-
-        // Set material properties (e.g., albedo color or textures)
-        if (mesh->material) {
-            // Bind the albedo map
-            shader->setInt("u_AlbedoMap", 0);
-            mesh->material->albedoMap->bind(0);
-            shader->setVec3("u_AlbedoColor", mesh->material->albedoColor);
-
-            // Bind normal map if available
-            if (mesh->material->normalMap) {
-                shader->setBool("u_HasNormalMap", true);
-                mesh->material->normalMap->bind(1);
-                shader->setInt("u_NormalMap", 1);
-            } else {
-                shader->setBool("u_HasNormalMap", false);
-            }
-
-            // Bind specular map if available
-            if (mesh->material->specularMap) {
-                shader->setBool("u_HasSpecularMap", true);
-                mesh->material->specularMap->bind(2);
-                shader->setInt("u_SpecularMap", 2);
-            } else {
-                shader->setBool("hasSpecularMap", false);
-            }
-        }
-
-        // Draw the mesh
-        draw(mesh);
-    }
-}
 
 /*
 * G-buffer Management
@@ -205,9 +148,7 @@ void Renderer::resizeGBuffer(int width, int height) {
 void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
                             const std::vector<Transform>& transforms,
                             const glm::mat4& view,
-                            const glm::mat4& projection)
-{
-    // Bind and clear framebuffer
+                            const glm::mat4& projection) {
     glBindFramebuffer(GL_FRAMEBUFFER, m_gBuffer);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -219,18 +160,15 @@ void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
         const Mesh* mesh = meshes[i];
         const Transform& transform = transforms[i];
 
-        // Set model matrix
         glm::mat4 model = transform.getModelMatrix();
         m_gBufferShader.setMat4("u_Model", model);
 
-        // Set material properties (e.g., albedo color or textures)
+        // Set material properties
         if (mesh->material) {
-            // Bind the albedo map (required)
             m_gBufferShader.setVec3("u_AlbedoColor", mesh->material->albedoColor);
             mesh->material->albedoMap->bind(0);
             m_gBufferShader.setInt("u_AlbedoMap", 0);
 
-            // Check and bind normal map if available
             if (mesh->material->normalMap) {
                 mesh->material->normalMap->bind(1);
                 m_gBufferShader.setInt("u_NormalMap", 1);
@@ -238,23 +176,105 @@ void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
             } else {
                 m_gBufferShader.setBool("u_HasNormalMap", false);
             }
-
-            // Check and bind specular map if available
-            // if (mesh->material->specularMap) {
-            //     mesh->material->specularMap->bind(2);
-            //     m_gBufferShader.setInt("u_SpecularMap", 2);
-            //     m_gBufferShader.setBool("u_HasSpecularMap", true);
-            // } else {
-            //     m_gBufferShader.setBool("u_HasSpecularMap", false);
-            // }
         }
 
-        // Draw the mesh
         draw(mesh);
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+
+void Renderer::setupMaterial(Shader* shader, const Material* material) {
+    // Bind the albedo map
+    shader->setInt("u_AlbedoMap", 0);
+    material->albedoMap->bind(0);
+    shader->setVec3("u_AlbedoColor", material->albedoColor);
+
+    // Bind normal map if available
+    // shader->setBool("u_HasNormalMap", material->normalMap != nullptr);
+    // if (material->normalMap) {
+    //     material->normalMap->bind(1);
+    //     shader->setInt("u_NormalMap", 1);
+    // }
+
+    // // Bind specular map if available
+    // shader->setBool("u_HasSpecularMap", material->specularMap != nullptr);
+    // if (material->specularMap) {
+    //     material->specularMap->bind(2);
+    //     shader->setInt("u_SpecularMap", 2);
+    // }
+}
+
+void Renderer::setupLight(Shader* shader, const LightSystem& lightSystem, int index) {
+    const glm::vec3& lightPos = lightSystem.positions[index];
+    const glm::vec3& lightColor = lightSystem.colors[index];
+    float lightIntensity = lightSystem.lightIntensities[index];
+    bool isDirectional = lightSystem.directionalFlags[index];
+    const glm::vec3& lightDir = lightSystem.directions[index];
+
+    // Pass light properties to the shader
+    shader->setVec3("u_LightPosition", lightPos);
+    shader->setVec3("u_LightColor", lightColor);
+    shader->setFloat("u_LightIntensity", lightIntensity);
+    // shader->setBool("u_IsDirectional", isDirectional);
+
+    if (isDirectional) {
+        shader->setVec3("u_LightDirection", lightDir);
+    }
+}
+
+void Renderer::setupGBufferTextures(Shader* shader) {
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[0]);
+    shader->setInt("gPosition", 0);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[1]);
+    shader->setInt("gNormal", 1);
+
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[2]);
+    shader->setInt("gAlbedo", 2);
+
+    // Handle additional G-buffer textures
+    for (int i = 3; i < NUM_ATTACHMENTS; ++i) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        glBindTexture(GL_TEXTURE_2D, m_gTextures[i]);
+        shader->setInt("gExtraTexture" + std::to_string(i - 3), i);
+    }
+}
+
+void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
+                           const std::vector<Transform>& transforms,
+                           const glm::mat4& view,
+                           const glm::mat4& projection) {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    for (size_t i = 0; i < meshes.size(); ++i) {
+        const Mesh* mesh = meshes[i];
+        const Transform& transform = transforms[i];
+
+        Shader* shader = mesh->material->shader;
+        if (!shader) {
+            std::cerr << "ERROR::RENDERER::FORWARD_PASS::Mesh does not have a shader!\n";
+            continue;
+        }
+
+        // Use the mesh's shader and set matrices
+        shader->use();
+        shader->setMat4("u_View", view);
+        shader->setMat4("u_Projection", projection);
+        shader->setMat4("u_Model", transform.getModelMatrix());
+
+        // Setup material
+        if (mesh->material) {
+            setupMaterial(shader, mesh->material);
+        }
+
+        // Draw the mesh
+        draw(mesh);
+    }
 }
 
 void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lightSystem) {
@@ -268,41 +288,11 @@ void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lig
     // Set camera position (for specular calculation)
     m_lightPassShader.setVec3("u_CameraPosition", cameraPosition);
 
-    // Set light properties (assuming you have at least one light in the system)
-    const glm::vec3& lightPos = lightSystem.positions[0];
-    const glm::vec3& lightColor = lightSystem.colors[0];
-    float lightIntensity = lightSystem.lightIntensities[0];
-    bool isDirectional = lightSystem.directionalFlags[0];
-    const glm::vec3& lightDir = lightSystem.directions[0];
+    // Setup light (assuming one light for now, can be extended)
+    setupLight(&m_lightPassShader, lightSystem, 0);
 
-    // Pass light properties to the shader
-    m_lightPassShader.setVec3("u_LightPosition", lightPos);
-    m_lightPassShader.setVec3("u_LightColor", lightColor);
-    m_lightPassShader.setFloat("u_LightIntensity", lightIntensity);
-    m_lightPassShader.setBool("u_IsDirectional", isDirectional);
-    if (isDirectional) {
-        m_lightPassShader.setVec3("u_LightDirection", lightDir);
-    }
-
-    // Bind G-buffer textures for the light pass
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_gTextures[0]);
-    m_lightPassShader.setInt("gPosition", 0);
-
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, m_gTextures[1]);
-    m_lightPassShader.setInt("gNormal", 1);
-
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, m_gTextures[2]);
-    m_lightPassShader.setInt("gAlbedo", 2);
-
-    // If there are additional G-buffer textures
-    for (int i = 3; i < NUM_ATTACHMENTS; ++i) {
-        glActiveTexture(GL_TEXTURE0 + i);
-        glBindTexture(GL_TEXTURE_2D, m_gTextures[i]);
-        m_lightPassShader.setInt("gExtraTexture" + std::to_string(i - 3), i);
-    }
+    // Setup G-buffer textures
+    setupGBufferTextures(&m_lightPassShader);
 
     // Draw the screen-aligned quad (for full-screen lighting)
     drawScreenQuad();
@@ -337,8 +327,8 @@ void Renderer::draw(const Mesh* mesh) {
 }
 
 void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic) {
-    if (mesh->uvs.size() == 0 || mesh->normals.size() == 0) {
-        std::cerr << "ERROR::RENDERER::INIT_MESH_BUFFERS::UVs and normals must be provided for all vertices.\n";
+    if (mesh->uvs.size() == 0 || mesh->normals.size() == 0 || mesh->tangents.size() == 0 || mesh->bitangents.size() == 0) {
+        std::cerr << "ERROR::RENDERER::INIT_MESH_BUFFERS::UVs, normals, tangents, and bitangents must be provided for all vertices.\n";
         return;
     }
 
@@ -351,10 +341,10 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic) {
     glGenVertexArrays(1, &data.VAO);
     glBindVertexArray(data.VAO);
 
-    // Build mesh buffer data (8 floats per vertex)
+    // Build mesh buffer data (14 floats per vertex: 3 for position, 2 for UVs, 3 for normals, 3 for tangents, 3 for bitangents)
     std::vector<float> bufferData;
     size_t numVertices = mesh->vertices.size();
-    bufferData.resize(numVertices * 8);
+    bufferData.resize(numVertices * 14);
 
     float* ptr = bufferData.data();
     for (size_t i = 0; i < numVertices; ++i) {
@@ -369,6 +359,14 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic) {
         *ptr++ = mesh->normals[i].x;
         *ptr++ = mesh->normals[i].y;
         *ptr++ = mesh->normals[i].z;
+        // Tangents
+        *ptr++ = mesh->tangents[i].x;
+        *ptr++ = mesh->tangents[i].y;
+        *ptr++ = mesh->tangents[i].z;
+        // Bitangents
+        *ptr++ = mesh->bitangents[i].x;
+        *ptr++ = mesh->bitangents[i].y;
+        *ptr++ = mesh->bitangents[i].z;
     }
 
     glGenBuffers(1, &data.VBO);
@@ -390,17 +388,25 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic) {
 
     // Vertex attribute pointers
 
-    // Vertex positions (location = 0)
+    // Positions (location = 0)
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(0));
-
-    // Normals (location = 1)
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)0);
 
     // UVs (location = 2)
     glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(3 * sizeof(float)));
+
+    // Normals (location = 1)
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(5 * sizeof(float)));
+
+    // Tangents (location = 3)
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
+
+    // Bitangents (location = 4)
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
 
     // Unbind buffers
     glBindVertexArray(0);
