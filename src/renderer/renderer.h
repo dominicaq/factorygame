@@ -1,7 +1,9 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
+#include "framegraph.h"
 #include "shader.h"
+
 #include "../components/transform.h"
 #include "../components/mesh.h"
 #include "../components/light.h"
@@ -32,18 +34,21 @@ public:
     void deleteMeshBuffer(const Mesh* mesh);
 
     /*
-    * Forward rendering
+    * Quad rendering (used for post-processing, G-buffer display, etc.)
     */
-   void forwardPass(const std::vector<Mesh*>& meshes,
-        const std::vector<Transform>& transforms,
-        const glm::mat4& view,
-        const glm::mat4& projection);
+    void drawScreenQuad();
+    void initScreenQuad();
 
+
+    // TODO: To be abstracted below
     /*
-    * G-Buffer management for deferred rendering
+    * Recreate gbuffer with new dimensions
     */
     void resizeGBuffer(int width, int height);
 
+    /*
+    * Render Passes
+    */
     void geometryPass(const std::vector<Mesh*>& meshes,
         const std::vector<Transform>& transforms,
         const glm::mat4& view,
@@ -51,48 +56,41 @@ public:
 
     void lightPass(const glm::vec3& cameraPosition, const LightSystem& lightSystem);
 
-    /*
-    * Quad rendering (used for post-processing, G-buffer display, etc.)
-    */
-    void drawScreenQuad();
-    void initScreenQuad();
+    void forwardPass(const std::vector<Mesh*>& meshes,
+        const std::vector<Transform>& transforms,
+        const glm::mat4& view,
+        const glm::mat4& projection);
 
-    /*
-    * Debugging: Display G-buffer textures (e.g., Position, Normal, Albedo)
-    */
-    void debugGBuffer(const Shader& debugShader, int debugMode);
+    // Debugging: Display G-buffer textures (e.g., Position, Normal, Albedo)
+    void debugGBufferPass(const Shader& debugShader, int debugMode);
 
 private:
-    void initOpenGLState();
-    void initGBuffer(int width, int height);
-
-    /*
-    * Helpers
-    */
-    void setupMaterial(Shader* shader, const Material* material);
-    void setupGBufferTextures(Shader* shader);
-
-    /*
-    * Screen dimensions
-    */
     int m_width, m_height;
+    void initOpenGLState();
 
     /*
     * Render Quad
     */
     unsigned int m_quadVAO;
 
+    // TODO: section to be abstracted below
     /*
-    * G-buffer resources
+    * G-buffer
     */
+    void initGBuffer(int width, int height);
     unsigned int m_gBuffer;
     unsigned int m_rboDepth;
 
     // Store G-buffer textures in a vector
     std::vector<unsigned int> m_gTextures;
 
+    /*
+    * Render pass shaders
+    */
     Shader m_gBufferShader;
     Shader m_lightPassShader;
+
+    // TODO: end of deprecation
 
     /*
     * Mesh buffer storage

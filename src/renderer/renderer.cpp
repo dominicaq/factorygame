@@ -6,43 +6,57 @@
 
 Renderer::Renderer(int width, int height) : m_width(width), m_height(height) {
     initOpenGLState();
-    initGBuffer(width, height);
+    initScreenQuad();
 
-    // Load Geometry Pass Shader
+    /*
+    * TODO: G-Buffer + Pass init (to be abstracted)
+    */
+
+    // Init gbuffer data
+    initGBuffer(width, height);
     std::string gBufferVertexPath = ASSET_DIR "shaders/deferred/gbuff.vs";
     std::string gBufferFragmentPath = ASSET_DIR "shaders/deferred/gbuff.fs";
     if (!m_gBufferShader.load(gBufferVertexPath, gBufferFragmentPath)) {
         std::cerr << "Failed to create gBufferShader!\n";
     }
 
-    // Load Light Pass Shader
+    // Init lightpass data
     std::string lightVertexPath = ASSET_DIR "shaders/deferred/lightpass.vs";
     std::string lightFragmentPath = ASSET_DIR "shaders/deferred/lightpass.fs";
     if (!m_lightPassShader.load(lightVertexPath, lightFragmentPath)) {
         std::cerr << "Failed to create lightPassShader!\n";
     }
-
-    // Initialize Screen Quad for Deferred Passes
-    initScreenQuad();
 }
 
 Renderer::~Renderer() {
+    // Clean up mesh buffers
+    for (auto& data : m_meshData) {
+        if (data.VAO) {
+            glDeleteVertexArrays(1, &data.VAO);
+        }
+        if (data.VBO) {
+            glDeleteBuffers(1, &data.VBO);
+        }
+        if (data.EBO) {
+            glDeleteBuffers(1, &data.EBO);
+        }
+    }
+
+    // Clean up quad
+    if (m_quadVAO) {
+        glDeleteVertexArrays(1, &m_quadVAO);
+    }
+
+    /*
+    * TODO: To be abstracted
+    */
+
     // Clean up G-buffer
     glDeleteFramebuffers(1, &m_gBuffer);
     for (auto& texture : m_gTextures) {
         glDeleteTextures(1, &texture);
     }
     glDeleteRenderbuffers(1, &m_rboDepth);
-
-    // Clean up mesh buffers
-    for (auto& data : m_meshData) {
-        if (data.VAO) glDeleteVertexArrays(1, &data.VAO);
-        if (data.VBO) glDeleteBuffers(1, &data.VBO);
-        if (data.EBO) glDeleteBuffers(1, &data.EBO);
-    }
-
-    // Clean up quad
-    if (m_quadVAO) glDeleteVertexArrays(1, &m_quadVAO);
 }
 
 /*
@@ -60,6 +74,224 @@ void Renderer::initOpenGLState() {
     // Disable Blending by default
     glDisable(GL_BLEND);
 }
+
+/*
+ * Mesh Management
+ */
+void Renderer::draw(const Mesh* mesh) {
+    size_t index = mesh->id;
+    if (index >= m_meshData.size() || m_meshData[index].VAO == 0) {
+        std::cerr << "ERROR::RENDERER::DRAW::Mesh buffer not found.\n";
+        return;
+    }
+
+    const MeshData& data = m_meshData[index];
+
+    // Bind VAO
+    glBindVertexArray(data.VAO);
+
+    // Draw the mesh
+    if (data.EBO != 0) {
+        glDrawElements(GL_TRIANGLES, data.indexCount, GL_UNSIGNED_INT, 0);
+    } else {
+        glDrawArrays(GL_TRIANGLES, 0, data.vertexCount);
+    }
+
+    // Unbind VAO
+    glBindVertexArray(0);
+}
+
+void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic) {
+    if (mesh->uvs.empty() ||
+        mesh->normals.empty() ||
+        mesh->tangents.empty() ||
+        mesh->bitangents.empty()) {
+        std::cerr << "ERROR::RENDERER::INIT_MESH_BUFFERS::UVs, normals, tangents, and bitangents must be provided for all vertices.\n";
+        return;
+    }
+
+    // Assign an ID if not already assigned
+    if (mesh->id == SIZE_MAX) {
+        mesh->id = m_meshData.size();
+    }
+
+    MeshData data = {};
+    glGenVertexArrays(1, &data.VAO);
+    glBindVertexArray(data.VAO);
+
+    // Build mesh buffer data (14 floats per vertex)
+    std::vector<float> bufferData;
+    size_t numVertices = mesh->vertices.size();
+    bufferData.reserve(numVertices * 14);
+
+    for (size_t i = 0; i < numVertices; ++i) {
+        // Positions
+        bufferData.push_back(mesh->vertices[i].x);
+        bufferData.push_back(mesh->vertices[i].y);
+        bufferData.push_back(mesh->vertices[i].z);
+        // UVs
+        bufferData.push_back(mesh->uvs[i].x);
+        bufferData.push_back(mesh->uvs[i].y);
+        // Normals
+        bufferData.push_back(mesh->normals[i].x);
+        bufferData.push_back(mesh->normals[i].y);
+        bufferData.push_back(mesh->normals[i].z);
+        // Tangents
+        bufferData.push_back(mesh->tangents[i].x);
+        bufferData.push_back(mesh->tangents[i].y);
+        bufferData.push_back(mesh->tangents[i].z);
+        // Bitangents
+        bufferData.push_back(mesh->bitangents[i].x);
+        bufferData.push_back(mesh->bitangents[i].y);
+        bufferData.push_back(mesh->bitangents[i].z);
+    }
+
+    glGenBuffers(1, &data.VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, data.VBO);
+    glBufferData(GL_ARRAY_BUFFER, bufferData.size() * sizeof(float), bufferData.data(), GL_STATIC_DRAW);
+
+    if (!mesh->indices.empty()) {
+        glGenBuffers(1, &data.EBO);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, data.EBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->indices.size() * sizeof(unsigned int), mesh->indices.data(), GL_STATIC_DRAW);
+        data.indexCount = static_cast<GLsizei>(mesh->indices.size());
+        data.vertexCount = 0;
+    } else {
+        // No indices
+        data.EBO = 0;
+        data.indexCount = 0;
+        data.vertexCount = static_cast<GLsizei>(mesh->vertices.size());
+    }
+
+    // Vertex attribute pointers
+
+    // Positions (location = 0)
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)0);
+
+    // Normals (location = 1)
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(5 * sizeof(float)));
+
+    // UVs (location = 2)
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(3 * sizeof(float)));
+
+    // Tangents (location = 3)
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
+
+    // Bitangents (location = 4)
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
+
+    // Unbind VAO
+    glBindVertexArray(0);
+
+    // Find the first available spot in the mesh data vector
+    bool inserted = false;
+    for (size_t i = 0; i < m_meshData.size(); ++i) {
+        if (m_meshData[i].VAO == 0) {
+            m_meshData[i] = data;
+            mesh->id = i;
+            inserted = true;
+            break;
+        }
+    }
+
+    // If all slots were full, append to end
+    if (!inserted) {
+        m_meshData.push_back(data);
+        mesh->id = m_meshData.size() - 1;
+    }
+
+    // Clear CPU-side mesh data if possible
+    if (isStatic) {
+        mesh->clearData();
+    }
+}
+
+void Renderer::deleteMeshBuffer(const Mesh* mesh) {
+    size_t index = mesh->id;
+    if (index >= m_meshData.size() || m_meshData[index].VAO == 0) {
+        std::cerr << "ERROR::RENDERER::DELETE_MESH_BUFFER::Mesh buffer not found.\n";
+        return;
+    }
+
+    MeshData& data = m_meshData[index];
+
+    // Delete mesh resources
+    if (data.VAO) {
+        glDeleteVertexArrays(1, &data.VAO);
+        data.VAO = 0;
+    }
+    if (data.VBO) {
+        glDeleteBuffers(1, &data.VBO);
+        data.VBO = 0;
+    }
+    if (data.EBO) {
+        glDeleteBuffers(1, &data.EBO);
+        data.EBO = 0;
+    }
+
+    // Reset mesh at index
+    m_meshData[index] = MeshData{};
+}
+
+/*
+ * Screen Quad Initialization and Drawing
+ */
+void Renderer::initScreenQuad() {
+    // Vertices for a screen-aligned quad (NDC space)
+    float quadVertices[] = {
+        // positions        // uvs
+        -1.0f,  1.0f, 0.0f,  0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f,  0.0f, 0.0f,
+         1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
+         1.0f,  1.0f, 0.0f,  1.0f, 1.0f
+    };
+
+    unsigned int quadIndices[] = {
+        0, 1, 2,
+        2, 3, 0
+    };
+
+    // Generate and bind VAO
+    glGenVertexArrays(1, &m_quadVAO);
+    glBindVertexArray(m_quadVAO);
+
+    // Generate and bind VBO
+    unsigned int VBO, EBO;
+    glGenBuffers(1, &VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+
+    // Generate and bind EBO
+    glGenBuffers(1, &EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quadIndices), &quadIndices, GL_STATIC_DRAW);
+
+    // Position attribute (location = 0)
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+
+    // UV attribute (location = 1)
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+
+    // Unbind VAO
+    glBindVertexArray(0);
+}
+
+void Renderer::drawScreenQuad() {
+    glBindVertexArray(m_quadVAO);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+}
+
+/*
+* TODO: Render Passes and GBuffer code below (will be abstracted later)
+*/
 
 /*
  * G-buffer Management
@@ -245,7 +477,24 @@ void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lig
     }
 
     // Setup G-buffer textures for lighting
-    setupGBufferTextures(&m_lightPassShader);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[0]);
+    m_lightPassShader.setInt("gPosition", 0);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[1]);
+    m_lightPassShader.setInt("gNormal", 1);
+
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, m_gTextures[2]);
+    m_lightPassShader.setInt("gAlbedo", 2);
+
+    // Bind additional G-buffer textures if any
+    for (int i = 4; i < NUM_ATTACHMENTS; ++i) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        glBindTexture(GL_TEXTURE_2D, m_gTextures[i]);
+        m_lightPassShader.setInt("gExtraTexture" + std::to_string(i - 3), i);
+    }
 
     // Enable additive blending for lighting accumulation
     glEnable(GL_BLEND);
@@ -298,295 +547,34 @@ void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
         shader->setMat4("u_Model", transform.getModelMatrix());
 
         // Setup material properties and bind textures
-        setupMaterial(shader, mesh->material);
+        shader->setVec3("u_AlbedoColor", mesh->material->albedoColor);
+
+        // Bind Albedo Map
+        if (mesh->material->albedoMap) {
+            glActiveTexture(GL_TEXTURE0);
+            mesh->material->albedoMap->bind(0);
+            shader->setInt("u_AlbedoMap", 0);
+        }
+
+        // Bind Normal Map
+        if (mesh->material->normalMap) {
+            glActiveTexture(GL_TEXTURE1);
+            mesh->material->normalMap->bind(1);
+            shader->setInt("u_NormalMap", 1);
+        }
 
         // Draw the mesh
         draw(mesh);
     }
 
-    // Re-enable face culling if it was disabled
+    // Re-enable face culling if it was disabled (for transparency later)
     // glEnable(GL_CULL_FACE);
-}
-
-/*
- * Material Setup for Forward Pass
- */
-void Renderer::setupMaterial(Shader* shader, const Material* material) {
-    // Set Albedo Color
-    shader->setVec3("u_AlbedoColor", material->albedoColor);
-
-    // Bind Albedo Map
-    if (material->albedoMap) {
-        glActiveTexture(GL_TEXTURE0);
-        material->albedoMap->bind(0);
-        shader->setInt("u_AlbedoMap", 0);
-        // shader->setBool("u_HasAlbedoMap", true);
-    } else {
-        // shader->setBool("u_HasAlbedoMap", false);
-    }
-
-    // Bind Normal Map
-    if (material->normalMap) {
-        glActiveTexture(GL_TEXTURE1);
-        material->normalMap->bind(1);
-        shader->setInt("u_NormalMap", 1);
-        // shader->setBool("u_HasNormalMap", true);
-    } else {
-        // shader->setBool("u_HasNormalMap", false);
-    }
-
-    // Bind Specular Map
-    // if (material->specularMap) {
-    //     glActiveTexture(GL_TEXTURE2);
-    //     material->specularMap->bind(2);
-    //     shader->setInt("u_SpecularMap", 2);
-    //     shader->setBool("u_HasSpecularMap", true);
-    // } else {
-    //     shader->setBool("u_HasSpecularMap", false);
-    // }
-
-    // Additional material properties can be set here
-}
-
-/*
- * G-buffer Texture Setup for Shaders
- */
-void Renderer::setupGBufferTextures(Shader* shader) {
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_gTextures[0]);
-    shader->setInt("gPosition", 0);
-
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, m_gTextures[1]);
-    shader->setInt("gNormal", 1);
-
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, m_gTextures[2]);
-    shader->setInt("gAlbedo", 2);
-
-    // Bind additional G-buffer textures if any
-    for (int i = 4; i < NUM_ATTACHMENTS; ++i) {
-        glActiveTexture(GL_TEXTURE0 + i);
-        glBindTexture(GL_TEXTURE_2D, m_gTextures[i]);
-        shader->setInt("gExtraTexture" + std::to_string(i - 3), i);
-    }
-}
-
-/*
- * Mesh Management
- */
-void Renderer::draw(const Mesh* mesh) {
-    size_t index = mesh->id;
-    if (index >= m_meshData.size() || m_meshData[index].VAO == 0) {
-        std::cerr << "ERROR::RENDERER::DRAW::Mesh buffer not found.\n";
-        return;
-    }
-
-    const MeshData& data = m_meshData[index];
-
-    // Bind VAO
-    glBindVertexArray(data.VAO);
-
-    // Draw the mesh
-    if (data.EBO != 0) {
-        glDrawElements(GL_TRIANGLES, data.indexCount, GL_UNSIGNED_INT, 0);
-    } else {
-        glDrawArrays(GL_TRIANGLES, 0, data.vertexCount);
-    }
-
-    // Unbind VAO
-    glBindVertexArray(0);
-}
-
-void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic) {
-    if (mesh->uvs.empty() || mesh->normals.empty() || mesh->tangents.empty() || mesh->bitangents.empty()) {
-        std::cerr << "ERROR::RENDERER::INIT_MESH_BUFFERS::UVs, normals, tangents, and bitangents must be provided for all vertices.\n";
-        return;
-    }
-
-    // Assign an ID if not already assigned
-    if (mesh->id == SIZE_MAX) {
-        mesh->id = m_meshData.size();
-    }
-
-    MeshData data = {};
-    glGenVertexArrays(1, &data.VAO);
-    glBindVertexArray(data.VAO);
-
-    // Build mesh buffer data (14 floats per vertex)
-    std::vector<float> bufferData;
-    size_t numVertices = mesh->vertices.size();
-    bufferData.reserve(numVertices * 14);
-
-    for (size_t i = 0; i < numVertices; ++i) {
-        // Positions
-        bufferData.push_back(mesh->vertices[i].x);
-        bufferData.push_back(mesh->vertices[i].y);
-        bufferData.push_back(mesh->vertices[i].z);
-        // UVs
-        bufferData.push_back(mesh->uvs[i].x);
-        bufferData.push_back(mesh->uvs[i].y);
-        // Normals
-        bufferData.push_back(mesh->normals[i].x);
-        bufferData.push_back(mesh->normals[i].y);
-        bufferData.push_back(mesh->normals[i].z);
-        // Tangents
-        bufferData.push_back(mesh->tangents[i].x);
-        bufferData.push_back(mesh->tangents[i].y);
-        bufferData.push_back(mesh->tangents[i].z);
-        // Bitangents
-        bufferData.push_back(mesh->bitangents[i].x);
-        bufferData.push_back(mesh->bitangents[i].y);
-        bufferData.push_back(mesh->bitangents[i].z);
-    }
-
-    glGenBuffers(1, &data.VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, data.VBO);
-    glBufferData(GL_ARRAY_BUFFER, bufferData.size() * sizeof(float), bufferData.data(), GL_STATIC_DRAW);
-
-    if (!mesh->indices.empty()) {
-        glGenBuffers(1, &data.EBO);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, data.EBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->indices.size() * sizeof(unsigned int), mesh->indices.data(), GL_STATIC_DRAW);
-        data.indexCount = static_cast<GLsizei>(mesh->indices.size());
-        data.vertexCount = 0;
-    } else {
-        // No indices
-        data.EBO = 0;
-        data.indexCount = 0;
-        data.vertexCount = static_cast<GLsizei>(mesh->vertices.size());
-    }
-
-    // Vertex attribute pointers
-
-    // Positions (location = 0)
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)0);
-
-    // Normals (location = 1)
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(5 * sizeof(float)));
-
-    // UVs (location = 2)
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(3 * sizeof(float)));
-
-    // Tangents (location = 3)
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
-
-    // Bitangents (location = 4)
-    glEnableVertexAttribArray(4);
-    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
-
-    // Unbind VAO
-    glBindVertexArray(0);
-
-    // Find the first available spot in the mesh data vector
-    bool inserted = false;
-    for (size_t i = 0; i < m_meshData.size(); ++i) {
-        if (m_meshData[i].VAO == 0) {
-            m_meshData[i] = data;
-            mesh->id = i;
-            inserted = true;
-            break;
-        }
-    }
-
-    // If all slots were full, append to end
-    if (!inserted) {
-        m_meshData.push_back(data);
-        mesh->id = m_meshData.size() - 1;
-    }
-
-    // Clear CPU-side mesh data if possible
-    if (isStatic) {
-        mesh->clearData();
-    }
-}
-
-void Renderer::deleteMeshBuffer(const Mesh* mesh) {
-    size_t index = mesh->id;
-    if (index >= m_meshData.size() || m_meshData[index].VAO == 0) {
-        std::cerr << "ERROR::RENDERER::DELETE_MESH_BUFFER::Mesh buffer not found.\n";
-        return;
-    }
-
-    MeshData& data = m_meshData[index];
-
-    // Delete mesh resources
-    if (data.VAO) {
-        glDeleteVertexArrays(1, &data.VAO);
-        data.VAO = 0;
-    }
-    if (data.VBO) {
-        glDeleteBuffers(1, &data.VBO);
-        data.VBO = 0;
-    }
-    if (data.EBO) {
-        glDeleteBuffers(1, &data.EBO);
-        data.EBO = 0;
-    }
-
-    // Reset mesh at index
-    m_meshData[index] = MeshData{};
-}
-
-/*
- * Screen Quad Initialization and Drawing
- */
-void Renderer::initScreenQuad() {
-    // Vertices for a screen-aligned quad (NDC space)
-    float quadVertices[] = {
-        // positions        // uvs
-        -1.0f,  1.0f, 0.0f,  0.0f, 1.0f,
-        -1.0f, -1.0f, 0.0f,  0.0f, 0.0f,
-         1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
-         1.0f,  1.0f, 0.0f,  1.0f, 1.0f
-    };
-
-    unsigned int quadIndices[] = {
-        0, 1, 2,
-        2, 3, 0
-    };
-
-    // Generate and bind VAO
-    glGenVertexArrays(1, &m_quadVAO);
-    glBindVertexArray(m_quadVAO);
-
-    // Generate and bind VBO
-    unsigned int VBO, EBO;
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-
-    // Generate and bind EBO
-    glGenBuffers(1, &EBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quadIndices), &quadIndices, GL_STATIC_DRAW);
-
-    // Position attribute (location = 0)
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-
-    // UV attribute (location = 1)
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-
-    // Unbind VAO
-    glBindVertexArray(0);
-}
-
-void Renderer::drawScreenQuad() {
-    glBindVertexArray(m_quadVAO);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);
 }
 
 /*
  * G-Buffer Debugging
  */
-void Renderer::debugGBuffer(const Shader& debugShader, int debugMode) {
+void Renderer::debugGBufferPass(const Shader& debugShader, int debugMode) {
     // Bind default framebuffer for debugging
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

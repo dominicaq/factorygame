@@ -344,7 +344,7 @@ int main() {
         renderer.lightPass(camera.position, lightSystem);
 
         if (debugMode >= 0) {
-            renderer.debugGBuffer(debugShader, debugMode);
+            renderer.debugGBufferPass(debugShader, debugMode);
         } else {
             // Render forward pass (draw the cube)
             renderer.forwardPass(forwardMeshes, forwardTransforms, view, projection);
