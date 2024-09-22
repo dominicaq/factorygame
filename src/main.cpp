@@ -329,8 +329,8 @@ int main() {
         }
 
         // Rotate the first light in a circular motion
-        float radius = 5.0f;  // Set the radius of the circular motion
-        float speed = 1.0f;   // Speed of rotation
+        float radius = 5.0f;
+        float speed = 1.0f;
 
         // Calculate the new position using sine and cosine for circular motion
         lightSystem.positions[0].x = cos(currentFrame * speed) * radius;

@@ -24,7 +24,7 @@ Texture::Texture(const std::string& filePath) : m_textureID(0), width(0), height
             format = GL_RGBA;
             internalFormat = GL_RGBA8;
         } else {
-            std::cerr << "ERROR::TEXTURE::Unsupported number of channels: " << nrChannels << "\n";
+            std::cerr << "[Error] Texture::Texture: Unsupported number of channels: " << nrChannels << "\n";
             format = GL_RGB;
             internalFormat = GL_RGB8;
         }
@@ -59,10 +59,10 @@ Texture::Texture(const std::string& filePath) : m_textureID(0), width(0), height
         // Error checking
         GLenum error = glGetError();
         if (error != GL_NO_ERROR) {
-            std::cerr << "ERROR::TEXTURE::OpenGL error during texture creation: " << error << "\n";
+            std::cerr << "[Error] Texture::Texture: OpenGL error during texture creation: " << error << "\n";
         }
     } else {
-        std::cerr << "ERROR::TEXTURE::Failed to load texture: " << filePath << "\n";
+        std::cerr << "[Error] Texture::Texture: Failed to load texture: " << filePath << "\n";
     }
 
     // Free image data after uploading to the GPU
@@ -80,7 +80,7 @@ void Texture::bind(unsigned int slot) const {
 
     // Ensure the slot is valid and within the maximum allowed texture units
     if (slot >= static_cast<unsigned int>(maxTextureUnits)) {
-        std::cerr << "ERROR::TEXTURE::Texture slot exceeds max allowed texture units: " << slot << "\n";
+        std::cerr << "[Error] Texture::bind: Texture slot exceeds max allowed texture units: " << slot << "\n";
         return;
     }
 
@@ -93,7 +93,7 @@ void Texture::bind(unsigned int slot) const {
     // Error checking: ensure no OpenGL errors occurred during texture binding
     GLenum error = glGetError();
     if (error != GL_NO_ERROR) {
-        std::cerr << "ERROR::TEXTURE::OpenGL error during texture binding: " << error << "\n";
+        std::cerr << "[Error] Texture::bind: OpenGL error during texture binding: " << error << "\n";
     }
 }
 
@@ -103,6 +103,6 @@ void Texture::unbind() const {
     // Error checking: ensure no OpenGL errors occurred during unbinding
     GLenum error = glGetError();
     if (error != GL_NO_ERROR) {
-        std::cerr << "ERROR::TEXTURE::OpenGL error during texture unbinding: " << error << "\n";
+        std::cerr << "[Error] Texture::unbind: OpenGL error during texture unbinding: " << error << "\n";
     }
 }

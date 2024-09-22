@@ -15,7 +15,7 @@
 std::string ResourceLoader::readFile(const std::string& filePath) {
     std::ifstream file(filePath);
     if (!file.is_open()) {
-        std::cerr << "ERROR::RESOURCE_LOADER::Failed to open file: " << filePath << "\n";
+        std::cerr << "[Error] ResourceLoader::readFile: Failed to open file: " << filePath << "\n";
         return "";
     }
 
@@ -32,7 +32,7 @@ unsigned char* ResourceLoader::loadImage(const std::string& filePath, int* width
     unsigned char* data = stbi_load(filePath.c_str(), width, height, nrChannels, 0);
 
     if (!data) {
-        std::cerr << "ERROR::RESOURCE_LOADER::Failed to load image: " << filePath << "\n";
+        std::cerr << "[Error] ResourceLoader::loadImage: Failed to load image: " << filePath << "\n";
         return nullptr;
     }
 
@@ -49,14 +49,14 @@ void ResourceLoader::freeImage(unsigned char* data) {
 Mesh* ResourceLoader::loadMesh(const std::string& filepath) {
     std::string fileContent = readFile(filepath);
     if (fileContent.empty()) {
-        std::cerr << "ERROR::RESOURCE_LOADER::File contents empty: " << filepath << "\n";
+        std::cerr << "[Error] ResourceLoader::loadMesh: File contents empty: " << filepath << "\n";
         return nullptr;
     }
 
     // Extract the file extension
     std::size_t dotPos = filepath.find_last_of(".");
     if (dotPos == std::string::npos) {
-        std::cerr << "ERROR::RESOURCE_LOADER::Failed to determine file type for: " << filepath << "\n";
+        std::cerr << "[Error] ResourceLoader::loadMesh: Failed to determine file type for: " << filepath << "\n";
         return nullptr;
     }
     std::string extension = filepath.substr(dotPos + 1);
@@ -70,10 +70,10 @@ Mesh* ResourceLoader::loadMesh(const std::string& filepath) {
     if (extension == "obj") {
         return ObjLoader::loadOBJ(fileContent);
     } else if (extension == "gltf") {
-        std::cerr << "ERROR::RESOURCE_LOADER::GLTF loading not yet implemented: " << filepath << "\n";
+        std::cerr << "[Error] ResourceLoader::loadMesh: GLTF loading not yet implemented: " << filepath << "\n";
         return nullptr;
     } else {
-        std::cerr << "ERROR::RESOURCE_LOADER::Unknown file extension: " << extension << " for file: " << filepath << "\n";
+        std::cerr << "[Error] ResourceLoader::loadMesh: Unknown file extension: " << extension << " for file: " << filepath << "\n";
         return nullptr;
     }
 }

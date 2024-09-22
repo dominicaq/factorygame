@@ -63,7 +63,7 @@ inline void generateTangentsAndBitangents(Mesh* mesh);
 */
 static Mesh* loadOBJ(const std::string& fileContent) {
     if (fileContent.empty()) {
-        std::cerr << "ERROR::OBJ_LOADER::File content is empty\n";
+        std::cerr << "[Error] OBJLoader::loadOBJ: File content is empty\n";
         return nullptr;
     }
 

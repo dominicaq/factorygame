@@ -16,7 +16,7 @@ CubeMap::CubeMap(const std::vector<std::string>& faces) : m_textureID(0) {
             glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
             ResourceLoader::freeImage(data);
         } else {
-            std::cerr << "ERROR::CUBE_MAP::Failed to load texture at path: " << faces[i] << "\n";
+            std::cerr << "[Error] CubeMap::CubeMap: Failed to load texture at path: " << faces[i] << "\n";
         }
     }
 
@@ -35,7 +35,7 @@ CubeMap::~CubeMap() {
     if (glIsTexture(m_textureID)) {
         glDeleteTextures(1, &m_textureID);
     } else {
-        std::cerr << "ERROR::CUBE_MAP::TEXTURE_NOT_DELETED: Texture ID is not valid\n";
+        std::cerr << "[Error] CubeMap::~CubeMap: Texture ID is not valid!\n";
     }
 }
 
