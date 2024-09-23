@@ -1,23 +1,23 @@
 #include "framebuffer.h"
-#include <iostream>
 
-Framebuffer::Framebuffer(unsigned int width, unsigned int height, unsigned int numColorAttachments, bool useDepthBuffer)
-    : m_width(width), m_height(height), m_useDepthBuffer(useDepthBuffer)
-{
-    initFrameBuffer(width, height, numColorAttachments);
+Framebuffer::Framebuffer(unsigned int width, unsigned int height, unsigned int numColorAttachments, bool useDepthBuffer) {
+    m_data.pack(width, height, numColorAttachments, useDepthBuffer);
+    initFrameBuffer(width, height, numColorAttachments, useDepthBuffer);
 }
 
 Framebuffer::~Framebuffer() {
     glDeleteFramebuffers(1, &m_fbo);
-    glDeleteTextures(m_colorAttachments.size(), m_colorAttachments.data());
-    if (m_useDepthBuffer) {
-        glDeleteRenderbuffers(1, &m_depthBuffer);
+    glDeleteTextures(MAX_ATTACHMENTS, m_colorAttachments);
+    if (m_depthBuffer > 0) {
+        glDeleteTextures(1, &m_depthBuffer);
     }
 }
 
 void Framebuffer::bind() const {
+    unsigned int width, height;
+    m_data.getDimensions(width, height);
     glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
-    glViewport(0, 0, m_width, m_height);
+    glViewport(0, 0, width, height);
 }
 
 void Framebuffer::unbind() const {
@@ -25,7 +25,9 @@ void Framebuffer::unbind() const {
 }
 
 unsigned int Framebuffer::getColorAttachment(unsigned int index) const {
-    if (index >= m_colorAttachments.size()) {
+    unsigned int numColorAttachments = m_data.getNumColorAttachments();
+
+    if (index >= numColorAttachments) {
         std::cerr << "[Error] Framebuffer::getColorAttachment: Invalid color attachment index!" << std::endl;
         return 0;
     }
@@ -33,7 +35,7 @@ unsigned int Framebuffer::getColorAttachment(unsigned int index) const {
 }
 
 unsigned int Framebuffer::getDepthAttachment() const {
-    if (!m_useDepthBuffer) {
+    if (m_depthBuffer == 0) {
         std::cerr << "[Error] Framebuffer::getDepthAttachment: No depth buffer available!" << std::endl;
         return 0;
     }
@@ -41,28 +43,33 @@ unsigned int Framebuffer::getDepthAttachment() const {
 }
 
 void Framebuffer::resize(unsigned int width, unsigned int height) {
-    m_width = width;
-    m_height = height;
+    unsigned int numColorAttachments = m_data.getNumColorAttachments();
+    bool depthFlag = m_data.getDepthFlag();
+
+    // Update the packed data
+    m_data.pack(width, height, numColorAttachments, depthFlag);
+
+    // Reinitialize the framebuffer
     glDeleteFramebuffers(1, &m_fbo);
-    glDeleteTextures(m_colorAttachments.size(), m_colorAttachments.data());
-    if (m_useDepthBuffer) {
-        glDeleteRenderbuffers(1, &m_depthBuffer);
+    glDeleteTextures(numColorAttachments, m_colorAttachments);
+    if (m_depthBuffer > 0) {
+        glDeleteTextures(1, &m_depthBuffer);
     }
-    initFrameBuffer(width, height, m_colorAttachments.size());
+
+    initFrameBuffer(width, height, numColorAttachments, depthFlag);
 }
 
-void Framebuffer::initFrameBuffer(unsigned int width, unsigned int height, unsigned int numColorAttachments) {
+void Framebuffer::initFrameBuffer(unsigned int width, unsigned int height, unsigned int numColorAttachments, bool useDepthBuffer) {
     // Create framebuffer
     glGenFramebuffers(1, &m_fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
 
     // Create color attachments
-    m_colorAttachments.resize(numColorAttachments);
-    glGenTextures(numColorAttachments, m_colorAttachments.data());
+    glGenTextures(numColorAttachments, m_colorAttachments);
 
     for (unsigned int i = 0; i < numColorAttachments; ++i) {
         glBindTexture(GL_TEXTURE_2D, m_colorAttachments[i]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, nullptr); // Color texture format
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -70,8 +77,8 @@ void Framebuffer::initFrameBuffer(unsigned int width, unsigned int height, unsig
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, m_colorAttachments[i], 0);
     }
 
-    // Optionally create a depth buffer
-    if (m_useDepthBuffer) {
+    // Create depth buffer if needed
+    if (useDepthBuffer) {
         glGenTextures(1, &m_depthBuffer);
         glBindTexture(GL_TEXTURE_2D, m_depthBuffer);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
@@ -81,15 +88,15 @@ void Framebuffer::initFrameBuffer(unsigned int width, unsigned int height, unsig
     }
 
     // Specify the list of draw buffers
-    std::vector<GLenum> drawBuffers(numColorAttachments);
+    GLenum drawBuffers[MAX_ATTACHMENTS];
     for (unsigned int i = 0; i < numColorAttachments; ++i) {
         drawBuffers[i] = GL_COLOR_ATTACHMENT0 + i;
     }
-    glDrawBuffers(numColorAttachments, drawBuffers.data());
+    glDrawBuffers(numColorAttachments, drawBuffers);
 
     // Check if the framebuffer is complete
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        std::cerr << "[Error] Framebuffer::init: Framebuffer is not complete!\n";
+        std::cerr << "[Error] Framebuffer::initFrameBuffer: Framebuffer is not complete!\n";
     }
 
     // Unbind framebuffer

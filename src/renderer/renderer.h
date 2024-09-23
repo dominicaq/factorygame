@@ -77,20 +77,19 @@ private:
     void initOpenGLState();
 
     /*
-     * Screen-aligned quad for post-processing
+     * Screen-aligned quad for post process / drawing deferred rendering to screen
      */
     unsigned int m_quadVAO;
 
-    /*
-     * G-buffer managed by Framebuffer class
-     */
-    std::unique_ptr<Framebuffer> m_gBuffer;  // Replacing manual G-buffer management
+
+    // List of framebuffers (in the future)
+    std::unique_ptr<Framebuffer> m_gBuffer;
 
     /*
      * Shaders for the rendering passes
      */
-    Shader m_gBufferShader;  // Shader for geometry pass (G-buffer)
-    Shader m_lightPassShader;  // Shader for light pass
+    Shader m_gBufferShader;
+    Shader m_lightPassShader;
 
     /*
      * Mesh buffer storage
