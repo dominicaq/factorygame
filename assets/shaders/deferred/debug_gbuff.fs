@@ -3,10 +3,13 @@ out vec4 FragColor;
 
 in vec2 TexCoord;
 
+// G-Buffer
 uniform sampler2D gPosition;
 uniform sampler2D gNormal;
 uniform sampler2D gAlbedo;
 uniform sampler2D gDepth;
+
+// Debug mode
 uniform int debugMode;
 
 uniform float u_Near;

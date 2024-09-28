@@ -1,10 +1,12 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#include "framegraph.h"
 #include "framebuffer.h"
+#include "rendergraph.h"
 #include "shader.h"
 
+// Components
+#include "../components/ecs.h"
 #include "../components/transform.h"
 #include "../components/mesh.h"
 #include "../components/light.h"
@@ -47,17 +49,19 @@ public:
     /*
      * Render Passes
      */
-    void geometryPass(const std::vector<Mesh*>& meshes,
-                      const std::vector<Transform>& transforms,
-                      const glm::mat4& view,
-                      const glm::mat4& projection);
+    void geometryPass(EntityManager& entityManager,
+        ComponentArray<Mesh>& meshComponents,
+        ComponentArray<Transform>& transformComponents,
+        const glm::mat4& view,
+        const glm::mat4& projection);
 
     void lightPass(const glm::vec3& cameraPosition, const LightSystem& lightSystem);
 
-    void forwardPass(const std::vector<Mesh*>& meshes,
-                     const std::vector<Transform>& transforms,
-                     const glm::mat4& view,
-                     const glm::mat4& projection);
+    void forwardPass(EntityManager& entityManager,
+        ComponentArray<Mesh>& meshComponents,
+        ComponentArray<Transform>& transformComponents,
+        const glm::mat4& view,
+        const glm::mat4& projection) ;
 
     /*
      * Debugging: Display G-buffer textures (e.g., Position, Normal, Albedo)
@@ -70,6 +74,8 @@ private:
      */
     int m_width;
     int m_height;
+
+    void setupRenderGraph();
 
     /*
      * Initialize OpenGL state (depth testing, face culling, etc.)

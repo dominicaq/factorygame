@@ -3,16 +3,12 @@
 #include <iostream>
 #include <memory>
 
+#include "../components/ecs.h"
+
 // Define the number of G-buffer attachments
 #define NUM_ATTACHMENTS 4
 
-Renderer::Renderer(int width, int height) : m_width(width), m_height(height) {
-    initOpenGLState();
-    initScreenQuad();
-
-    // Initialize G-buffer
-    m_gBuffer = std::make_unique<Framebuffer>(width, height, NUM_ATTACHMENTS, true);
-
+void Renderer::setupRenderGraph() {
     // Init shaders
     std::string gBufferVertexPath = ASSET_DIR "shaders/deferred/gbuff.vs";
     std::string gBufferFragmentPath = ASSET_DIR "shaders/deferred/gbuff.fs";
@@ -25,6 +21,17 @@ Renderer::Renderer(int width, int height) : m_width(width), m_height(height) {
     if (!m_lightPassShader.load(lightVertexPath, lightFragmentPath)) {
         std::cerr << "[Error] Renderer::Renderer: Failed to create lightPassShader!\n";
     }
+}
+
+Renderer::Renderer(int width, int height) : m_width(width), m_height(height) {
+    initOpenGLState();
+    initScreenQuad();
+
+    // Initialize G-buffer
+    m_gBuffer = std::make_unique<Framebuffer>(width, height, NUM_ATTACHMENTS, true);
+
+    // Set up render passes directly in the RenderGraph
+    setupRenderGraph();
 }
 
 Renderer::~Renderer() {
@@ -292,8 +299,9 @@ void Renderer::resizeGBuffer(int width, int height) {
 /*
  * Render Passes
  */
-void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
-                            const std::vector<Transform>& transforms,
+void Renderer::geometryPass(EntityManager& entityManager,
+                            ComponentArray<Mesh>& meshComponents,
+                            ComponentArray<Transform>& transformComponents,
                             const glm::mat4& view,
                             const glm::mat4& projection) {
     // Bind G-buffer framebuffer
@@ -305,34 +313,25 @@ void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
     m_gBufferShader.setMat4("u_View", view);
     m_gBufferShader.setMat4("u_Projection", projection);
 
-    for (size_t i = 0; i < meshes.size(); ++i) {
-        const Mesh* mesh = meshes[i];
-        const Transform& transform = transforms[i];
+    // Loop through all entities and check for Mesh and Transform components
+    for (int entity = 0; entity < entityManager.size(); ++entity) {
+        if (entityManager.isActive(entity) &&
+            meshComponents.hasComponent(entity) &&
+            transformComponents.hasComponent(entity))
+        {
+            const Mesh& mesh = meshComponents.getComponent(entity);
+            const Transform& transform = transformComponents.getComponent(entity);
 
-        glm::mat4 model = transform.getModelMatrix();
-        m_gBufferShader.setMat4("u_Model", model);
-
-        // Set material properties
-        if (mesh->material) {
-            m_gBufferShader.setVec3("u_AlbedoColor", mesh->material->albedoColor);
-
-            // Bind Albedo Map
-            if (mesh->material->albedoMap) {
-                mesh->material->albedoMap->bind(0);
-                m_gBufferShader.setInt("u_AlbedoMap", 0);
+            if (mesh.material->isDeferred == false) {
+                continue;  // Skip forward rendering materials
             }
 
-            // Bind Normal Map
-            bool hasNormalMap = mesh->material->normalMap;
-             m_gBufferShader.setBool("u_HasNormalMap", hasNormalMap);
-            if (hasNormalMap) {
-                mesh->material->normalMap->bind(1);
-                m_gBufferShader.setInt("u_NormalMap", 1);
-                m_gBufferShader.setBool("u_HasNormalMap", true);
-            }
+            glm::mat4 model = transform.getModelMatrix();
+            m_gBufferShader.setMat4("u_Model", model);
+            mesh.material->bind(&m_gBufferShader);
+
+            draw(&mesh);
         }
-
-        draw(mesh);
     }
 
     // Unbind framebuffer
@@ -392,8 +391,9 @@ void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lig
     glDisable(GL_BLEND);
 }
 
-void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
-                           const std::vector<Transform>& transforms,
+void Renderer::forwardPass(EntityManager& entityManager,
+                           ComponentArray<Mesh>& meshComponents,
+                           ComponentArray<Transform>& transformComponents,
                            const glm::mat4& view,
                            const glm::mat4& projection) {
     // Copy depth buffer from G-buffer to default framebuffer
@@ -408,44 +408,33 @@ void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    // Iterate over all forward pass meshes
-    for (size_t i = 0; i < meshes.size(); ++i) {
-        const Mesh* mesh = meshes[i];
-        const Transform& transform = transforms[i];
+    // Iterate over all entities to render forward pass meshes
+    for (int entity = 0; entity < entityManager.size(); ++entity) {
+        if (entityManager.isActive(entity) &&
+            meshComponents.hasComponent(entity) &&
+            transformComponents.hasComponent(entity))
+        {
+            const Mesh& mesh = meshComponents.getComponent(entity);
+            const Transform& transform = transformComponents.getComponent(entity);
 
-        Shader* shader = mesh->material->shader;
-        if (!shader) {
-            std::cerr << "[Error] Renderer::forwardPass: Mesh does not have a shader!\n";
-            continue;
+            // Skip meshes that are part of the deferred rendering pass
+            if (mesh.material->isDeferred) {
+                continue;
+            }
+
+            Shader* shader = mesh.material->shader;
+            shader->use();
+
+            // Set transformation matrices
+            shader->setMat4("u_View", view);
+            shader->setMat4("u_Projection", projection);
+            shader->setMat4("u_Model", transform.getModelMatrix());
+
+            mesh.material->bind();
+
+            // Draw the mesh
+            draw(&mesh);
         }
-
-        // Use the forward shader
-        shader->use();
-
-        // Set transformation matrices
-        shader->setMat4("u_View", view);
-        shader->setMat4("u_Projection", projection);
-        shader->setMat4("u_Model", transform.getModelMatrix());
-
-        // Setup material properties and bind textures
-        shader->setVec3("u_AlbedoColor", mesh->material->albedoColor);
-
-        // Bind Albedo Map
-        if (mesh->material->albedoMap) {
-            glActiveTexture(GL_TEXTURE0);
-            mesh->material->albedoMap->bind(0);
-            shader->setInt("u_AlbedoMap", 0);
-        }
-
-        // Bind Normal Map (if it exists)
-        if (mesh->material->normalMap) {
-            glActiveTexture(GL_TEXTURE1);
-            mesh->material->normalMap->bind(1);
-            shader->setInt("u_NormalMap", 1);
-        }
-
-        // Draw the mesh
-        draw(mesh);
     }
 }
 

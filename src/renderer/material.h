@@ -7,45 +7,73 @@
 #include <glm.hpp>
 #include <memory>
 
+#include <glm.hpp>
+#include <memory>
+
 struct Material {
+    // Shader ptr
     Shader* shader = nullptr;
 
-    // Textures
+    // Texture ptr(s)
     Texture* albedoMap = nullptr;
     Texture* specularMap = nullptr;
     Texture* normalMap = nullptr;
 
-    // Colors
+    // RGB Material properties
     glm::vec3 albedoColor = glm::vec3(1.0f);
     glm::vec3 specularColor = glm::vec3(1.0f);
 
-    // Scalars
     float shininess = 32.0f;
 
-    Material(Shader* shader) : shader(shader) {}
+    // Flag(s)
+    bool isDeferred = false;
 
-    void bind() const {
-        shader->use();  // Ensure the shader is active
+    // Constructor
+    Material(Shader* shader)
+        : shader(shader),
+          albedoColor(glm::vec3(1.0f)),
+          specularColor(glm::vec3(1.0f)),
+          shininess(32.0f),
+          isDeferred(false)
+    {}
 
-        // Bind the albedo color uniform
-        shader->setVec3("u_AlbedoColor", albedoColor);
+    // Function to bind the material data to the shader
+    void bind(Shader* shaderOverride = nullptr) const {
+        if (shaderOverride == nullptr) {
+            // Use default shader if no shader is passed
+            shaderOverride = shader;
+        }
 
-        // Add material maps for sampling if they exist
+        // Bind albedo map if it exists, otherwise set default color
         if (albedoMap) {
-            shader->setInt("u_AlbedoMap", 0);
+            shaderOverride->setInt("u_AlbedoMap", 0);
             albedoMap->bind(0);
         }
+        shaderOverride->setVec3("u_AlbedoColor", albedoColor);
 
-        if (specularMap) {
-            shader->setInt("u_SpecularMap", 1);
-            specularMap->bind(1);
-        }
-
+        // Bind normal map if it exists, otherwise set flag for shader
         if (normalMap) {
-            shader->setInt("u_NormalMap", 2);
-            normalMap->bind(2);
+            shaderOverride->setInt("u_NormalMap", 1);
+            shaderOverride->setBool("u_HasNormalMap", true);
+            normalMap->bind(1);
+        } else {
+            shaderOverride->setBool("u_HasNormalMap", false);
         }
+
+        // Bind specular map if it exists
+        // if (specularMap) {
+        //     shaderOverride->setInt("u_SpecularMap", 1);
+        //     specularMap->bind(1);
+        // }
+
+        // Set material properties like specular color and shininess
+        // shaderOverride->setVec3("u_SpecularColor", specularColor);
+        // shaderOverride->setFloat("u_Shininess", shininess);
+
+        // TODO: Unbind texture(s) if they exist
     }
+
+
 };
 
-#endif // MATERIAL_H
+#endif
