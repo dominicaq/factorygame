@@ -281,7 +281,7 @@ int main() {
     LightSystem lightSystem;
     ECSWorld world;
 
-    // Vector to store GameObjects
+    // Vector to store GameObjects (objects with scripts)
     std::vector<GameObject*> gameObjects;
 
     // Load the scene data
@@ -296,7 +296,13 @@ int main() {
         renderer.initMeshBuffers(mesh);
     }
 
-    // Camera setup
+    // Setup gameobject scripts
+    for (auto& gameObject : gameObjects) {
+        gameObject->startScripts();
+    }
+
+    // ------------------------ Setup Camera ------------------------
+
     Camera camera;
     camera.position = glm::vec3(4.0f, 0.21f, 4.04f);
     camera.eulerAngles = glm::vec3(-2.38f, 239.0f, 0.0f);
@@ -310,6 +316,8 @@ int main() {
         farPlane
     );
 
+    // ------------------------ Debug Setup --------------------------
+
     // Debug Pass Shader (for visualizing G-buffer)
     std::string debugVertexPath = SHADER_DIR + "deferred/debug_gbuff.vs";
     std::string debugFragmentPath = SHADER_DIR + "deferred/debug_gbuff.fs";
@@ -318,59 +326,68 @@ int main() {
     debugShader.setFloat("u_Near", nearPlane);
     debugShader.setFloat("u_Far", farPlane);
 
-    // Variables for delta time calculation
-    float deltaTime = 0.0f;
-    float lastFrame = 0.0f;
+    // Control which gbuffer texture is shown
+    int debugMode = -1;
+
+    // ---------------------------------------------------------------
 
     // Hide and capture the cursor for free camera movement
     glfwSetInputMode(window.getGLFWwindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-    // Setup gameobject scripts
-    for (auto& gameObject : gameObjects) {
-        gameObject->startScripts();
-    }
+    float deltaTime = 0.0f;
+    float lastFrame = 0.0f;
 
-    // Main render loop
-    int debugMode = -1;
+    // Render loop
     while (!window.shouldClose()) {
         // Calculate delta time
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
-        // Process input
+        // -------------- Temporary Logic (Camera & Input) --------------
+
+        // Process input for camera movement
         GLFWwindow* glfwWindow = window.getGLFWwindow();
         processCameraInput(glfwWindow, camera, deltaTime);
         glfwControls(glfwWindow, debugMode);
 
-        // Light movement
+        // Light movement (temporary, can move into another system later)
         float radius = 5.0f;
         float speed = 1.0f;
         lightSystem.positions[0].x = cos(currentFrame * speed) * radius;
         lightSystem.positions[0].z = sin(currentFrame * speed) * radius;
 
-        // Get view matrix from the camera
-        glm::mat4 view = camera.getViewMatrix();
+        // ------------------------ Core Update Logic ------------------------
 
         // Update all scripts in all gameObjects
         for (auto& gameObject : gameObjects) {
             gameObject->updateScripts(deltaTime);
         }
 
-        // Render deferred pass (geometry and lighting)
+        // ------------------------ Rendering ------------------------
+
+        // Get view matrix from the camera
+        glm::mat4 view = camera.getViewMatrix();
+
+        // Render deferred passes
         renderer.geometryPass(world, renderQuery, view, projection);
         renderer.lightPass(camera.position, lightSystem);
 
+        // Debug rendering
         if (debugMode >= 0) {
             renderer.debugGBufferPass(debugShader, debugMode);
         }
+
+        // Render forward pass
         renderer.forwardPass(world, renderQuery, view, projection);
 
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();
     }
 
-    // Cleanup
+    // ------------------------ Cleanup ------------------------
+
+    // Cleanup allocated GameObjects
     for (auto& gameObject : gameObjects) {
         delete gameObject;
     }
