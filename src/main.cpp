@@ -106,16 +106,17 @@ void processCameraInput(GLFWwindow* window, Camera& camera, float deltaTime) {
     }
 }
 
-void loadScene(ECSWorld& world, LightSystem& lightSystem, std::vector<GameObject*>& gameObjects) {
+void loadScene(ECSWorld& ecs, LightSystem& lightSystem, std::vector<GameObject*>& gameObjects) {
     // Create shader for both models
     std::string vertexPath = SHADER_DIR + "default.vs";
     std::string fragmentPath = SHADER_DIR + "default.fs";
     Shader* basicShader = new Shader(vertexPath, fragmentPath);
 
     // --------------------- Stanford Bunny Model ---------------------
-    Entity bunnyEntity = world.createEntity();
+    Entity bunnyEntity = ecs.createEntity();
     Transform bunnyTransform(glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(5.0f), glm::vec3(0.0f));
-    world.addComponent(bunnyEntity, bunnyTransform);
+    ecs.addComponent(bunnyEntity, bunnyTransform);
+    ecs.addComponent(bunnyEntity, ModelMatrix());
 
     Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
     if (bunnyMesh != nullptr) {
@@ -127,21 +128,22 @@ void loadScene(ECSWorld& world, LightSystem& lightSystem, std::vector<GameObject
         bunnyMaterial->albedoMap = bunnyAlbedoMap;
 
         bunnyMesh->material = bunnyMaterial;
-        world.addComponent(bunnyEntity, bunnyMesh);
+        ecs.addComponent(bunnyEntity, bunnyMesh);
 
         // Create GameObject and attach the MoveScript
-        GameObject* bunnyObject = new GameObject(bunnyEntity, &world);
+        GameObject* bunnyObject = new GameObject(bunnyEntity, &ecs);
         bunnyObject->addScript<MoveScript>();  // Attach MoveScript
         gameObjects.push_back(bunnyObject);
     }
 
     // --------------------- Dummy Entity ----------------------
-    Entity dummyEntity = world.createEntity();
+    Entity dummyEntity = ecs.createEntity();
 
     // --------------------- Diablo Model ---------------------
-    Entity diabloEntity = world.createEntity();
+    Entity diabloEntity = ecs.createEntity();
     Transform diabloTransform(glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(2.0f), glm::vec3(0.0f));
-    world.addComponent(diabloEntity, diabloTransform);
+    ecs.addComponent(diabloEntity, diabloTransform);
+    ecs.addComponent(diabloEntity, ModelMatrix());
 
     Mesh* diabloModel = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
     if (diabloModel != nullptr) {
@@ -156,12 +158,7 @@ void loadScene(ECSWorld& world, LightSystem& lightSystem, std::vector<GameObject
         diabloMaterial->normalMap = diabloNormalMap;
 
         diabloModel->material = diabloMaterial;
-        world.addComponent(diabloEntity, diabloModel);
-
-        // Create GameObject and attach the MoveScript
-        // GameObject* diabloObject = new GameObject(diabloEntity, &world);
-        // diabloObject->addScript<MoveScript>();  // Attach MoveScript to Diablo model
-        // gameObjects.push_back(diabloObject);
+        ecs.addComponent(diabloEntity, diabloModel);
     }
 
     // --------------------- Cube Model (Forward Rendering) ---------------------
@@ -169,9 +166,10 @@ void loadScene(ECSWorld& world, LightSystem& lightSystem, std::vector<GameObject
     std::string forwardFragmentPath = SHADER_DIR + "default.fs";
     Shader* forwardShader = new Shader(forwardVertexPath, forwardFragmentPath);
 
-    Entity cubeEntity = world.createEntity();
+    Entity cubeEntity = ecs.createEntity();
     Transform cubeTransform(glm::vec3(0.0f, 2.0f, 0.0f), glm::vec3(0.5f), glm::vec3(0.0f));
-    world.addComponent(cubeEntity, cubeTransform);
+    ecs.addComponent(cubeEntity, cubeTransform);
+    ecs.addComponent(cubeEntity, ModelMatrix());
 
     Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
     if (cubeMesh != nullptr) {
@@ -180,11 +178,11 @@ void loadScene(ECSWorld& world, LightSystem& lightSystem, std::vector<GameObject
         cubeMaterial->isDeferred = false;
 
         cubeMesh->material = cubeMaterial;
-        world.addComponent(cubeEntity, cubeMesh);
+        ecs.addComponent(cubeEntity, cubeMesh);
 
         // Create GameObject and attach the MoveScript
-        GameObject* cubeObject = new GameObject(cubeEntity, &world);
-        // cubeObject->addScript<MoveScript>();  // Attach MoveScript to cube as well
+        GameObject* cubeObject = new GameObject(cubeEntity, &ecs);
+        // cubeObject->addScript<MoveScript>();
         gameObjects.push_back(cubeObject);
     }
 
@@ -279,20 +277,21 @@ int main() {
     window.setRenderer(&renderer);
 
     LightSystem lightSystem;
-    ECSWorld world;
+    ECSWorld ecs;
 
     // Vector to store GameObjects (objects with scripts)
     std::vector<GameObject*> gameObjects;
 
     // Load the scene data
-    loadScene(world, lightSystem, gameObjects);
+    loadScene(ecs, lightSystem, gameObjects);
 
-    // Query entities with both Mesh and Transform components (returns valid indices)
-    std::vector<Entity> renderQuery = world.batchedQuery<Mesh, Transform>();
+    // Batched queries from scene
+    std::vector<Entity> renderQuery = ecs.batchedQuery<Mesh, Transform, ModelMatrix>();
+    std::vector<Entity> modelQuery = ecs.batchedQuery<Transform, ModelMatrix>();
 
     // Initialize the renderer with mesh buffers directly from the query
     for (Entity entity : renderQuery) {
-        Mesh* mesh = world.getComponent<Mesh>(entity);
+        Mesh* mesh = ecs.getComponent<Mesh>(entity);
         renderer.initMeshBuffers(mesh);
     }
 
@@ -368,9 +367,10 @@ int main() {
 
         // Get view matrix from the camera
         glm::mat4 view = camera.getViewMatrix();
+        updateModelMatrices(ecs, modelQuery);
 
         // Render deferred passes
-        renderer.geometryPass(world, renderQuery, view, projection);
+        renderer.geometryPass(ecs, renderQuery, view, projection);
         renderer.lightPass(camera.position, lightSystem);
 
         // Debug rendering
@@ -379,7 +379,7 @@ int main() {
         }
 
         // Render forward pass
-        renderer.forwardPass(world, renderQuery, view, projection);
+        renderer.forwardPass(ecs, renderQuery, view, projection);
 
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();

@@ -8,7 +8,7 @@ class GameObject;
 
 class Script {
 protected:
-    GameObject* gameObject = nullptr; // Remove const to allow assignment during initialization
+    GameObject* gameObject = nullptr;
 
 public:
     bool isActive = true;

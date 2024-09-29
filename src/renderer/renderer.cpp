@@ -299,7 +299,7 @@ void Renderer::resizeGBuffer(int width, int height) {
 /*
  * Render Passes
  */
-void Renderer::geometryPass(ECSWorld& world,
+void Renderer::geometryPass(ECSWorld& ecs,
     const std::vector<Entity> entities,
     const glm::mat4& view,
     const glm::mat4& projection) {
@@ -315,15 +315,15 @@ void Renderer::geometryPass(ECSWorld& world,
     // Loop through both arrays (meshes and transforms) together
     for (Entity entity : entities) {
         // Retrieve Mesh and Transform components
-        Mesh* mesh = world.getComponent<Mesh>(entity);
-        Transform& transform = world.getComponent<Transform>(entity);
+        Mesh* mesh = ecs.getComponent<Mesh>(entity);
+        ModelMatrix& modelMatrix = ecs.getComponent<ModelMatrix>(entity);
 
         // Skip forward rendering materials
         if (mesh->material->isDeferred == false) {
             continue;
         }
 
-        m_gBufferShader.setMat4("u_Model", transform.getModelMatrix());
+        m_gBufferShader.setMat4("u_Model", modelMatrix.matrix);
         mesh->material->bind(&m_gBufferShader);
 
         draw(mesh);
@@ -386,7 +386,7 @@ void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lig
     glDisable(GL_BLEND);
 }
 
-void Renderer::forwardPass(ECSWorld& world,
+void Renderer::forwardPass(ECSWorld& ecs,
     const std::vector<Entity> entities,
     const glm::mat4& view,
     const glm::mat4& projection)  {
@@ -405,8 +405,8 @@ void Renderer::forwardPass(ECSWorld& world,
     // Loop through both arrays (meshes and transforms) together
     for (Entity entity : entities) {
         // Retrieve Mesh and Transform components
-        Mesh* mesh = world.getComponent<Mesh>(entity);
-        Transform& transform = world.getComponent<Transform>(entity);
+        Mesh* mesh = ecs.getComponent<Mesh>(entity);
+        ModelMatrix& modelMatrix = ecs.getComponent<ModelMatrix>(entity);
 
         // Skip deferred rendering materials
         if (mesh->material->isDeferred == true) {
@@ -419,7 +419,7 @@ void Renderer::forwardPass(ECSWorld& world,
         // Set transformation matrices
         shader->setMat4("u_View", view);
         shader->setMat4("u_Projection", projection);
-        shader->setMat4("u_Model", transform.getModelMatrix());
+        shader->setMat4("u_Model", modelMatrix.matrix);
 
         mesh->material->bind();
 

@@ -15,6 +15,8 @@
 #include "components/transform.h"
 #include "components/light.h"
 #include "components/gameobject.h"
+#include "components/modelmatrix.h"
+
 #include "components/script.h"
 
 // Resources
