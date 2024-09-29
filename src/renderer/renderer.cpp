@@ -323,8 +323,7 @@ void Renderer::geometryPass(ECSWorld& world,
             continue;
         }
 
-        glm::mat4 model = transform.getModelMatrix();
-        m_gBufferShader.setMat4("u_Model", model);
+        m_gBufferShader.setMat4("u_Model", transform.getModelMatrix());
         mesh->material->bind(&m_gBufferShader);
 
         draw(mesh);

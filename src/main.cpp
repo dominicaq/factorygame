@@ -1,24 +1,12 @@
-#include "system/window.h"
+#include "engine.h"
 
 // Math
 #include "glm.hpp"
 #include "gtc/matrix_transform.hpp"
 #include "gtc/type_ptr.hpp"
 
-// Renderer
-#include "renderer/shader.h"
-#include "renderer/renderer.h"
-#include "renderer/texture.h"
-
-// Components
-#include "components/ecs.h"
-#include "components/mesh.h"
-#include "components/transform.h"
-#include "components/light.h"
-
-// Resources
-#include "resources/meshgen.h"
-#include "resources/resource_loader.h"
+// Scripts
+#include "MoveScript.h"
 
 #include <string>
 #include <vector>
@@ -26,9 +14,7 @@
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
 
-/*
-* Asset paths
-*/
+// Asset paths
 static const std::string SHADER_DIR = ASSET_DIR "shaders/";
 static const std::string MODEL_DIR = ASSET_DIR "models/";
 static const std::string TEXTURE_DIR = ASSET_DIR "textures/";
@@ -120,7 +106,7 @@ void processCameraInput(GLFWwindow* window, Camera& camera, float deltaTime) {
     }
 }
 
-void loadScene(ECSWorld& world, LightSystem& lightSystem) {
+void loadScene(ECSWorld& world, LightSystem& lightSystem, std::vector<GameObject*>& gameObjects) {
     // Create shader for both models
     std::string vertexPath = SHADER_DIR + "default.vs";
     std::string fragmentPath = SHADER_DIR + "default.fs";
@@ -142,6 +128,11 @@ void loadScene(ECSWorld& world, LightSystem& lightSystem) {
 
         bunnyMesh->material = bunnyMaterial;
         world.addComponent(bunnyEntity, bunnyMesh);
+
+        // Create GameObject and attach the MoveScript
+        GameObject* bunnyObject = new GameObject(bunnyEntity, &world);
+        bunnyObject->addScript<MoveScript>();  // Attach MoveScript
+        gameObjects.push_back(bunnyObject);
     }
 
     // --------------------- Dummy Entity ----------------------
@@ -166,6 +157,11 @@ void loadScene(ECSWorld& world, LightSystem& lightSystem) {
 
         diabloModel->material = diabloMaterial;
         world.addComponent(diabloEntity, diabloModel);
+
+        // Create GameObject and attach the MoveScript
+        // GameObject* diabloObject = new GameObject(diabloEntity, &world);
+        // diabloObject->addScript<MoveScript>();  // Attach MoveScript to Diablo model
+        // gameObjects.push_back(diabloObject);
     }
 
     // --------------------- Cube Model (Forward Rendering) ---------------------
@@ -185,6 +181,11 @@ void loadScene(ECSWorld& world, LightSystem& lightSystem) {
 
         cubeMesh->material = cubeMaterial;
         world.addComponent(cubeEntity, cubeMesh);
+
+        // Create GameObject and attach the MoveScript
+        GameObject* cubeObject = new GameObject(cubeEntity, &world);
+        // cubeObject->addScript<MoveScript>();  // Attach MoveScript to cube as well
+        gameObjects.push_back(cubeObject);
     }
 
     // --------------------- Light System ---------------------
@@ -209,7 +210,7 @@ void loadScene(ECSWorld& world, LightSystem& lightSystem) {
         false                         // Point light
     );
 
-    // See lights being
+    // Optionally, output light information
     bool seeLightData = false;
     if (!seeLightData) {
         return;
@@ -240,6 +241,32 @@ void loadScene(ECSWorld& world, LightSystem& lightSystem) {
     }
 }
 
+void glfwControls(GLFWwindow* glfwWindow, int& debugMode) {
+    if (glfwGetKey(glfwWindow, GLFW_KEY_1) == GLFW_PRESS) {
+        // Turn off debug mode
+        debugMode = -1;
+    }
+    if (glfwGetKey(glfwWindow, GLFW_KEY_2) == GLFW_PRESS) {
+        // Position
+        debugMode = 0;
+    }
+    if (glfwGetKey(glfwWindow, GLFW_KEY_3) == GLFW_PRESS) {
+        // Normal
+        debugMode = 1;
+    }
+    if (glfwGetKey(glfwWindow, GLFW_KEY_4) == GLFW_PRESS) {
+        // Albedo
+        debugMode = 2;
+    }
+    if (glfwGetKey(glfwWindow, GLFW_KEY_5) == GLFW_PRESS) {
+        // Depth
+        debugMode = 3;
+    }
+    if (glfwGetKey(glfwWindow, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        glfwSetWindowShouldClose(glfwWindow, true);
+    }
+}
+
 int main() {
     // Initialize window
     Window window("Factory Game", SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -252,11 +279,13 @@ int main() {
     window.setRenderer(&renderer);
 
     LightSystem lightSystem;
-
     ECSWorld world;
 
+    // Vector to store GameObjects
+    std::vector<GameObject*> gameObjects;
+
     // Load the scene data
-    loadScene(world, lightSystem);
+    loadScene(world, lightSystem, gameObjects);
 
     // Query entities with both Mesh and Transform components (returns valid indices)
     std::vector<Entity> renderQuery = world.batchedQuery<Mesh, Transform>();
@@ -266,10 +295,6 @@ int main() {
         Mesh* mesh = world.getComponent<Mesh>(entity);
         renderer.initMeshBuffers(mesh);
     }
-
-    // Single query
-    // Mesh& mesh = world.getComponent<Mesh>(entity);
-    // Transform& transform = world.getComponent<Transform>(entity);
 
     // Camera setup
     Camera camera;
@@ -300,6 +325,11 @@ int main() {
     // Hide and capture the cursor for free camera movement
     glfwSetInputMode(window.getGLFWwindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
+    // Setup gameobject scripts
+    for (auto& gameObject : gameObjects) {
+        gameObject->startScripts();
+    }
+
     // Main render loop
     int debugMode = -1;
     while (!window.shouldClose()) {
@@ -311,41 +341,21 @@ int main() {
         // Process input
         GLFWwindow* glfwWindow = window.getGLFWwindow();
         processCameraInput(glfwWindow, camera, deltaTime);
+        glfwControls(glfwWindow, debugMode);
 
-        if (glfwGetKey(glfwWindow, GLFW_KEY_1) == GLFW_PRESS) {
-            // Turn off debug mode
-            debugMode = -1;
-        }
-        if (glfwGetKey(glfwWindow, GLFW_KEY_2) == GLFW_PRESS) {
-            // Position
-            debugMode = 0;
-        }
-        if (glfwGetKey(glfwWindow, GLFW_KEY_3) == GLFW_PRESS) {
-            // Normal
-            debugMode = 1;
-        }
-        if (glfwGetKey(glfwWindow, GLFW_KEY_4) == GLFW_PRESS) {
-            // Albedo
-            debugMode = 2;
-        }
-        if (glfwGetKey(glfwWindow, GLFW_KEY_5) == GLFW_PRESS) {
-            // Depth
-            debugMode = 3;
-        }
-        if (glfwGetKey(glfwWindow, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-            glfwSetWindowShouldClose(glfwWindow, true);
-        }
-
-        // Rotate the first light in a circular motion
+        // Light movement
         float radius = 5.0f;
         float speed = 1.0f;
-
-        // Calculate the new position using sine and cosine for circular motion
         lightSystem.positions[0].x = cos(currentFrame * speed) * radius;
         lightSystem.positions[0].z = sin(currentFrame * speed) * radius;
 
         // Get view matrix from the camera
         glm::mat4 view = camera.getViewMatrix();
+
+        // Update all scripts in all gameObjects
+        for (auto& gameObject : gameObjects) {
+            gameObject->updateScripts(deltaTime);
+        }
 
         // Render deferred pass (geometry and lighting)
         renderer.geometryPass(world, renderQuery, view, projection);
@@ -358,6 +368,11 @@ int main() {
 
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();
+    }
+
+    // Cleanup
+    for (auto& gameObject : gameObjects) {
+        delete gameObject;
     }
 
     return 0;

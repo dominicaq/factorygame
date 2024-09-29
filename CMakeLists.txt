@@ -11,6 +11,10 @@ include_directories(${CMAKE_SOURCE_DIR}/external/glfw-3.4/include)
 include_directories(${CMAKE_SOURCE_DIR}/external/glm)
 include_directories(${CMAKE_SOURCE_DIR}/external/stb)
 
+# Include src directory and assets/scripts directory recursively
+include_directories(${CMAKE_SOURCE_DIR}/src)
+include_directories(${CMAKE_SOURCE_DIR}/assets/scripts)
+
 # Find OpenGL
 find_package(OpenGL REQUIRED)
 
@@ -21,6 +25,13 @@ endif()
 
 # Find all .cpp files in src/ and its subdirectories
 file(GLOB_RECURSE SOURCES "${CMAKE_SOURCE_DIR}/src/*.cpp")
+
+# Recursively find all header and script files in assets/scripts
+file(GLOB_RECURSE SCRIPT_HEADERS "${CMAKE_SOURCE_DIR}/assets/scripts/*.h")
+file(GLOB_RECURSE SCRIPT_SOURCES "${CMAKE_SOURCE_DIR}/assets/scripts/*.cpp")
+
+# Add the scripts to the executable
+set(SOURCES ${SOURCES} ${SCRIPT_SOURCES})
 
 # Define asset directory as an absolute path
 set(ASSET_DIR "${CMAKE_SOURCE_DIR}/assets/")
@@ -42,3 +53,6 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 
 # Link GLAD, GLFW, and OpenGL
 target_link_libraries(${PROJECT_NAME} glad ${GLFW_LIBRARY} OpenGL::GL)
+
+# Define ASSET_DIR macro globally for source files
+target_compile_definitions(${PROJECT_NAME} PRIVATE ASSET_DIR="${ASSET_DIR}")
