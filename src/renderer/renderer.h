@@ -49,19 +49,17 @@ public:
     /*
      * Render Passes
      */
-    void geometryPass(EntityManager& entityManager,
-        ComponentArray<Mesh>& meshComponents,
-        ComponentArray<Transform>& transformComponents,
+    void geometryPass(const std::vector<Mesh*>& meshes,
+        const std::vector<Transform*>& transforms,
         const glm::mat4& view,
         const glm::mat4& projection);
 
     void lightPass(const glm::vec3& cameraPosition, const LightSystem& lightSystem);
 
-    void forwardPass(EntityManager& entityManager,
-        ComponentArray<Mesh>& meshComponents,
-        ComponentArray<Transform>& transformComponents,
+    void forwardPass(const std::vector<Mesh*>& meshes,
+        const std::vector<Transform*>& transforms,
         const glm::mat4& view,
-        const glm::mat4& projection) ;
+        const glm::mat4& projection);
 
     /*
      * Debugging: Display G-buffer textures (e.g., Position, Normal, Albedo)

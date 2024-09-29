@@ -120,20 +120,16 @@ void processCameraInput(GLFWwindow* window, Camera& camera, float deltaTime) {
     }
 }
 
-void loadScene(EntityManager& entityManager,
-               ComponentArray<Mesh>& meshComponents,
-               ComponentArray<Transform>& transformComponents,
-               LightSystem& lightSystem)
-{
+void loadScene(ECSWorld& world, LightSystem& lightSystem) {
     // Create shader for both models
     std::string vertexPath = SHADER_DIR + "default.vs";
     std::string fragmentPath = SHADER_DIR + "default.fs";
     Shader* basicShader = new Shader(vertexPath, fragmentPath);
 
     // --------------------- Stanford Bunny Model ---------------------
-    int bunnyEntity = entityManager.createEntity();
+    Entity bunnyEntity = world.createEntity();
     Transform bunnyTransform(glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(5.0f), glm::vec3(0.0f));
-    transformComponents.addComponent(bunnyEntity, bunnyTransform);
+    world.addComponent(bunnyEntity, bunnyTransform);
 
     Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
     if (bunnyMesh != nullptr) {
@@ -141,18 +137,17 @@ void loadScene(EntityManager& entityManager,
         bunnyMaterial->albedoColor = glm::vec3(1.0f, 0.5f, 0.31f);
         bunnyMaterial->isDeferred = true;
 
-        // Load Albedo texture for the bunny
         Texture* bunnyAlbedoMap = new Texture(TEXTURE_DIR + "uv_map.jpg");
         bunnyMaterial->albedoMap = bunnyAlbedoMap;
 
         bunnyMesh->material = bunnyMaterial;
-        meshComponents.addComponent(bunnyEntity, *bunnyMesh);
+        world.addComponent(bunnyEntity, *bunnyMesh);
     }
 
     // --------------------- Diablo Model ---------------------
-    int diabloEntity = entityManager.createEntity();
+    Entity diabloEntity = world.createEntity();
     Transform diabloTransform(glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(2.0f), glm::vec3(0.0f));
-    transformComponents.addComponent(diabloEntity, diabloTransform);
+    world.addComponent(diabloEntity, diabloTransform);
 
     Mesh* diabloModel = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
     if (diabloModel != nullptr) {
@@ -160,16 +155,14 @@ void loadScene(EntityManager& entityManager,
         diabloMaterial->albedoColor = glm::vec3(0.7f, 0.7f, 0.7f);
         diabloMaterial->isDeferred = true;
 
-        // Load Albedo texture for Diablo
         Texture* diabloAlbedoMap = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_diffuse.tga");
         diabloMaterial->albedoMap = diabloAlbedoMap;
 
-        // Load Normal map for Diablo
         Texture* diabloNormalMap = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_nm_tangent.tga");
         diabloMaterial->normalMap = diabloNormalMap;
 
         diabloModel->material = diabloMaterial;
-        meshComponents.addComponent(diabloEntity, *diabloModel);
+        world.addComponent(diabloEntity, *diabloModel);
     }
 
     // --------------------- Cube Model (Forward Rendering) ---------------------
@@ -177,19 +170,18 @@ void loadScene(EntityManager& entityManager,
     std::string forwardFragmentPath = SHADER_DIR + "default.fs";
     Shader* forwardShader = new Shader(forwardVertexPath, forwardFragmentPath);
 
-    int cubeEntity = entityManager.createEntity();
+    Entity cubeEntity = world.createEntity();
     Transform cubeTransform(glm::vec3(0.0f, 2.0f, 0.0f), glm::vec3(0.5f), glm::vec3(0.0f));
-    transformComponents.addComponent(cubeEntity, cubeTransform);
+    world.addComponent(cubeEntity, cubeTransform);
 
     Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
     if (cubeMesh != nullptr) {
         Material* cubeMaterial = new Material(forwardShader);
-        cubeMaterial->albedoColor = glm::vec3(0.2f, 0.7f, 0.2f);  // A greenish color
+        cubeMaterial->albedoColor = glm::vec3(0.2f, 0.7f, 0.2f);  // Greenish color
         cubeMaterial->isDeferred = false;
 
-        // No textures for the cube in this example
         cubeMesh->material = cubeMaterial;
-        meshComponents.addComponent(cubeEntity, *cubeMesh);
+        world.addComponent(cubeEntity, *cubeMesh);
     }
 
     // --------------------- Light System ---------------------
@@ -258,19 +250,29 @@ int main() {
 
     LightSystem lightSystem;
 
-    EntityManager entityManager;
-    ComponentArray<Mesh> meshComponents;
-    ComponentArray<Transform> transformComponents;
+    ECSWorld world;
 
-    // Load the scene
-    loadScene(entityManager, meshComponents, transformComponents, lightSystem);
+    // Load the scene data
+    loadScene(world, lightSystem);
 
-    // Initialize mesh buffers after loading the scene
-    for (int entity = 0; entity < entityManager.size(); ++entity) {
-        if (entityManager.isActive(entity) && meshComponents.hasComponent(entity)) {
-            Mesh& mesh = meshComponents.getComponent(entity);
-            renderer.initMeshBuffers(&mesh);
-        }
+    // Create required render pass queries
+    std::vector<Mesh*> meshes;
+    std::vector<Transform*> transforms;
+
+    auto entities = world.queryEntities<Mesh, Transform>();
+
+    // Pre-query Components, and setup renderer
+    for (Entity entity : entities) {
+        // Single entity data
+        Mesh* mesh = &world.getComponent<Mesh>(entity);
+        Transform* transform = &world.getComponent<Transform>(entity);
+
+        // Create the queries
+        meshes.push_back(mesh);
+        transforms.push_back(transform);
+
+        // Setup renderer
+        renderer.initMeshBuffers(mesh);
     }
 
     // Camera setup
@@ -350,13 +352,13 @@ int main() {
         glm::mat4 view = camera.getViewMatrix();
 
         // Render deferred pass (geometry and lighting)
-        renderer.geometryPass(entityManager, meshComponents, transformComponents, view, projection);
+        renderer.geometryPass(meshes, transforms, view, projection);
         renderer.lightPass(camera.position, lightSystem);
 
         if (debugMode >= 0) {
             renderer.debugGBufferPass(debugShader, debugMode);
         }
-        renderer.forwardPass(entityManager, meshComponents, transformComponents, view, projection);
+        renderer.forwardPass(meshes, transforms, view, projection);
 
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();

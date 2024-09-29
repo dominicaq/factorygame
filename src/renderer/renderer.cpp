@@ -299,9 +299,8 @@ void Renderer::resizeGBuffer(int width, int height) {
 /*
  * Render Passes
  */
-void Renderer::geometryPass(EntityManager& entityManager,
-                            ComponentArray<Mesh>& meshComponents,
-                            ComponentArray<Transform>& transformComponents,
+void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
+                            const std::vector<Transform*>& transforms,
                             const glm::mat4& view,
                             const glm::mat4& projection) {
     // Bind G-buffer framebuffer
@@ -313,25 +312,21 @@ void Renderer::geometryPass(EntityManager& entityManager,
     m_gBufferShader.setMat4("u_View", view);
     m_gBufferShader.setMat4("u_Projection", projection);
 
-    // Loop through all entities and check for Mesh and Transform components
-    for (int entity = 0; entity < entityManager.size(); ++entity) {
-        if (entityManager.isActive(entity) &&
-            meshComponents.hasComponent(entity) &&
-            transformComponents.hasComponent(entity))
-        {
-            const Mesh& mesh = meshComponents.getComponent(entity);
-            const Transform& transform = transformComponents.getComponent(entity);
+    // Loop through both arrays (meshes and transforms) together
+    for (size_t i = 0; i < meshes.size(); ++i) {
+        const Mesh* mesh = meshes[i];
+        const Transform* transform = transforms[i];
 
-            if (mesh.material->isDeferred == false) {
-                continue;  // Skip forward rendering materials
-            }
-
-            glm::mat4 model = transform.getModelMatrix();
-            m_gBufferShader.setMat4("u_Model", model);
-            mesh.material->bind(&m_gBufferShader);
-
-            draw(&mesh);
+        // Skip forward rendering materials
+        if (mesh->material->isDeferred == false) {
+            continue;
         }
+
+        glm::mat4 model = transform->getModelMatrix();
+        m_gBufferShader.setMat4("u_Model", model);
+        mesh->material->bind(&m_gBufferShader);
+
+        draw(mesh);
     }
 
     // Unbind framebuffer
@@ -391,13 +386,12 @@ void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lig
     glDisable(GL_BLEND);
 }
 
-void Renderer::forwardPass(EntityManager& entityManager,
-                           ComponentArray<Mesh>& meshComponents,
-                           ComponentArray<Transform>& transformComponents,
-                           const glm::mat4& view,
-                           const glm::mat4& projection) {
+void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
+        const std::vector<Transform*>& transforms,
+        const glm::mat4& view,
+        const glm::mat4& projection) {
     // Copy depth buffer from G-buffer to default framebuffer
-    m_gBuffer->bind();  // Use the G-buffer's bind function
+    m_gBuffer->bind();
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);  // Default framebuffer (the screen)
     glBlitFramebuffer(0, 0, m_width, m_height,
                       0, 0, m_width, m_height,
@@ -409,32 +403,27 @@ void Renderer::forwardPass(EntityManager& entityManager,
     glDepthFunc(GL_LESS);
 
     // Iterate over all entities to render forward pass meshes
-    for (int entity = 0; entity < entityManager.size(); ++entity) {
-        if (entityManager.isActive(entity) &&
-            meshComponents.hasComponent(entity) &&
-            transformComponents.hasComponent(entity))
-        {
-            const Mesh& mesh = meshComponents.getComponent(entity);
-            const Transform& transform = transformComponents.getComponent(entity);
+    for (size_t i = 0; i < meshes.size(); ++i) {
+        const Mesh* mesh = meshes[i];
+        const Transform* transform = transforms[i];
 
-            // Skip meshes that are part of the deferred rendering pass
-            if (mesh.material->isDeferred) {
-                continue;
-            }
-
-            Shader* shader = mesh.material->shader;
-            shader->use();
-
-            // Set transformation matrices
-            shader->setMat4("u_View", view);
-            shader->setMat4("u_Projection", projection);
-            shader->setMat4("u_Model", transform.getModelMatrix());
-
-            mesh.material->bind();
-
-            // Draw the mesh
-            draw(&mesh);
+        // Skip deferred rendering materials
+        if (mesh->material->isDeferred == true) {
+            continue;
         }
+
+        Shader* shader = mesh->material->shader;
+        shader->use();
+
+        // Set transformation matrices
+        shader->setMat4("u_View", view);
+        shader->setMat4("u_Projection", projection);
+        shader->setMat4("u_Model", transform->getModelMatrix());
+
+        mesh->material->bind();
+
+        // Draw the mesh
+        draw(mesh);
     }
 }
 
