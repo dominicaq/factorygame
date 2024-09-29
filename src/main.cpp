@@ -141,8 +141,11 @@ void loadScene(ECSWorld& world, LightSystem& lightSystem) {
         bunnyMaterial->albedoMap = bunnyAlbedoMap;
 
         bunnyMesh->material = bunnyMaterial;
-        world.addComponent(bunnyEntity, *bunnyMesh);
+        world.addComponent(bunnyEntity, bunnyMesh);
     }
+
+    // --------------------- Dummy Entity ----------------------
+    Entity dummyEntity = world.createEntity();
 
     // --------------------- Diablo Model ---------------------
     Entity diabloEntity = world.createEntity();
@@ -162,7 +165,7 @@ void loadScene(ECSWorld& world, LightSystem& lightSystem) {
         diabloMaterial->normalMap = diabloNormalMap;
 
         diabloModel->material = diabloMaterial;
-        world.addComponent(diabloEntity, *diabloModel);
+        world.addComponent(diabloEntity, diabloModel);
     }
 
     // --------------------- Cube Model (Forward Rendering) ---------------------
@@ -181,7 +184,7 @@ void loadScene(ECSWorld& world, LightSystem& lightSystem) {
         cubeMaterial->isDeferred = false;
 
         cubeMesh->material = cubeMaterial;
-        world.addComponent(cubeEntity, *cubeMesh);
+        world.addComponent(cubeEntity, cubeMesh);
     }
 
     // --------------------- Light System ---------------------
@@ -255,25 +258,18 @@ int main() {
     // Load the scene data
     loadScene(world, lightSystem);
 
-    // Create required render pass queries
-    std::vector<Mesh*> meshes;
-    std::vector<Transform*> transforms;
+    // Query entities with both Mesh and Transform components (returns valid indices)
+    std::vector<Entity> renderQuery = world.batchedQuery<Mesh, Transform>();
 
-    auto entities = world.queryEntities<Mesh, Transform>();
-
-    // Pre-query Components, and setup renderer
-    for (Entity entity : entities) {
-        // Single entity data
-        Mesh* mesh = &world.getComponent<Mesh>(entity);
-        Transform* transform = &world.getComponent<Transform>(entity);
-
-        // Create the queries
-        meshes.push_back(mesh);
-        transforms.push_back(transform);
-
-        // Setup renderer
+    // Initialize the renderer with mesh buffers directly from the query
+    for (Entity entity : renderQuery) {
+        Mesh* mesh = world.getComponent<Mesh>(entity);
         renderer.initMeshBuffers(mesh);
     }
+
+    // Single query
+    // Mesh& mesh = world.getComponent<Mesh>(entity);
+    // Transform& transform = world.getComponent<Transform>(entity);
 
     // Camera setup
     Camera camera;
@@ -352,13 +348,13 @@ int main() {
         glm::mat4 view = camera.getViewMatrix();
 
         // Render deferred pass (geometry and lighting)
-        renderer.geometryPass(meshes, transforms, view, projection);
+        renderer.geometryPass(world, renderQuery, view, projection);
         renderer.lightPass(camera.position, lightSystem);
 
         if (debugMode >= 0) {
             renderer.debugGBufferPass(debugShader, debugMode);
         }
-        renderer.forwardPass(meshes, transforms, view, projection);
+        renderer.forwardPass(world, renderQuery, view, projection);
 
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();

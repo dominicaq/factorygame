@@ -49,15 +49,15 @@ public:
     /*
      * Render Passes
      */
-    void geometryPass(const std::vector<Mesh*>& meshes,
-        const std::vector<Transform*>& transforms,
+    void geometryPass(ECSWorld& world,
+        const std::vector<Entity> entities,
         const glm::mat4& view,
         const glm::mat4& projection);
 
     void lightPass(const glm::vec3& cameraPosition, const LightSystem& lightSystem);
 
-    void forwardPass(const std::vector<Mesh*>& meshes,
-        const std::vector<Transform*>& transforms,
+    void forwardPass(ECSWorld& world,
+        const std::vector<Entity> entities,
         const glm::mat4& view,
         const glm::mat4& projection);
 

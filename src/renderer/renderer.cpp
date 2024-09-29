@@ -299,10 +299,10 @@ void Renderer::resizeGBuffer(int width, int height) {
 /*
  * Render Passes
  */
-void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
-                            const std::vector<Transform*>& transforms,
-                            const glm::mat4& view,
-                            const glm::mat4& projection) {
+void Renderer::geometryPass(ECSWorld& world,
+    const std::vector<Entity> entities,
+    const glm::mat4& view,
+    const glm::mat4& projection) {
     // Bind G-buffer framebuffer
     m_gBuffer->bind();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -313,16 +313,17 @@ void Renderer::geometryPass(const std::vector<Mesh*>& meshes,
     m_gBufferShader.setMat4("u_Projection", projection);
 
     // Loop through both arrays (meshes and transforms) together
-    for (size_t i = 0; i < meshes.size(); ++i) {
-        const Mesh* mesh = meshes[i];
-        const Transform* transform = transforms[i];
+    for (Entity entity : entities) {
+        // Retrieve Mesh and Transform components
+        Mesh* mesh = world.getComponent<Mesh>(entity);
+        Transform& transform = world.getComponent<Transform>(entity);
 
         // Skip forward rendering materials
         if (mesh->material->isDeferred == false) {
             continue;
         }
 
-        glm::mat4 model = transform->getModelMatrix();
+        glm::mat4 model = transform.getModelMatrix();
         m_gBufferShader.setMat4("u_Model", model);
         mesh->material->bind(&m_gBufferShader);
 
@@ -386,10 +387,10 @@ void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lig
     glDisable(GL_BLEND);
 }
 
-void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
-        const std::vector<Transform*>& transforms,
-        const glm::mat4& view,
-        const glm::mat4& projection) {
+void Renderer::forwardPass(ECSWorld& world,
+    const std::vector<Entity> entities,
+    const glm::mat4& view,
+    const glm::mat4& projection)  {
     // Copy depth buffer from G-buffer to default framebuffer
     m_gBuffer->bind();
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);  // Default framebuffer (the screen)
@@ -402,10 +403,11 @@ void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    // Iterate over all entities to render forward pass meshes
-    for (size_t i = 0; i < meshes.size(); ++i) {
-        const Mesh* mesh = meshes[i];
-        const Transform* transform = transforms[i];
+    // Loop through both arrays (meshes and transforms) together
+    for (Entity entity : entities) {
+        // Retrieve Mesh and Transform components
+        Mesh* mesh = world.getComponent<Mesh>(entity);
+        Transform& transform = world.getComponent<Transform>(entity);
 
         // Skip deferred rendering materials
         if (mesh->material->isDeferred == true) {
@@ -418,7 +420,7 @@ void Renderer::forwardPass(const std::vector<Mesh*>& meshes,
         // Set transformation matrices
         shader->setMat4("u_View", view);
         shader->setMat4("u_Projection", projection);
-        shader->setMat4("u_Model", transform->getModelMatrix());
+        shader->setMat4("u_Model", transform.getModelMatrix());
 
         mesh->material->bind();
 
