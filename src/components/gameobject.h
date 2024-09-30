@@ -2,7 +2,7 @@
 #define GAMEOBJECT_H
 
 #include "script.h"
-#include "ecs.h"
+#include "ecs/ecs.h"
 
 #include <vector>
 #include <memory>

@@ -3,6 +3,7 @@
 
 #include <glm.hpp>
 #include "../renderer/material.h"
+#include "ecs/component_traits.h"
 
 #include <vector>
 
@@ -32,5 +33,9 @@ struct Mesh {
         indices.shrink_to_fit();
     }
 };
+
+// Don't want to move mesh data around, ensure ECS stores it as a pointer
+template<>
+struct ShouldStoreAsPointer<Mesh> : std::true_type {};
 
 #endif // MESH_H

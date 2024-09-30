@@ -10,7 +10,7 @@
 #include "renderer/texture.h"
 
 // ECS Components
-#include "components/ecs.h"
+#include "components/ecs/ecs.h"
 #include "components/mesh.h"
 #include "components/transform.h"
 #include "components/light.h"

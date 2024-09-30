@@ -277,21 +277,22 @@ int main() {
     window.setRenderer(&renderer);
 
     LightSystem lightSystem;
-    ECSWorld ecs;
+    ECSWorld world;
+    // world.insertResource<Texture>(texture);
 
     // Vector to store GameObjects (objects with scripts)
     std::vector<GameObject*> gameObjects;
 
     // Load the scene data
-    loadScene(ecs, lightSystem, gameObjects);
+    loadScene(world, lightSystem, gameObjects);
 
     // Batched queries from scene
-    std::vector<Entity> renderQuery = ecs.batchedQuery<Mesh, Transform, ModelMatrix>();
-    std::vector<Entity> modelQuery = ecs.batchedQuery<Transform, ModelMatrix>();
+    std::vector<Entity> renderQuery = world.batchedQuery<Mesh, Transform, ModelMatrix>();
+    std::vector<Entity> modelQuery = world.batchedQuery<Transform, ModelMatrix>();
 
     // Initialize the renderer with mesh buffers directly from the query
     for (Entity entity : renderQuery) {
-        Mesh* mesh = ecs.getComponent<Mesh>(entity);
+        Mesh* mesh = world.getComponent<Mesh>(entity);
         renderer.initMeshBuffers(mesh);
     }
 
@@ -367,10 +368,10 @@ int main() {
 
         // Get view matrix from the camera
         glm::mat4 view = camera.getViewMatrix();
-        updateModelMatrices(ecs, modelQuery);
+        updateModelMatrices(world, modelQuery);
 
         // Render deferred passes
-        renderer.geometryPass(ecs, renderQuery, view, projection);
+        renderer.geometryPass(world, renderQuery, view, projection);
         renderer.lightPass(camera.position, lightSystem);
 
         // Debug rendering
@@ -379,7 +380,7 @@ int main() {
         }
 
         // Render forward pass
-        renderer.forwardPass(ecs, renderQuery, view, projection);
+        renderer.forwardPass(world, renderQuery, view, projection);
 
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();

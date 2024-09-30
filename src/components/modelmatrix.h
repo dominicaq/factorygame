@@ -1,7 +1,7 @@
 #ifndef MODELMATRIX_H
 #define MODELMATRIX_H
 
-#include "ecs.h"
+#include "ecs/ecs.h"
 #include "transform.h"
 
 #include "glm.hpp"

@@ -3,7 +3,7 @@
 #include <iostream>
 #include <memory>
 
-#include "../components/ecs.h"
+#include "../components/ecs/ecs.h"
 
 // Define the number of G-buffer attachments
 #define NUM_ATTACHMENTS 4
@@ -299,7 +299,7 @@ void Renderer::resizeGBuffer(int width, int height) {
 /*
  * Render Passes
  */
-void Renderer::geometryPass(ECSWorld& ecs,
+void Renderer::geometryPass(ECSWorld& world,
     const std::vector<Entity> entities,
     const glm::mat4& view,
     const glm::mat4& projection) {
@@ -315,8 +315,8 @@ void Renderer::geometryPass(ECSWorld& ecs,
     // Loop through both arrays (meshes and transforms) together
     for (Entity entity : entities) {
         // Retrieve Mesh and Transform components
-        Mesh* mesh = ecs.getComponent<Mesh>(entity);
-        ModelMatrix& modelMatrix = ecs.getComponent<ModelMatrix>(entity);
+        Mesh* mesh = world.getComponent<Mesh>(entity);
+        ModelMatrix& modelMatrix = world.getComponent<ModelMatrix>(entity);
 
         // Skip forward rendering materials
         if (mesh->material->isDeferred == false) {
@@ -386,7 +386,7 @@ void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lig
     glDisable(GL_BLEND);
 }
 
-void Renderer::forwardPass(ECSWorld& ecs,
+void Renderer::forwardPass(ECSWorld& world,
     const std::vector<Entity> entities,
     const glm::mat4& view,
     const glm::mat4& projection)  {
@@ -405,8 +405,8 @@ void Renderer::forwardPass(ECSWorld& ecs,
     // Loop through both arrays (meshes and transforms) together
     for (Entity entity : entities) {
         // Retrieve Mesh and Transform components
-        Mesh* mesh = ecs.getComponent<Mesh>(entity);
-        ModelMatrix& modelMatrix = ecs.getComponent<ModelMatrix>(entity);
+        Mesh* mesh = world.getComponent<Mesh>(entity);
+        ModelMatrix& modelMatrix = world.getComponent<ModelMatrix>(entity);
 
         // Skip deferred rendering materials
         if (mesh->material->isDeferred == true) {
