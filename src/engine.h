@@ -11,8 +11,10 @@
 
 // ECS Components
 #include "components/ecs/ecs.h"
+#include "components/camera.h"
 #include "components/mesh.h"
 #include "components/transform.h"
+
 #include "components/light.h"
 #include "components/gameobject.h"
 #include "components/modelmatrix.h"

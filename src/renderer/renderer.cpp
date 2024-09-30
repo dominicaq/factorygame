@@ -23,7 +23,11 @@ void Renderer::setupRenderGraph() {
     }
 }
 
-Renderer::Renderer(int width, int height) : m_width(width), m_height(height) {
+Renderer::Renderer(int width, int height, Camera* camera) {
+    m_camera = camera;
+    m_width = width;
+    m_height = height;
+
     initOpenGLState();
     initScreenQuad();
 
@@ -292,8 +296,11 @@ void Renderer::resizeGBuffer(int width, int height) {
     m_width = width;
     m_height = height;
 
-    // Resize the G-buffer using the Framebuffer abstraction
+    // Resize the G-buffer (and in the future, all framebuffers)
     m_gBuffer->resize(width, height);
+    if (m_camera) {
+        m_camera->setAspectRatio(static_cast<float>(width), static_cast<float>(height));
+    }
 }
 
 /*
@@ -301,8 +308,7 @@ void Renderer::resizeGBuffer(int width, int height) {
  */
 void Renderer::geometryPass(ECSWorld& world,
     const std::vector<Entity> entities,
-    const glm::mat4& view,
-    const glm::mat4& projection) {
+    const glm::mat4& view) {
     // Bind G-buffer framebuffer
     m_gBuffer->bind();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -310,7 +316,7 @@ void Renderer::geometryPass(ECSWorld& world,
     // Use Geometry Pass Shader
     m_gBufferShader.use();
     m_gBufferShader.setMat4("u_View", view);
-    m_gBufferShader.setMat4("u_Projection", projection);
+    m_gBufferShader.setMat4("u_Projection", world.getResource<Camera>().getProjectionMatrix());
 
     // Loop through both arrays (meshes and transforms) together
     for (Entity entity : entities) {
@@ -333,7 +339,7 @@ void Renderer::geometryPass(ECSWorld& world,
     m_gBuffer->unbind();
 }
 
-void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lightSystem) {
+void Renderer::lightPass(ECSWorld& world, const LightSystem& lightSystem) {
     // Bind default framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -342,7 +348,7 @@ void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lig
     m_lightPassShader.use();
 
     // Set camera position
-    m_lightPassShader.setVec3("u_CameraPosition", cameraPosition);
+    m_lightPassShader.setVec3("u_CameraPosition", world.getResource<Camera>().position);
 
     // Set the number of lights
     m_lightPassShader.setInt("numLights", lightSystem.size);
@@ -388,8 +394,7 @@ void Renderer::lightPass(const glm::vec3& cameraPosition, const LightSystem& lig
 
 void Renderer::forwardPass(ECSWorld& world,
     const std::vector<Entity> entities,
-    const glm::mat4& view,
-    const glm::mat4& projection)  {
+    const glm::mat4& view) {
     // Copy depth buffer from G-buffer to default framebuffer
     m_gBuffer->bind();
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);  // Default framebuffer (the screen)
@@ -418,7 +423,7 @@ void Renderer::forwardPass(ECSWorld& world,
 
         // Set transformation matrices
         shader->setMat4("u_View", view);
-        shader->setMat4("u_Projection", projection);
+        shader->setMat4("u_Projection", world.getResource<Camera>().getProjectionMatrix());
         shader->setMat4("u_Model", modelMatrix.matrix);
 
         mesh->material->bind();

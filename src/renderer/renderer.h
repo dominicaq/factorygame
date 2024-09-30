@@ -1,19 +1,21 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
+#include "../engine.h"
+
 #include "framebuffer.h"
 #include "rendergraph.h"
-#include "shader.h"
-
-// Components
-#include "../components/ecs/ecs.h"
-#include "../components/modelmatrix.h"
-#include "../components/mesh.h"
-#include "../components/light.h"
 
 #include <glad/glad.h>
 #include <memory>
 #include <vector>
+
+// Forward declarations to prevent circular dependency from engine.h
+class Mesh;
+class ECSWorld;
+class Entity;
+class LightSystem;
+class Camera;
 
 /*
  * The Renderer class is responsible for handling OpenGL rendering,
@@ -21,7 +23,7 @@
  */
 class Renderer {
 public:
-    Renderer(int width, int height);
+    Renderer(int width, int height, Camera* camera);
     ~Renderer();
 
     /*
@@ -51,15 +53,13 @@ public:
      */
     void geometryPass(ECSWorld& world,
         const std::vector<Entity> entities,
-        const glm::mat4& view,
-        const glm::mat4& projection);
+        const glm::mat4& view);
 
-    void lightPass(const glm::vec3& cameraPosition, const LightSystem& lightSystem);
+    void lightPass(ECSWorld& world, const LightSystem& lightSystem);
 
     void forwardPass(ECSWorld& world,
         const std::vector<Entity> entities,
-        const glm::mat4& view,
-        const glm::mat4& projection);
+        const glm::mat4& view);
 
     /*
      * Debugging: Display G-buffer textures (e.g., Position, Normal, Albedo)
@@ -81,10 +81,10 @@ private:
     void initOpenGLState();
 
     /*
-     * Screen-aligned quad for post process / drawing deferred rendering to screen
-     */
+    * Viewport
+    */
     unsigned int m_quadVAO;
-
+    Camera* m_camera;
 
     // List of framebuffers (in the future)
     std::unique_ptr<Framebuffer> m_gBuffer;

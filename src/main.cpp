@@ -1,10 +1,5 @@
 #include "engine.h"
 
-// Math
-#include "glm.hpp"
-#include "gtc/matrix_transform.hpp"
-#include "gtc/type_ptr.hpp"
-
 // Scripts
 #include "MoveScript.h"
 
@@ -19,34 +14,12 @@ static const std::string SHADER_DIR = ASSET_DIR "shaders/";
 static const std::string MODEL_DIR = ASSET_DIR "models/";
 static const std::string TEXTURE_DIR = ASSET_DIR "textures/";
 
-struct Camera {
-    glm::vec3 position = glm::vec3(0.0f, 0.0f, 5.0f);
-    glm::vec3 eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
-
-    glm::mat4 getViewMatrix() const {
-        glm::vec3 front;
-        front.x = cos(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
-        front.y = sin(glm::radians(eulerAngles.x)); // Pitch controls vertical rotation
-        front.z = sin(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
-        front = glm::normalize(front);
-
-        // The world up vector for an FPS camera is always (0, 1, 0)
-        glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-
-        // The right vector is always perpendicular to the front and up vector
-        glm::vec3 right = glm::normalize(glm::cross(front, up));
-
-        // Recompute the up vector (it could be tilted slightly)
-        up = glm::normalize(glm::cross(right, front));
-
-        return glm::lookAt(position, position + front, up);
-    }
-};
-
-void processCameraInput(GLFWwindow* window, Camera& camera, float deltaTime) {
+void freeCamera(GLFWwindow* window, ECSWorld& world, float deltaTime) {
     // Camera speed
     const float cameraSpeed = 2.5f * deltaTime;
     const float sensitivity = 0.1f;
+
+    Camera& camera = world.getResource<Camera>();
 
     // Calculate camera front vector based on Euler angles
     glm::vec3 front;
@@ -106,17 +79,28 @@ void processCameraInput(GLFWwindow* window, Camera& camera, float deltaTime) {
     }
 }
 
-void loadScene(ECSWorld& ecs, LightSystem& lightSystem, std::vector<GameObject*>& gameObjects) {
-    // Create shader for both models
+void loadScene(ECSWorld& world, LightSystem& lightSystem, std::vector<GameObject*>& gameObjects) {
+    // ------------------------ Setup Camera ------------------------
+    Camera camera;
+    camera.position = glm::vec3(4.0f, 0.21f, 4.04f);
+    camera.eulerAngles = glm::vec3(-2.38f, 239.0f, 0.0f);
+    camera.setNearPlane(0.1f);
+    camera.setFarPlane(100.0f);
+    camera.setFov(50.0f);
+    camera.setAspectRatio(SCREEN_WIDTH, SCREEN_HEIGHT);
+    world.insertResource<Camera>(camera);
+
+    // ------------------------ Shader Setup ------------------------
+
     std::string vertexPath = SHADER_DIR + "default.vs";
     std::string fragmentPath = SHADER_DIR + "default.fs";
     Shader* basicShader = new Shader(vertexPath, fragmentPath);
 
     // --------------------- Stanford Bunny Model ---------------------
-    Entity bunnyEntity = ecs.createEntity();
+    Entity bunnyEntity = world.createEntity();
     Transform bunnyTransform(glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(5.0f), glm::vec3(0.0f));
-    ecs.addComponent(bunnyEntity, bunnyTransform);
-    ecs.addComponent(bunnyEntity, ModelMatrix());
+    world.addComponent(bunnyEntity, bunnyTransform);
+    world.addComponent(bunnyEntity, ModelMatrix());
 
     Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
     if (bunnyMesh != nullptr) {
@@ -128,22 +112,22 @@ void loadScene(ECSWorld& ecs, LightSystem& lightSystem, std::vector<GameObject*>
         bunnyMaterial->albedoMap = bunnyAlbedoMap;
 
         bunnyMesh->material = bunnyMaterial;
-        ecs.addComponent(bunnyEntity, bunnyMesh);
+        world.addComponent(bunnyEntity, bunnyMesh);
 
         // Create GameObject and attach the MoveScript
-        GameObject* bunnyObject = new GameObject(bunnyEntity, &ecs);
+        GameObject* bunnyObject = new GameObject(bunnyEntity, &world);
         bunnyObject->addScript<MoveScript>();  // Attach MoveScript
         gameObjects.push_back(bunnyObject);
     }
 
     // --------------------- Dummy Entity ----------------------
-    Entity dummyEntity = ecs.createEntity();
+    Entity dummyEntity = world.createEntity();
 
     // --------------------- Diablo Model ---------------------
-    Entity diabloEntity = ecs.createEntity();
+    Entity diabloEntity = world.createEntity();
     Transform diabloTransform(glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(2.0f), glm::vec3(0.0f));
-    ecs.addComponent(diabloEntity, diabloTransform);
-    ecs.addComponent(diabloEntity, ModelMatrix());
+    world.addComponent(diabloEntity, diabloTransform);
+    world.addComponent(diabloEntity, ModelMatrix());
 
     Mesh* diabloModel = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
     if (diabloModel != nullptr) {
@@ -158,7 +142,7 @@ void loadScene(ECSWorld& ecs, LightSystem& lightSystem, std::vector<GameObject*>
         diabloMaterial->normalMap = diabloNormalMap;
 
         diabloModel->material = diabloMaterial;
-        ecs.addComponent(diabloEntity, diabloModel);
+        world.addComponent(diabloEntity, diabloModel);
     }
 
     // --------------------- Cube Model (Forward Rendering) ---------------------
@@ -166,10 +150,10 @@ void loadScene(ECSWorld& ecs, LightSystem& lightSystem, std::vector<GameObject*>
     std::string forwardFragmentPath = SHADER_DIR + "default.fs";
     Shader* forwardShader = new Shader(forwardVertexPath, forwardFragmentPath);
 
-    Entity cubeEntity = ecs.createEntity();
+    Entity cubeEntity = world.createEntity();
     Transform cubeTransform(glm::vec3(0.0f, 2.0f, 0.0f), glm::vec3(0.5f), glm::vec3(0.0f));
-    ecs.addComponent(cubeEntity, cubeTransform);
-    ecs.addComponent(cubeEntity, ModelMatrix());
+    world.addComponent(cubeEntity, cubeTransform);
+    world.addComponent(cubeEntity, ModelMatrix());
 
     Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
     if (cubeMesh != nullptr) {
@@ -178,10 +162,10 @@ void loadScene(ECSWorld& ecs, LightSystem& lightSystem, std::vector<GameObject*>
         cubeMaterial->isDeferred = false;
 
         cubeMesh->material = cubeMaterial;
-        ecs.addComponent(cubeEntity, cubeMesh);
+        world.addComponent(cubeEntity, cubeMesh);
 
         // Create GameObject and attach the MoveScript
-        GameObject* cubeObject = new GameObject(cubeEntity, &ecs);
+        GameObject* cubeObject = new GameObject(cubeEntity, &world);
         // cubeObject->addScript<MoveScript>();
         gameObjects.push_back(cubeObject);
     }
@@ -272,49 +256,18 @@ int main() {
         return -1;
     }
 
-    // Create renderer
-    Renderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT);
-    window.setRenderer(&renderer);
-
-    LightSystem lightSystem;
+    // Scene data
     ECSWorld world;
-    // world.insertResource<Texture>(texture);
-
-    // Vector to store GameObjects (objects with scripts)
+    LightSystem lightSystem;
     std::vector<GameObject*> gameObjects;
 
     // Load the scene data
     loadScene(world, lightSystem, gameObjects);
 
-    // Batched queries from scene
-    std::vector<Entity> renderQuery = world.batchedQuery<Mesh, Transform, ModelMatrix>();
-    std::vector<Entity> modelQuery = world.batchedQuery<Transform, ModelMatrix>();
-
-    // Initialize the renderer with mesh buffers directly from the query
-    for (Entity entity : renderQuery) {
-        Mesh* mesh = world.getComponent<Mesh>(entity);
-        renderer.initMeshBuffers(mesh);
-    }
-
     // Setup gameobject scripts
     for (auto& gameObject : gameObjects) {
         gameObject->startScripts();
     }
-
-    // ------------------------ Setup Camera ------------------------
-
-    Camera camera;
-    camera.position = glm::vec3(4.0f, 0.21f, 4.04f);
-    camera.eulerAngles = glm::vec3(-2.38f, 239.0f, 0.0f);
-
-    float nearPlane = 0.1f;
-    float farPlane = 100.0f;
-    glm::mat4 projection = glm::perspective(
-        glm::radians(45.0f),
-        float(SCREEN_WIDTH) / float(SCREEN_HEIGHT),
-        nearPlane,
-        farPlane
-    );
 
     // ------------------------ Debug Setup --------------------------
 
@@ -323,8 +276,8 @@ int main() {
     std::string debugFragmentPath = SHADER_DIR + "deferred/debug_gbuff.fs";
     Shader debugShader(debugVertexPath, debugFragmentPath);
     debugShader.use();
-    debugShader.setFloat("u_Near", nearPlane);
-    debugShader.setFloat("u_Far", farPlane);
+    debugShader.setFloat("u_Near", world.getResource<Camera>().getNearPlane());
+    debugShader.setFloat("u_Far",  world.getResource<Camera>().getFarPlane());
 
     // Control which gbuffer texture is shown
     int debugMode = -1;
@@ -334,21 +287,32 @@ int main() {
     // Hide and capture the cursor for free camera movement
     glfwSetInputMode(window.getGLFWwindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
+    // Batched queries from scene
+    std::vector<Entity> renderQuery = world.batchedQuery<Mesh, Transform, ModelMatrix>();
+    std::vector<Entity> modelQuery = world.batchedQuery<Transform, ModelMatrix>();
+
+    // Create renderer and send mesh data to GPU
+    Renderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT, &world.getResource<Camera>());
+    window.setRenderer(&renderer);
+    for (Entity entity : renderQuery) {
+        Mesh* mesh = world.getComponent<Mesh>(entity);
+        renderer.initMeshBuffers(mesh);
+    }
+
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
 
-    // Render loop
+    // Game loop
     while (!window.shouldClose()) {
         // Calculate delta time
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
 
         // -------------- Temporary Logic (Camera & Input) --------------
 
         // Process input for camera movement
         GLFWwindow* glfwWindow = window.getGLFWwindow();
-        processCameraInput(glfwWindow, camera, deltaTime);
+        freeCamera(glfwWindow, world, deltaTime);
         glfwControls(glfwWindow, debugMode);
 
         // Light movement (temporary, can move into another system later)
@@ -367,12 +331,12 @@ int main() {
         // ------------------------ Rendering ------------------------
 
         // Get view matrix from the camera
-        glm::mat4 view = camera.getViewMatrix();
+        glm::mat4 view = world.getResource<Camera>().getViewMatrix();
         updateModelMatrices(world, modelQuery);
 
         // Render deferred passes
-        renderer.geometryPass(world, renderQuery, view, projection);
-        renderer.lightPass(camera.position, lightSystem);
+        renderer.geometryPass(world, renderQuery, view);
+        renderer.lightPass(world, lightSystem);
 
         // Debug rendering
         if (debugMode >= 0) {
@@ -380,10 +344,11 @@ int main() {
         }
 
         // Render forward pass
-        renderer.forwardPass(world, renderQuery, view, projection);
+        renderer.forwardPass(world, renderQuery, view);
 
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();
+        lastFrame = currentFrame;
     }
 
     // ------------------------ Cleanup ------------------------
