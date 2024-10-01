@@ -12,6 +12,14 @@
 
 class ECSWorld {
 public:
+    ECSWorld() = default;
+
+    ~ECSWorld() {
+        // Clean up resources
+        m_componentArrays.clear();
+        m_resources.clear();
+    }
+
     Entity createEntity();
 
     // Add component stored by value

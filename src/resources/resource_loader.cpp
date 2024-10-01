@@ -77,3 +77,32 @@ Mesh* ResourceLoader::loadMesh(const std::string& filepath) {
         return nullptr;
     }
 }
+
+/*
+* Cube maps
+*/
+/*
+* Cubemap (Loading only image data, no OpenGL calls)
+*/
+std::vector<unsigned char*> ResourceLoader::loadCubemapImages(const std::vector<std::string>& faces, int* width, int* height, int* nrChannels) {
+    stbi_set_flip_vertically_on_load(false);
+
+    std::vector<unsigned char*> data;
+    for (const std::string& face : faces) {
+        unsigned char* imgData = stbi_load(face.c_str(), width, height, nrChannels, 0);
+        if (!imgData) {
+            std::cerr << "[Error] ResourceLoader::loadCubemapImages: Failed to load image: " << face << "\n";
+            freeCubemapImages(data);
+            return {};
+        }
+        data.push_back(imgData);
+    }
+    return data;
+}
+
+void ResourceLoader::freeCubemapImages(std::vector<unsigned char*>& data) {
+    for (unsigned char* img : data) {
+        stbi_image_free(img);
+    }
+    data.clear();
+}

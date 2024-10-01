@@ -10,14 +10,14 @@
 
 void Renderer::setupRenderGraph() {
     // Init shaders
-    std::string gBufferVertexPath = ASSET_DIR "shaders/deferred/gbuff.vs";
-    std::string gBufferFragmentPath = ASSET_DIR "shaders/deferred/gbuff.fs";
+    std::string gBufferVertexPath = ASSET_DIR "shaders/core/deferred/gbuff.vs";
+    std::string gBufferFragmentPath = ASSET_DIR "shaders/core/deferred/gbuff.fs";
     if (!m_gBufferShader.load(gBufferVertexPath, gBufferFragmentPath)) {
         std::cerr << "[Error] Renderer::Renderer: Failed to create gBufferShader!\n";
     }
 
-    std::string lightVertexPath = ASSET_DIR "shaders/deferred/lightpass.vs";
-    std::string lightFragmentPath = ASSET_DIR "shaders/deferred/lightpass.fs";
+    std::string lightVertexPath = ASSET_DIR "shaders/core/deferred/lightpass.vs";
+    std::string lightFragmentPath = ASSET_DIR "shaders/core/deferred/lightpass.fs";
     if (!m_lightPassShader.load(lightVertexPath, lightFragmentPath)) {
         std::cerr << "[Error] Renderer::Renderer: Failed to create lightPassShader!\n";
     }
@@ -33,6 +33,24 @@ Renderer::Renderer(int width, int height, Camera* camera) {
 
     // Initialize G-buffer
     m_gBuffer = std::make_unique<Framebuffer>(width, height, NUM_ATTACHMENTS, true);
+
+    // Set up the skybox shader
+    std::string skyboxVertexPath = ASSET_DIR "shaders/core/skybox.vs";
+    std::string skyboxFragmentPath = ASSET_DIR "shaders/core/skybox.fs";
+    if (!m_skyboxShader.load(skyboxVertexPath, skyboxFragmentPath)) {
+        std::cerr << "[Error] Renderer::loadSkyboxShader: Failed to create skyboxShader!\n";
+    }
+
+    // Initialize skybox with cubemap faces
+    std::vector<std::string> faces = {
+        ASSET_DIR "textures/skybox/right.jpg",
+        ASSET_DIR "textures/skybox/left.jpg",
+        ASSET_DIR "textures/skybox/top.jpg",
+        ASSET_DIR "textures/skybox/bottom.jpg",
+        ASSET_DIR "textures/skybox/front.jpg",
+        ASSET_DIR "textures/skybox/back.jpg"
+    };
+    initSkybox(faces);
 
     // Set up render passes directly in the RenderGraph
     setupRenderGraph();
@@ -75,7 +93,7 @@ void Renderer::initOpenGLState() {
 }
 
 /*
- * Mesh Management
+ * Mesh management
  */
 void Renderer::draw(const Mesh* mesh) {
     size_t index = mesh->id;
@@ -392,9 +410,7 @@ void Renderer::lightPass(ECSWorld& world, const LightSystem& lightSystem) {
     glDisable(GL_BLEND);
 }
 
-void Renderer::forwardPass(ECSWorld& world,
-    const std::vector<Entity> entities,
-    const glm::mat4& view) {
+void Renderer::forwardPass(ECSWorld& world, const std::vector<Entity> entities, const glm::mat4& view) {
     // Copy depth buffer from G-buffer to default framebuffer
     m_gBuffer->bind();
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);  // Default framebuffer (the screen)
@@ -407,9 +423,7 @@ void Renderer::forwardPass(ECSWorld& world,
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    // Loop through both arrays (meshes and transforms) together
     for (Entity entity : entities) {
-        // Retrieve Mesh and Transform components
         Mesh* mesh = world.getComponent<Mesh>(entity);
         ModelMatrix& modelMatrix = world.getComponent<ModelMatrix>(entity);
 
@@ -431,6 +445,60 @@ void Renderer::forwardPass(ECSWorld& world,
         // Draw the mesh
         draw(mesh);
     }
+
+    // Reset depth function to default (GL_LESS)
+    glDepthFunc(GL_LESS);
+}
+
+/*
+* Skybox
+*/
+void Renderer::drawSkybox(const glm::mat4& view, const glm::mat4& projection) {
+    // Change depth function so the skybox renders behind everything
+    glDepthFunc(GL_LEQUAL);
+
+    // Disable depth writing so the skybox doesn't overwrite depth buffer values
+    glDepthMask(GL_FALSE);
+
+    m_skyboxShader.use();
+
+    // Remove translation from the view matrix for the skybox
+    glm::mat4 viewNoTranslation = glm::mat4(glm::mat3(view));
+    m_skyboxShader.setMat4("view", viewNoTranslation);
+    m_skyboxShader.setMat4("projection", projection);
+
+    glBindVertexArray(m_skyboxVAO);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, m_skyboxTexture);
+    glDrawArrays(GL_TRIANGLES, 0, 36);  // Draw skybox cube
+    glBindVertexArray(0);
+
+    // Re-enable depth writing
+    glDepthMask(GL_TRUE);
+
+    // Reset depth function to default (GL_LESS)
+    glDepthFunc(GL_LESS);
+}
+
+void Renderer::initSkybox(const std::vector<std::string>& faces) {
+    // Load the cubemap textures from image files
+    m_skyboxTexture = CubeMap::createFromImages(faces);
+
+    // Get the cubemap vertices from MeshGen
+    const float* cubeMapVerts = MeshGen::createCubeMapVerts();
+
+    // Generate the VAO for the skybox
+    glGenVertexArrays(1, &m_skyboxVAO);
+    glGenBuffers(1, &m_skyboxVBO);
+
+    glBindVertexArray(m_skyboxVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, m_skyboxVBO);
+    glBufferData(GL_ARRAY_BUFFER, 108 * sizeof(float), cubeMapVerts, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+    // Unbind VAO
+    glBindVertexArray(0);
 }
 
 /*

@@ -8,25 +8,32 @@
 
 class MoveScript : public Script {
 public:
-    glm::vec3 rotationAxis = glm::vec3(0.0f, 1.0f, 0.0f); // Rotate around the Y-axis by default
-    float rotationSpeed = 50.0f; // Degrees per second
-    glm::vec3 rot = glm::vec3(1.0f);
+    // Reference to component(s)
+    Transform* transform = nullptr;
+
+    // Script Properties
+    glm::vec3 rotation;
+    glm::vec3 rotationAxis = glm::vec3(0.0f, 1.0f, 0.0f);
+    float rotationSpeed = 50.0f;
 
     void start() override {
         std::cout << "MoveScript started for entity: " << gameObject->getEntity().id << "\n";
-        rot = gameObject->getComponent<Transform>()->getEulerAngles();
+        transform = gameObject->getComponent<Transform>();
+        rotation = transform->getEulerAngles();
     }
 
     void update(float deltaTime) override {
-        // Get the transform component of the associated entity
-        Transform& transform = *gameObject->getComponent<Transform>();
+        if (transform == nullptr) {
+            std::cout << "MoveScript no transform from entity: : " << gameObject->getEntity().id << "\n";
+            return;
+        }
 
         // Calculate the rotation in degrees
         float rotationAmount = rotationSpeed * deltaTime;
 
         // Update the object's eulerAngles around the specified axis
-        rot += rotationAxis * rotationAmount;
-        transform.setRotation(rot);
+        rotation += rotationAxis * rotationAmount;
+        transform->setRotation(rotation);
     }
 };
 

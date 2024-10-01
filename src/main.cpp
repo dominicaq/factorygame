@@ -264,11 +264,6 @@ int main() {
     // Load the scene data
     loadScene(world, lightSystem, gameObjects);
 
-    // Setup gameobject scripts
-    for (auto& gameObject : gameObjects) {
-        gameObject->startScripts();
-    }
-
     // ------------------------ Debug Setup --------------------------
 
     // Debug Pass Shader (for visualizing G-buffer)
@@ -297,6 +292,11 @@ int main() {
     for (Entity entity : renderQuery) {
         Mesh* mesh = world.getComponent<Mesh>(entity);
         renderer.initMeshBuffers(mesh);
+    }
+
+    // Setup gameobject scripts
+    for (auto& gameObject : gameObjects) {
+        gameObject->startScripts();
     }
 
     float deltaTime = 0.0f;
@@ -336,6 +336,10 @@ int main() {
 
         // Render deferred passes
         renderer.geometryPass(world, renderQuery, view);
+
+        // Forward pass skybox
+        // renderer.drawSkybox(view, world.getResource<Camera>().getProjectionMatrix());
+
         renderer.lightPass(world, lightSystem);
 
         // Debug rendering
@@ -353,8 +357,15 @@ int main() {
 
     // ------------------------ Cleanup ------------------------
 
-    // Cleanup allocated GameObjects
+    // Cleanup allocated GameObjects and their components
     for (auto& gameObject : gameObjects) {
+        Mesh* mesh = gameObject->getComponent<Mesh>();
+        if (mesh != nullptr) {
+            delete mesh->material->albedoMap;
+            delete mesh->material->normalMap;
+            delete mesh->material;
+            delete mesh;
+        }
         delete gameObject;
     }
 

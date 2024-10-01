@@ -5,6 +5,7 @@
 
 #include "framebuffer.h"
 #include "rendergraph.h"
+#include "cube_map.h"
 
 #include <glad/glad.h>
 #include <memory>
@@ -27,13 +28,9 @@ public:
     ~Renderer();
 
     /*
-     * Render a mesh using its buffers
-     */
-    void draw(const Mesh* mesh);
-
-    /*
      * Initialize and manage mesh buffers
      */
+    void draw(const Mesh* mesh);
     void initMeshBuffers(Mesh* mesh, bool isStatic = true);
     void deleteMeshBuffer(const Mesh* mesh);
 
@@ -60,6 +57,12 @@ public:
     void forwardPass(ECSWorld& world,
         const std::vector<Entity> entities,
         const glm::mat4& view);
+
+    /*
+     * Skybox
+     */
+    void drawSkybox(const glm::mat4& view, const glm::mat4& projection);
+    void initSkybox(const std::vector<std::string>& faces);
 
     /*
      * Debugging: Display G-buffer textures (e.g., Position, Normal, Albedo)
@@ -105,6 +108,13 @@ private:
     };
 
     std::vector<MeshData> m_meshData;
+
+    /*
+     * Skybox creation / management
+     */
+    unsigned int m_skyboxVAO, m_skyboxVBO;
+    unsigned int m_skyboxTexture;
+    Shader m_skyboxShader;
 };
 
 #endif // RENDERER_H

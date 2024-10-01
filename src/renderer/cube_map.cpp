@@ -1,49 +1,36 @@
+#include "../engine.h"
 #include "cube_map.h"
-#include "../resources/resource_loader.h"
+
+#include <glad/glad.h>
 #include <iostream>
 
-CubeMap::CubeMap(const std::vector<std::string>& faces) : m_textureID(0) {
-    glGenTextures(1, &m_textureID);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_textureID);
-
-    // Load texture faces
-    int width, height, nrChannels;
-    for (unsigned int i = 0; i < faces.size(); i++) {
-        unsigned char* data = ResourceLoader::loadImage(faces[i], &width, &height, &nrChannels);
-        if (data) {
-            GLenum format = (nrChannels == 1) ? GL_RED : (nrChannels == 3) ? GL_RGB : GL_RGBA;
-
-            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-            ResourceLoader::freeImage(data);
-        } else {
-            std::cerr << "[Error] CubeMap::CubeMap: Failed to load texture at path: " << faces[i] << "\n";
+namespace CubeMap {
+    unsigned int createFromImages(const std::vector<std::string>& faces) {
+        int width, height, nrChannels;
+        std::vector<unsigned char*> cubemapData = ResourceLoader::loadCubemapImages(faces, &width, &height, &nrChannels);
+        if (cubemapData.empty()) {
+            std::cerr << "[Error] Failed to load cubemap images\n";
+            return 0;
         }
+
+        unsigned int cubemapTexture;
+        glGenTextures(1, &cubemapTexture);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+
+        for (unsigned int i = 0; i < cubemapData.size(); i++) {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                         0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, cubemapData[i]);
+        }
+
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+        // Free image data
+        ResourceLoader::freeCubemapImages(cubemapData);
+
+        return cubemapTexture;
     }
-
-    // Set texture parameters
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-    // Unbind the cubemap texture
-    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-}
-
-CubeMap::~CubeMap() {
-    if (glIsTexture(m_textureID)) {
-        glDeleteTextures(1, &m_textureID);
-    } else {
-        std::cerr << "[Error] CubeMap::~CubeMap: Texture ID is not valid!\n";
-    }
-}
-
-void CubeMap::bind(unsigned int slot) const {
-    glActiveTexture(GL_TEXTURE0 + slot);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_textureID);
-}
-
-void CubeMap::unbind() const {
-    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 }

@@ -21,6 +21,12 @@ namespace ResourceLoader {
     */
     unsigned char* loadImage(const std::string& filePath, int* width, int* height, int* nrChannels);
     void freeImage(unsigned char* data);
+
+    /*
+    * Cubemap loaders
+    */
+    std::vector<unsigned char*> loadCubemapImages(const std::vector<std::string>& faces, int* width, int* height, int* nrChannels);
+    void freeCubemapImages(std::vector<unsigned char*>& data);;
 }
 
 #endif // RESOURCE_LOADER_H
