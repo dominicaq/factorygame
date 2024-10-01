@@ -43,12 +43,12 @@ Renderer::Renderer(int width, int height, Camera* camera) {
 
     // Initialize skybox with cubemap faces
     std::vector<std::string> faces = {
-        ASSET_DIR "textures/skybox/right.jpg",
-        ASSET_DIR "textures/skybox/left.jpg",
-        ASSET_DIR "textures/skybox/top.jpg",
-        ASSET_DIR "textures/skybox/bottom.jpg",
-        ASSET_DIR "textures/skybox/front.jpg",
-        ASSET_DIR "textures/skybox/back.jpg"
+        ASSET_DIR "textures/skyboxes/bspace/1.png",
+        ASSET_DIR "textures/skyboxes/bspace/3.png",
+        ASSET_DIR "textures/skyboxes/bspace/5.png",
+        ASSET_DIR "textures/skyboxes/bspace/6.png",
+        ASSET_DIR "textures/skyboxes/bspace/2.png",
+        ASSET_DIR "textures/skyboxes/bspace/4.png"
     };
     initSkybox(faces);
 
@@ -325,7 +325,7 @@ void Renderer::resizeGBuffer(int width, int height) {
  * Render Passes
  */
 void Renderer::geometryPass(ECSWorld& world,
-    const std::vector<Entity> entities,
+    const std::vector<Entity>& entities,
     const glm::mat4& view) {
     // Bind G-buffer framebuffer
     m_gBuffer->bind();
@@ -353,14 +353,27 @@ void Renderer::geometryPass(ECSWorld& world,
         draw(mesh);
     }
 
-    // Unbind framebuffer
+    // Copy depth buffer from G-buffer to default framebuffer
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);  // Default framebuffer (the screen)
+    glBlitFramebuffer(
+        0, 0, m_width, m_height,
+        0, 0, m_width, m_height,
+        GL_DEPTH_BUFFER_BIT, GL_NEAREST);
     m_gBuffer->unbind();
 }
 
 void Renderer::lightPass(ECSWorld& world, const LightSystem& lightSystem) {
     // Bind default framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    // Screen space light calculation, dont need depth
+    glDisable(GL_DEPTH_TEST);
+
+    // Enable additive blending for lighting accumulation
+    glEnable(GL_BLEND);
+    glBlendEquation(GL_FUNC_ADD);
+    glBlendFunc(GL_ONE, GL_ONE);
 
     // Use Light Pass Shader
     m_lightPassShader.use();
@@ -398,27 +411,17 @@ void Renderer::lightPass(ECSWorld& world, const LightSystem& lightSystem) {
     glBindTexture(GL_TEXTURE_2D, m_gBuffer->getColorAttachment(2)); // Albedo
     m_lightPassShader.setInt("gAlbedo", 2);
 
-    // Enable additive blending for lighting accumulation
-    glEnable(GL_BLEND);
-    glBlendEquation(GL_FUNC_ADD);
-    glBlendFunc(GL_ONE, GL_ONE);
-
     // Draw the screen-aligned quad for lighting
     drawScreenQuad();
 
-    // Disable blending after lighting pass
+    // Disable blending after the lighting pass
     glDisable(GL_BLEND);
+
+    // Re-enable depth testing for subsequent passes
+    glEnable(GL_DEPTH_TEST);
 }
 
-void Renderer::forwardPass(ECSWorld& world, const std::vector<Entity> entities, const glm::mat4& view) {
-    // Copy depth buffer from G-buffer to default framebuffer
-    m_gBuffer->bind();
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);  // Default framebuffer (the screen)
-    glBlitFramebuffer(0, 0, m_width, m_height,
-                      0, 0, m_width, m_height,
-                      GL_DEPTH_BUFFER_BIT, GL_NEAREST);  // Only blit the depth buffer
-    m_gBuffer->unbind();
-
+void Renderer::forwardPass(ECSWorld& world, const std::vector<Entity>& entities, const glm::mat4& view) {
     // Enable depth testing for forward pass
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
@@ -428,7 +431,7 @@ void Renderer::forwardPass(ECSWorld& world, const std::vector<Entity> entities, 
         ModelMatrix& modelMatrix = world.getComponent<ModelMatrix>(entity);
 
         // Skip deferred rendering materials
-        if (mesh->material->isDeferred == true) {
+        if (mesh->material->isDeferred) {
             continue;
         }
 
@@ -442,37 +445,38 @@ void Renderer::forwardPass(ECSWorld& world, const std::vector<Entity> entities, 
 
         mesh->material->bind();
 
-        // Draw the mesh
+        // Draw the forward-rendered mesh
         draw(mesh);
     }
-
-    // Reset depth function to default (GL_LESS)
-    glDepthFunc(GL_LESS);
 }
 
 /*
 * Skybox
 */
-void Renderer::drawSkybox(const glm::mat4& view, const glm::mat4& projection) {
+void Renderer::skyboxPass(const glm::mat4& view, const glm::mat4& projection) {
     // Change depth function so the skybox renders behind everything
     glDepthFunc(GL_LEQUAL);
 
     // Disable depth writing so the skybox doesn't overwrite depth buffer values
     glDepthMask(GL_FALSE);
 
+    // Use skybox shader
     m_skyboxShader.use();
 
     // Remove translation from the view matrix for the skybox
-    glm::mat4 viewNoTranslation = glm::mat4(glm::mat3(view));
+    glm::mat4 viewNoTranslation = glm::mat4(glm::mat3(view));  // Remove translation
     m_skyboxShader.setMat4("view", viewNoTranslation);
     m_skyboxShader.setMat4("projection", projection);
 
+    // Bind the skybox VAO and texture
     glBindVertexArray(m_skyboxVAO);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_skyboxTexture);
-    glDrawArrays(GL_TRIANGLES, 0, 36);  // Draw skybox cube
+    glDrawArrays(GL_TRIANGLES, 0, 36);  // Draw the skybox
+
+    // Unbind VAO
     glBindVertexArray(0);
 
-    // Re-enable depth writing
+    // Re-enable depth writing after drawing the skybox
     glDepthMask(GL_TRUE);
 
     // Reset depth function to default (GL_LESS)

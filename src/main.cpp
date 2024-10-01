@@ -337,9 +337,6 @@ int main() {
         // Render deferred passes
         renderer.geometryPass(world, renderQuery, view);
 
-        // Forward pass skybox
-        // renderer.drawSkybox(view, world.getResource<Camera>().getProjectionMatrix());
-
         renderer.lightPass(world, lightSystem);
 
         // Debug rendering
@@ -349,6 +346,9 @@ int main() {
 
         // Render forward pass
         renderer.forwardPass(world, renderQuery, view);
+
+        // Forward pass skybox
+        renderer.skyboxPass(view, world.getResource<Camera>().getProjectionMatrix());
 
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();
