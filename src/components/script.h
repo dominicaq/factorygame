@@ -15,9 +15,9 @@ public:
 
     virtual ~Script() = default;
 
-    // Virtual functions for derived classes to implement
-    virtual void start() = 0;
-    virtual void update(float deltaTime) = 0;
+    // Virtual functions with default implementations
+    virtual void start() {}
+    virtual void update(float deltaTime) {}
 
     // Protected constructor to prevent direct instantiation
     Script() = default;

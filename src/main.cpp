@@ -2,6 +2,8 @@
 
 // Scripts
 #include "MoveScript.h"
+#include "ViewFramebuffers.h"
+#include "FreeCamera.h"
 
 #include <string>
 #include <vector>
@@ -13,71 +15,6 @@
 static const std::string SHADER_DIR = ASSET_DIR "shaders/";
 static const std::string MODEL_DIR = ASSET_DIR "models/";
 static const std::string TEXTURE_DIR = ASSET_DIR "textures/";
-
-void freeCamera(GLFWwindow* window, ECSWorld& world, float deltaTime) {
-    // Camera speed
-    const float cameraSpeed = 2.5f * deltaTime;
-    const float sensitivity = 0.1f;
-
-    Camera& camera = world.getResource<Camera>();
-
-    // Calculate camera front vector based on Euler angles
-    glm::vec3 front;
-    front.x = cos(glm::radians(camera.eulerAngles.y)) * cos(glm::radians(camera.eulerAngles.x));
-    front.y = sin(glm::radians(camera.eulerAngles.x));
-    front.z = sin(glm::radians(camera.eulerAngles.y)) * cos(glm::radians(camera.eulerAngles.x));
-    front = glm::normalize(front);
-
-    glm::vec3 right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
-    glm::vec3 up = glm::normalize(glm::cross(right, front));
-
-    // Get the current mouse position once on startup
-    static bool firstMouse = true;
-    static double lastX, lastY;
-
-    if (firstMouse) {
-        glfwGetCursorPos(window, &lastX, &lastY);
-        firstMouse = false;
-    }
-
-    // Keyboard input for movement (WASD)
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-        camera.position += cameraSpeed * front;
-    }
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-        camera.position -= cameraSpeed * front;
-    }
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-        camera.position -= right * cameraSpeed;
-    }
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-        camera.position += right * cameraSpeed;
-    }
-
-    // Mouse input for look rotation
-    double mouseX, mouseY;
-    glfwGetCursorPos(window, &mouseX, &mouseY);
-
-    float xOffset = (mouseX - lastX) * sensitivity;
-    float yOffset = (lastY - mouseY) * sensitivity;
-
-    lastX = mouseX;
-    lastY = mouseY;
-
-    // Apply only if there is movement
-    if (glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED) {
-        camera.eulerAngles.y += xOffset;
-        camera.eulerAngles.x += yOffset;
-
-        // Constrain the pitch to avoid gimbal lock
-        if (camera.eulerAngles.x > 89.0f) {
-            camera.eulerAngles.x = 89.0f;
-        }
-        if (camera.eulerAngles.x < -89.0f) {
-            camera.eulerAngles.x = -89.0f;
-        }
-    }
-}
 
 void loadScene(ECSWorld& world, LightSystem& lightSystem, std::vector<GameObject*>& gameObjects) {
     // ------------------------ Setup Camera ------------------------
@@ -116,12 +53,16 @@ void loadScene(ECSWorld& world, LightSystem& lightSystem, std::vector<GameObject
 
         // Create GameObject and attach the MoveScript
         GameObject* bunnyObject = new GameObject(bunnyEntity, &world);
-        bunnyObject->addScript<MoveScript>();  // Attach MoveScript
+        bunnyObject->addScript<MoveScript>();
         gameObjects.push_back(bunnyObject);
     }
 
-    // --------------------- Dummy Entity ----------------------
+    // --------------------- Dummy Entity (global scripts) ------------------
     Entity dummyEntity = world.createEntity();
+    GameObject* dummyObject = new GameObject(dummyEntity, &world);
+    dummyObject->addScript<ViewFrameBuffers>();
+    dummyObject->addScript<FreeCamera>();
+    gameObjects.push_back(dummyObject);
 
     // --------------------- Diablo Model ---------------------
     Entity diabloEntity = world.createEntity();
@@ -166,7 +107,7 @@ void loadScene(ECSWorld& world, LightSystem& lightSystem, std::vector<GameObject
 
         // Create GameObject and attach the MoveScript
         GameObject* cubeObject = new GameObject(cubeEntity, &world);
-        // cubeObject->addScript<MoveScript>();
+        cubeObject->addScript<MoveScript>();
         gameObjects.push_back(cubeObject);
     }
 
@@ -223,31 +164,9 @@ void loadScene(ECSWorld& world, LightSystem& lightSystem, std::vector<GameObject
     }
 }
 
-void glfwControls(GLFWwindow* glfwWindow, int& debugMode) {
-    if (glfwGetKey(glfwWindow, GLFW_KEY_1) == GLFW_PRESS) {
-        // Turn off debug mode
-        debugMode = -1;
-    }
-    if (glfwGetKey(glfwWindow, GLFW_KEY_2) == GLFW_PRESS) {
-        // Position
-        debugMode = 0;
-    }
-    if (glfwGetKey(glfwWindow, GLFW_KEY_3) == GLFW_PRESS) {
-        // Normal
-        debugMode = 1;
-    }
-    if (glfwGetKey(glfwWindow, GLFW_KEY_4) == GLFW_PRESS) {
-        // Albedo
-        debugMode = 2;
-    }
-    if (glfwGetKey(glfwWindow, GLFW_KEY_5) == GLFW_PRESS) {
-        // Depth
-        debugMode = 3;
-    }
-    if (glfwGetKey(glfwWindow, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-        glfwSetWindowShouldClose(glfwWindow, true);
-    }
-}
+// Define globals
+InputManager inputManager;
+int DEBUG_view_framebuffers = -1;
 
 int main() {
     // Initialize window
@@ -260,6 +179,7 @@ int main() {
     ECSWorld world;
     LightSystem lightSystem;
     std::vector<GameObject*> gameObjects;
+    inputManager.init(window.getGLFWwindow());
 
     // Load the scene data
     loadScene(world, lightSystem, gameObjects);
@@ -273,9 +193,6 @@ int main() {
     debugShader.use();
     debugShader.setFloat("u_Near", world.getResource<Camera>().getNearPlane());
     debugShader.setFloat("u_Far",  world.getResource<Camera>().getFarPlane());
-
-    // Control which gbuffer texture is shown
-    int debugMode = -1;
 
     // ---------------------------------------------------------------
 
@@ -310,10 +227,12 @@ int main() {
 
         // -------------- Temporary Logic (Camera & Input) --------------
 
-        // Process input for camera movement
-        GLFWwindow* glfwWindow = window.getGLFWwindow();
-        freeCamera(glfwWindow, world, deltaTime);
-        glfwControls(glfwWindow, debugMode);
+        inputManager.update();
+
+        // TEMPORARY
+        if (inputManager.isKeyPressed(GLFW_KEY_ESCAPE)) {
+            glfwSetWindowShouldClose(window.getGLFWwindow(), true);
+        }
 
         // Light movement (temporary, can move into another system later)
         float radius = 5.0f;
@@ -340,8 +259,8 @@ int main() {
         renderer.lightPass(world, lightSystem);
 
         // Debug rendering
-        if (debugMode >= 0) {
-            renderer.debugGBufferPass(debugShader, debugMode);
+        if (DEBUG_view_framebuffers >= 0) {
+            renderer.debugGBufferPass(debugShader, DEBUG_view_framebuffers);
         }
 
         // Render forward pass

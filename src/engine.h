@@ -3,6 +3,8 @@
 
 // System
 #include "system/window.h"
+#include "system/input_manager.h"
+#include "globals.h"
 
 // Renderer
 #include "renderer/shader.h"

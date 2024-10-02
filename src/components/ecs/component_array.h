@@ -4,7 +4,6 @@
 
 #include <vector>
 #include <optional>
-#include <cassert>
 #include "component_traits.h"
 
 // Interface for component arrays (type erasure)
@@ -47,7 +46,13 @@ public:
 
     // Retrieve component
     StorageType getComponent(size_t entityId) {
-        assert(hasComponent(entityId) && "Component does not exist!");
+        if (entityId >= m_components.size() || !m_components[entityId].has_value()) {
+            if constexpr (ShouldStoreAsPointer<T>::value) {
+                return nullptr;
+            } else {
+                throw std::runtime_error("Component not found!");
+            }
+        }
         return m_components[entityId].value();
     }
 

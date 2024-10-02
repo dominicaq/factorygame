@@ -18,8 +18,8 @@ private:
     std::vector<std::unique_ptr<Script>> m_scripts;
 
 public:
-    // Constructor that takes the entity ID and ECSWorld pointer
-    GameObject(Entity entity, ECSWorld* world)
+    // Constructor that takes the entity ID, ECSWorld pointer, and optionally an InputManager
+    GameObject(Entity entity, ECSWorld* world, InputManager* inputManager = nullptr)
         : m_entity(entity), m_world(world) {}
 
     // Method to add a script to the GameObject
@@ -81,6 +81,11 @@ public:
             // For other components, return a pointer to the reference
             return &(m_world->getComponent<ComponentType>(m_entity));
         }
+    }
+
+    template<typename ResourceType>
+    ResourceType& getResource() {
+        return m_world->getResource<ResourceType>();
     }
 };
 
