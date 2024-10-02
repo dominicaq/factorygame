@@ -36,8 +36,8 @@ namespace Scene {
         // --------------------- Stanford Bunny Model ---------------------
         Entity bunnyEntity = world.createEntity();
         Transform bunnyTransform(glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(5.0f), glm::vec3(0.0f));
-        world.addComponent(bunnyEntity, bunnyTransform);
-        world.addComponent(bunnyEntity, ModelMatrix());
+        world.addComponent<Transform>(bunnyEntity, bunnyTransform);
+        world.addComponent<ModelMatrix>(bunnyEntity);
 
         Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
         if (bunnyMesh != nullptr) {
@@ -49,7 +49,7 @@ namespace Scene {
             bunnyMaterial->albedoMap = bunnyAlbedoMap;
 
             bunnyMesh->material = bunnyMaterial;
-            world.addComponent(bunnyEntity, bunnyMesh);
+            world.addComponent<Mesh*>(bunnyEntity, bunnyMesh);
 
             // Create GameObject and attach the MoveScript
             GameObject* bunnyObject = new GameObject(bunnyEntity, &world);
@@ -67,8 +67,8 @@ namespace Scene {
         // --------------------- Diablo Model ---------------------
         Entity diabloEntity = world.createEntity();
         Transform diabloTransform(glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(2.0f), glm::vec3(0.0f));
-        world.addComponent(diabloEntity, diabloTransform);
-        world.addComponent(diabloEntity, ModelMatrix());
+        world.addComponent<Transform>(diabloEntity, diabloTransform);
+        world.addComponent<ModelMatrix>(diabloEntity);
 
         Mesh* diabloModel = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
         if (diabloModel != nullptr) {
@@ -83,7 +83,7 @@ namespace Scene {
             diabloMaterial->normalMap = diabloNormalMap;
 
             diabloModel->material = diabloMaterial;
-            world.addComponent(diabloEntity, diabloModel);
+            world.addComponent<Mesh*>(diabloEntity, diabloModel);
         }
 
         // --------------------- Cube Model (Forward Rendering) ---------------------
@@ -93,8 +93,8 @@ namespace Scene {
 
         Entity cubeEntity = world.createEntity();
         Transform cubeTransform(glm::vec3(0.0f, 2.0f, 0.0f), glm::vec3(0.5f), glm::vec3(0.0f));
-        world.addComponent(cubeEntity, cubeTransform);
-        world.addComponent(cubeEntity, ModelMatrix());
+        world.addComponent<Transform>(cubeEntity, cubeTransform);
+        world.addComponent<ModelMatrix>(cubeEntity);
 
         Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
         if (cubeMesh != nullptr) {
@@ -103,7 +103,7 @@ namespace Scene {
             cubeMaterial->isDeferred = false;
 
             cubeMesh->material = cubeMaterial;
-            world.addComponent(cubeEntity, cubeMesh);
+            world.addComponent<Mesh*>(cubeEntity, cubeMesh);
 
             // Create GameObject and attach the MoveScript
             GameObject* cubeObject = new GameObject(cubeEntity, &world);

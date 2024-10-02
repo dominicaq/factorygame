@@ -9,6 +9,11 @@
 #include <typeindex>
 #include <memory>
 #include <vector>
+#include <cassert>
+
+// Helper struct to create a non-deduced context
+template <typename T>
+struct non_deduced {};
 
 class ECSWorld {
 public:
@@ -31,21 +36,46 @@ public:
 
     void destroyEntity(Entity entity) {
         m_entityManager.destroyEntity(entity);
-        // Optionally remove the entity's components
+        // Remove all components associated with the entity
+        // for (auto& [type, array] : m_componentArrays) {
+        //     array->removeComponent(entity.id);
+        // }
     }
 
-    // Add component stored by value
+    // Delete the function that allows implicit type deduction
+    template<typename T>
+    void addComponent(Entity entity, T&& component) = delete;
+
+    // Delete the function that allows implicit type deduction
+    template<typename T>
+    void addComponent(Entity entity, T* component) = delete;
+
+    // Add component stored by value (requires explicit type declaration)
     template<typename T>
     std::enable_if_t<!ShouldStoreAsPointer<T>::value, void>
-    addComponent(Entity entity, const T& component) {
+    addComponent(Entity entity, const T& component, non_deduced<T>* = nullptr) {
         getComponentArray<T>()->addComponent(entity.id, component);
     }
 
-    // Add component stored by pointer
+    // Add component stored by pointer (requires explicit type declaration)
     template<typename T>
     std::enable_if_t<ShouldStoreAsPointer<T>::value, void>
-    addComponent(Entity entity, T* component) {
+    addComponent(Entity entity, T* component, non_deduced<T>* = nullptr) {
         getComponentArray<T>()->addComponent(entity.id, component);
+    }
+
+    // Add component stored by value using default constructor (requires explicit type declaration)
+    template<typename T>
+    std::enable_if_t<!ShouldStoreAsPointer<T>::value, void>
+    addComponent(Entity entity, non_deduced<T>* = nullptr) {
+        getComponentArray<T>()->addComponent(entity.id, T());
+    }
+
+    // Add component stored by pointer using nullptr (requires explicit type declaration)
+    template<typename T>
+    std::enable_if_t<ShouldStoreAsPointer<T>::value, void>
+    addComponent(Entity entity, non_deduced<T>* = nullptr) {
+        getComponentArray<T>()->addComponent(entity.id, nullptr);
     }
 
     // Retrieve component
