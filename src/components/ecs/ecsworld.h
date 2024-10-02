@@ -12,7 +12,12 @@
 
 class ECSWorld {
 public:
-    ECSWorld() = default;
+    ECSWorld() {
+        // Register callback with EntityManager to resize component arrays
+        m_entityManager.registerResizeCallback([this](size_t newSize) {
+            resizeAllComponentArrays(newSize);
+        });
+    }
 
     ~ECSWorld() {
         // Clean up resources
@@ -20,7 +25,14 @@ public:
         m_resources.clear();
     }
 
-    Entity createEntity();
+    Entity createEntity() {
+        return m_entityManager.createEntity();
+    }
+
+    void destroyEntity(Entity entity) {
+        m_entityManager.destroyEntity(entity);
+        // Optionally remove the entity's components
+    }
 
     // Add component stored by value
     template<typename T>
@@ -40,6 +52,12 @@ public:
     template<typename T>
     auto getComponent(Entity entity) -> typename ComponentStorage<T>::StorageType {
         return getComponentArray<T>()->getComponent(entity.id);
+    }
+
+    // Remove component
+    template<typename T>
+    void removeComponent(Entity entity) {
+        getComponentArray<T>()->removeComponent(entity.id);
     }
 
     // Add a resource to the world
@@ -84,26 +102,26 @@ private:
 
     // Get or create component array for a type
     template<typename T>
-    SparseArray<T>* getComponentArray() {
+    ComponentArray<T>* getComponentArray() {
         std::type_index index = std::type_index(typeid(T));
         auto it = m_componentArrays.find(index);
         if (it == m_componentArrays.end()) {
-            auto newArray = std::make_unique<SparseArray<T>>();
-            SparseArray<T>* ptr = newArray.get();
+            auto newArray = std::make_unique<ComponentArray<T>>();
+            ComponentArray<T>* ptr = newArray.get();
             m_componentArrays[index] = std::move(newArray);
             return ptr;
         } else {
-            return static_cast<SparseArray<T>*>(it->second.get());
+            return static_cast<ComponentArray<T>*>(it->second.get());
         }
     }
 
     // Const version of getComponentArray
     template<typename T>
-    const SparseArray<T>* getComponentArray() const {
+    const ComponentArray<T>* getComponentArray() const {
         std::type_index index = std::type_index(typeid(T));
         auto it = m_componentArrays.find(index);
         if (it != m_componentArrays.end()) {
-            return static_cast<const SparseArray<T>*>(it->second.get());
+            return static_cast<const ComponentArray<T>*>(it->second.get());
         } else {
             return nullptr;
         }
@@ -112,11 +130,18 @@ private:
     // Check if an entity has a specific component
     template<typename T>
     bool hasComponent(size_t entityId) const {
-        const SparseArray<T>* array = getComponentArray<T>();
+        const ComponentArray<T>* array = getComponentArray<T>();
         if (array == nullptr) {
             return false;
         }
         return array->hasComponent(entityId);
+    }
+
+    // Resize all component arrays when EntityManager resizes
+    void resizeAllComponentArrays(size_t newSize) {
+        for (auto& [type, array] : m_componentArrays) {
+            array->resize(newSize);
+        }
     }
 };
 

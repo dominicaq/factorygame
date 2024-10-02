@@ -74,11 +74,11 @@ public:
     // Get ECS component from this GameObject by type
     template<typename ComponentType>
     ComponentType* getComponent() {
-        // Check if the component is a Mesh (which should return a pointer)
-        if constexpr (std::is_same<ComponentType, Mesh>::value) {
+        if constexpr (ShouldStoreAsPointer<ComponentType>::value) {
+            // For types stored as pointers
             return m_world->getComponent<ComponentType>(m_entity);
         } else {
-            // For other components, return a pointer to the reference
+            // For other types, return a pointer to the reference
             return &(m_world->getComponent<ComponentType>(m_entity));
         }
     }
