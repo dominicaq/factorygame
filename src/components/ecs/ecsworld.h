@@ -5,15 +5,29 @@
 #include "component_array.h"
 #include "resource.h"
 
-#include <unordered_map>
+#include <vector>
 #include <typeindex>
 #include <memory>
-#include <vector>
 #include <cassert>
+
+// Resource map
+#include <unordered_map>
 
 // Helper struct to create a non-deduced context
 template <typename T>
 struct non_deduced {};
+
+// Helper to assign unique IDs to component types
+inline size_t GetUniqueComponentTypeId() {
+    static size_t id = 0;
+    return id++;
+}
+
+template <typename T>
+size_t GetComponentTypeId() {
+    static size_t id = GetUniqueComponentTypeId();
+    return id;
+}
 
 class ECSWorld {
 public:
@@ -37,8 +51,10 @@ public:
     void destroyEntity(Entity entity) {
         m_entityManager.destroyEntity(entity);
         // Remove all components associated with the entity
-        for (auto& [type, array] : m_componentArrays) {
-            array->removeComponent(entity.id);
+        for (auto& array : m_componentArrays) {
+            if (array) {
+                array->removeComponent(entity.id);
+            }
         }
     }
 
@@ -102,12 +118,12 @@ public:
         return static_cast<ResourceHolder<T>*>(it->second.get())->m_resource;
     }
 
-    // Component queries
+    // **Batched Query: Retrieves entities that have all of the specified components**
     template<typename... Components>
     std::vector<Entity> batchedQuery() const {
         std::vector<Entity> matchingEntities;
 
-        // Iterate through entities and check if all requested components exist
+        // Iterate through all entities
         for (size_t entityId = 0; entityId < m_entityManager.getNumEntities(); ++entityId) {
             if ((hasComponent<Components>(entityId) && ...)) {
                 matchingEntities.emplace_back(entityId);
@@ -120,34 +136,31 @@ public:
 private:
     EntityManager m_entityManager;
 
-    // Component arrays, indexed by typeid
-    std::unordered_map<std::type_index, std::unique_ptr<IComponentArray>> m_componentArrays;
-
-    // Resource storage
+    // Component arrays, indexed by component type ID
+    std::vector<std::unique_ptr<IComponentArray>> m_componentArrays;
     std::unordered_map<std::type_index, std::unique_ptr<IResource>> m_resources;
 
     // Get or create component array for a type
     template<typename T>
     ComponentArray<T>* getComponentArray() {
-        std::type_index index = std::type_index(typeid(T));
-        auto it = m_componentArrays.find(index);
-        if (it == m_componentArrays.end()) {
-            auto newArray = std::make_unique<ComponentArray<T>>();
-            ComponentArray<T>* ptr = newArray.get();
-            m_componentArrays[index] = std::move(newArray);
-            return ptr;
-        } else {
-            return static_cast<ComponentArray<T>*>(it->second.get());
+        size_t index = GetComponentTypeId<T>();
+        if (index >= m_componentArrays.size()) {
+            m_componentArrays.resize(index + 1);
         }
+
+        if (!m_componentArrays[index]) {
+            m_componentArrays[index] = std::make_unique<ComponentArray<T>>();
+        }
+
+        return static_cast<ComponentArray<T>*>(m_componentArrays[index].get());
     }
 
     // Const version of getComponentArray
     template<typename T>
     const ComponentArray<T>* getComponentArray() const {
-        std::type_index index = std::type_index(typeid(T));
-        auto it = m_componentArrays.find(index);
-        if (it != m_componentArrays.end()) {
-            return static_cast<const ComponentArray<T>*>(it->second.get());
+        size_t index = GetComponentTypeId<T>();
+        if (index < m_componentArrays.size() && m_componentArrays[index]) {
+            return static_cast<const ComponentArray<T>*>(m_componentArrays[index].get());
         } else {
             return nullptr;
         }
@@ -165,8 +178,10 @@ private:
 
     // Resize all component arrays when EntityManager resizes
     void resizeAllComponentArrays(size_t newSize) {
-        for (auto& [type, array] : m_componentArrays) {
-            array->resize(newSize);
+        for (auto& array : m_componentArrays) {
+            if (array) {
+                array->resize(newSize);
+            }
         }
     }
 };
