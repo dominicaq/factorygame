@@ -8,14 +8,15 @@
 
 class MoveScript : public Script {
 public:
-    // Reference to component(s)
-    Transform* transform = nullptr;
-
-    // Script Properties
-    glm::vec3 rotation;
+    // Public Script Properties
     glm::vec3 rotationAxis = glm::vec3(0.0f, 1.0f, 0.0f);
     float rotationSpeed = 50.0f;
 
+private:
+    Transform* transform = nullptr;
+    glm::vec3 rotation;
+
+public:
     void start() override {
         std::cout << "MoveScript started for entity: " << gameObject->getEntity().id << "\n";
         transform = gameObject->getComponent<Transform>();
