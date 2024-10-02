@@ -49,7 +49,7 @@ namespace Scene {
             bunnyMaterial->albedoMap = bunnyAlbedoMap;
 
             bunnyMesh->material = bunnyMaterial;
-            world.addComponent<Mesh*>(bunnyEntity, bunnyMesh);
+            world.addComponent<Mesh>(bunnyEntity, bunnyMesh);
 
             // Create GameObject and attach the MoveScript
             GameObject* bunnyObject = new GameObject(bunnyEntity, &world);
@@ -83,7 +83,7 @@ namespace Scene {
             diabloMaterial->normalMap = diabloNormalMap;
 
             diabloModel->material = diabloMaterial;
-            world.addComponent<Mesh*>(diabloEntity, diabloModel);
+            world.addComponent<Mesh>(diabloEntity, diabloModel);
         }
 
         // --------------------- Cube Model (Forward Rendering) ---------------------
@@ -103,7 +103,7 @@ namespace Scene {
             cubeMaterial->isDeferred = false;
 
             cubeMesh->material = cubeMaterial;
-            world.addComponent<Mesh*>(cubeEntity, cubeMesh);
+            world.addComponent<Mesh>(cubeEntity, cubeMesh);
 
             // Create GameObject and attach the MoveScript
             GameObject* cubeObject = new GameObject(cubeEntity, &world);
