@@ -20,7 +20,7 @@ public:
     // Gameobject management
     GameObject* createGameObject(const Entity& entity, bool runScripts = false);
     GameObject* getGameObject(const Entity& entity) const;
-    bool removeGameObject(const Entity& entity);
+    void removeGameObject(const Entity& entity);
 
     // Start() and Update() calls
     void startAll();

@@ -48,19 +48,18 @@ GameObject* GameObjectManager::getGameObject(const Entity& entity) const {
 }
 
 // Remove a GameObject by its entity ID
-bool GameObjectManager::removeGameObject(const Entity& entity) {
+void GameObjectManager::removeGameObject(const Entity& entity) {
     std::lock_guard<std::mutex> lock(m_mutex);
 
     if (entity.id >= m_gameObjects.size() || !m_gameObjects[entity.id]) {
-        return false;  // Invalid entity ID
+        std::cerr << "[Warning]: GameObjectManager::removeGameObject: Invalid ID: " << entity.id << ".\n";
+        return;
     }
 
     // Perform any necessary cleanup on the GameObject
     m_gameObjects[entity.id].reset();  // Destroy the GameObject
     m_freeList.push(entity.id);        // Add the slot to the free list
     m_world.destroyEntity(entity);     // Remove from ECSWorld
-
-    return true;
 }
 
 // Start all active GameObjects' scripts

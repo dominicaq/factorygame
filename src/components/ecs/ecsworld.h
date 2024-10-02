@@ -42,8 +42,6 @@ public:
         }
     }
 
-    // **Delete the functions that allow implicit type deduction**
-
     // Delete the function that allows implicit type deduction for value and universal references
     template<typename T>
     void addComponent(Entity entity, T&& component) = delete;

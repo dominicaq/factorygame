@@ -340,13 +340,13 @@ void Renderer::geometryPass(ECSWorld& world,
     for (Entity entity : entities) {
         // Retrieve Mesh and Transform components
         Mesh* mesh = world.getComponent<Mesh>(entity);
-        ModelMatrix& modelMatrix = world.getComponent<ModelMatrix>(entity);
 
         // Skip forward rendering materials
         if (mesh->material->isDeferred == false) {
             continue;
         }
 
+        ModelMatrix& modelMatrix = world.getComponent<ModelMatrix>(entity);
         m_gBufferShader.setMat4("u_Model", modelMatrix.matrix);
         mesh->material->bind(&m_gBufferShader);
 
