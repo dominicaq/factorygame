@@ -1,0 +1,6 @@
+[submodule "assets/gltf-assets"]
+	path = assets/gltf-assets
+	url = https://github.com/KhronosGroup/glTF-Sample-Assets.git
+[submodule "assets/obj-assets"]
+	path = assets/obj-assets
+	url = https://github.com/alecjacobson/common-3d-test-models
