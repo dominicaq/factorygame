@@ -15,7 +15,7 @@ class IComponentArray {
 public:
     virtual ~IComponentArray() = default;
 
-    // Virtual resize method to resize the array when requested by the EntityManager
+    virtual void removeComponent(size_t entityId) = 0;
     virtual void resize(size_t newSize) = 0;
 };
 
@@ -62,7 +62,7 @@ public:
     }
 
     // Remove component
-    void removeComponent(size_t entityId) {
+    void removeComponent(size_t entityId) override {
         if (entityId < m_components.size()) {
             m_components[entityId].reset();
         }

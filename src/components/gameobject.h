@@ -1,3 +1,4 @@
+// GameObject.h
 #ifndef GAMEOBJECT_H
 #define GAMEOBJECT_H
 
@@ -18,11 +19,11 @@ private:
     std::vector<std::unique_ptr<Script>> m_scripts;
 
 public:
-    // Constructor that takes the entity ID, ECSWorld pointer, and optionally an InputManager
-    GameObject(Entity entity, ECSWorld* world, InputManager* inputManager = nullptr)
+    GameObject(Entity entity, ECSWorld* world)
         : m_entity(entity), m_world(world) {}
 
-    // Method to add a script to the GameObject
+    ~GameObject() {}
+
     template<typename ScriptType>
     void addScript() {
         static_assert(std::is_base_of<Script, ScriptType>::value, "ScriptType must derive from Script");
@@ -37,7 +38,6 @@ public:
         m_scripts.push_back(std::move(script));
     }
 
-    // Method to get a specific script
     template<typename ScriptType>
     ScriptType* getScript() {
         for (const auto& script : m_scripts) {
@@ -48,7 +48,6 @@ public:
         return nullptr;  // Return nullptr if the script isn't found
     }
 
-    // Update all scripts attached to this GameObject
     void updateScripts(float deltaTime) {
         for (const auto& script : m_scripts) {
             if (script->isActive) {
@@ -57,7 +56,6 @@ public:
         }
     }
 
-    // Call the start() method on all scripts
     void startScripts() {
         for (const auto& script : m_scripts) {
             if (script->isActive) {

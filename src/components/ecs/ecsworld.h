@@ -36,10 +36,10 @@ public:
 
     void destroyEntity(Entity entity) {
         m_entityManager.destroyEntity(entity);
-        // Optionally, remove all components associated with the entity
-        // for (auto& [type, array] : m_componentArrays) {
-        //     array->removeComponent(entity.id);
-        // }
+        // Remove all components associated with the entity
+        for (auto& [type, array] : m_componentArrays) {
+            array->removeComponent(entity.id);
+        }
     }
 
     // **Delete the functions that allow implicit type deduction**

@@ -1,9 +1,9 @@
 #include "engine.h"
-
 #include "scene.h"
 
 #include <string>
 #include <vector>
+#include <iostream>
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
@@ -22,11 +22,13 @@ int main() {
     // Scene data
     ECSWorld world;
     LightSystem lightSystem;
-    std::vector<GameObject*> gameObjects;
     inputManager.init(window.getGLFWwindow());
 
+    // Initialize GameObjectManager
+    GameObjectManager gameObjectManager(world);
+
     // Load the scene data
-    Scene::loadScene(world, lightSystem, gameObjects);
+    Scene::loadScene(world, lightSystem, gameObjectManager);
 
     // Batched queries from scene
     std::vector<Entity> renderQuery = world.batchedQuery<Mesh, Transform, ModelMatrix>();
@@ -37,16 +39,10 @@ int main() {
     window.setRenderer(&renderer);
     for (Entity entity : renderQuery) {
         Mesh* mesh = world.getComponent<Mesh>(entity);
-        renderer.initMeshBuffers(mesh);
+        if (mesh) {
+            renderer.initMeshBuffers(mesh);
+        }
     }
-
-    // Setup gameobject scripts
-    for (auto& gameObject : gameObjects) {
-        gameObject->startScripts();
-    }
-
-    float deltaTime = 0.0f;
-    float lastFrame = 0.0f;
 
     // ------------------------ Debug Setup --------------------------
     // Debug Pass Shader (for visualizing G-buffer)
@@ -58,6 +54,11 @@ int main() {
     debugShader.setFloat("u_Far",  world.getResource<Camera>().getFarPlane());
     // ---------------------------------------------------------------
 
+    float deltaTime = 0.0f;
+    float lastFrame = 0.0f;
+
+    gameObjectManager.startAll();
+
     // Game loop
     while (!window.shouldClose()) {
         // Calculate delta time
@@ -68,7 +69,7 @@ int main() {
 
         inputManager.update();
 
-        // TEMPORARY
+        // TEMPORARY: Exit on ESC key
         if (inputManager.isKeyPressed(GLFW_KEY_ESCAPE)) {
             glfwSetWindowShouldClose(window.getGLFWwindow(), true);
         }
@@ -81,10 +82,8 @@ int main() {
 
         // ------------------------ Core Update Logic ------------------------
 
-        // Update all scripts in all gameObjects
-        for (auto& gameObject : gameObjects) {
-            gameObject->updateScripts(deltaTime);
-        }
+        // Update all scripts via GameObjectManager
+        gameObjectManager.updateAll(deltaTime);
 
         // ------------------------ Rendering ------------------------
 
@@ -110,18 +109,6 @@ int main() {
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();
         lastFrame = currentFrame;
-    }
-
-    // ------------------------ Cleanup ------------------------
-    for (auto& gameObject : gameObjects) {
-        Mesh* mesh = gameObject->getComponent<Mesh>();
-        if (mesh != nullptr) {
-            delete mesh->material->albedoMap;
-            delete mesh->material->normalMap;
-            delete mesh->material;
-            delete mesh;
-        }
-        delete gameObject;
     }
 
     return 0;

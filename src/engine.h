@@ -19,6 +19,7 @@
 
 #include "components/light.h"
 #include "components/gameobject.h"
+#include "components/gameobjectmanager.h"
 #include "components/modelmatrix.h"
 
 #include "components/script.h"
