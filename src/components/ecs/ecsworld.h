@@ -15,22 +15,6 @@
 constexpr size_t MAX_COMPONENTS = 64;
 using Signature = std::bitset<MAX_COMPONENTS>;
 
-// Helper struct to create a non-deduced context
-template <typename T>
-struct non_deduced {};
-
-// Helper to assign unique IDs to component types
-inline size_t GetUniqueComponentTypeId() {
-    static size_t id = 0;
-    return id++;
-}
-
-template <typename T>
-size_t GetComponentTypeId() {
-    static size_t id = GetUniqueComponentTypeId();
-    return id;
-}
-
 class ECSWorld {
 public:
     ECSWorld() {
@@ -49,18 +33,16 @@ public:
         m_resources.clear();
     }
 
+    // Create a new entity
     Entity createEntity() {
         return m_entityManager.createEntity();
     }
 
+    // Destroy an entity and remove its components
     void destroyEntity(Entity entity) {
-        if (!entity.isValid()) {
-            std::cerr << "[Error] ECSWorld::destroyEntity: Invalid entity!\n";
-            return;
-        }
+        if (!validateEntity(entity)) return;
 
         m_entityManager.destroyEntity(entity);
-        // Clear the entity's signature
         m_entitySignatures[entity.id].reset();
 
         // Remove all components associated with the entity
@@ -71,63 +53,37 @@ public:
         }
     }
 
-    // **Explicitly add component stored by value**
+    // Add component stored by value
     template<typename T>
-    std::enable_if_t<!ShouldStoreAsPointer<T>::value, void>
-    addComponent(Entity entity, const T& component, non_deduced<T> = {}) {
-        if (!entity.isValid()) {
-            std::cerr << "[Error] ECSWorld::addComponent: Invalid entity!\n";
-            return;
-        }
+    void addComponent(Entity entity, const T& component) {
+        if (!validateEntity(entity)) return;
 
         getComponentArray<T>()->addComponent(entity.id, component);
-        m_entitySignatures[entity.id].set(GetComponentTypeId<T>());
+        m_entitySignatures[entity.id].set(getComponentTypeId<T>());
     }
 
-    // **Explicitly add component stored by pointer**
+    // Add component stored by pointer
     template<typename T>
-    std::enable_if_t<ShouldStoreAsPointer<T>::value, void>
-    addComponent(Entity entity, T* component, non_deduced<T> = {}) {
-        if (!entity.isValid()) {
-            std::cerr << "[Error] ECSWorld::addComponent: Invalid entity!\n";
-            return;
-        }
+    void addComponent(Entity entity, T* component) {
+        if (!validateEntity(entity)) return;
 
         getComponentArray<T>()->addComponent(entity.id, component);
-        m_entitySignatures[entity.id].set(GetComponentTypeId<T>());
+        m_entitySignatures[entity.id].set(getComponentTypeId<T>());
     }
 
-    // **Add component by default constructor (for value types)**
+    // Add component by default constructor
     template<typename T>
-    std::enable_if_t<!ShouldStoreAsPointer<T>::value, void>
-    addComponent(Entity entity, non_deduced<T> = {}) {
-        if (!entity.isValid()) {
-            std::cerr << "[Error] ECSWorld::addComponent: Invalid entity!\n";
-            return;
-        }
+    void addComponent(Entity entity) {
+        if (!validateEntity(entity)) return;
 
         getComponentArray<T>()->addComponent(entity.id, T());
-        m_entitySignatures[entity.id].set(GetComponentTypeId<T>());
-    }
-
-    // **Add component by default constructor (for pointer types)**
-    template<typename T>
-    std::enable_if_t<ShouldStoreAsPointer<T>::value, void>
-    addComponent(Entity entity, non_deduced<T> = {}) {
-        if (!entity.isValid()) {
-            std::cerr << "[Error] ECSWorld::addComponent: Invalid entity!\n";
-            return;
-        }
-
-        getComponentArray<T>()->addComponent(entity.id, new T());
-        m_entitySignatures[entity.id].set(GetComponentTypeId<T>());
+        m_entitySignatures[entity.id].set(getComponentTypeId<T>());
     }
 
     // Retrieve component
     template<typename T>
     auto getComponent(Entity entity) -> typename ComponentStorage<T>::StorageType {
-        if (!entity.isValid()) {
-            std::cerr << "[Error] ECSWorld::getComponent: Invalid entity!\n";
+        if (!validateEntity(entity)) {
             throw std::runtime_error("Invalid entity");
         }
 
@@ -137,33 +93,28 @@ public:
     // Remove component
     template<typename T>
     void removeComponent(Entity entity) {
-        if (!entity.isValid()) {
-            std::cerr << "[Error] ECSWorld::removeComponent: Invalid entity!\n";
-            return;
-        }
+        if (!validateEntity(entity)) return;
 
         getComponentArray<T>()->removeComponent(entity.id);
-        m_entitySignatures[entity.id].reset(GetComponentTypeId<T>());
+        m_entitySignatures[entity.id].reset(getComponentTypeId<T>());
     }
 
-    // Check if entity ID has component
+    // Check if entity has component
     template<typename T>
     bool hasComponent(Entity entity) const {
-        return entity.isValid() && m_entitySignatures[entity.id].test(GetComponentTypeId<T>());
+        return validateEntity(entity) && m_entitySignatures[entity.id].test(getComponentTypeId<T>());
     }
 
-    // Add a resource to the world
+    // Add resource to the world
     template<typename T>
     void insertResource(T resource) {
-        std::type_index index = std::type_index(typeid(T));
-        m_resources[index] = std::make_unique<ResourceHolder<T>>(std::move(resource));
+        m_resources[std::type_index(typeid(T))] = std::make_unique<ResourceHolder<T>>(std::move(resource));
     }
 
-    // Get a resource from the world
+    // Get resource from the world
     template<typename T>
     T& getResource() {
-        std::type_index index = std::type_index(typeid(T));
-        auto it = m_resources.find(index);
+        auto it = m_resources.find(std::type_index(typeid(T)));
         assert(it != m_resources.end() && "Resource not found!");
         return static_cast<ResourceHolder<T>*>(it->second.get())->m_resource;
     }
@@ -171,11 +122,9 @@ public:
     // Batched query for entities with specific components
     template<typename... Components>
     std::vector<Entity> batchedQuery() const {
-        // Set the bits corresponding to each requested component
         Signature querySignature;
-        (querySignature.set(GetComponentTypeId<Components>()) , ...);
+        (querySignature.set(getComponentTypeId<Components>()), ...);
 
-        // Iterate through all entities, check their signatures
         std::vector<Entity> matchingEntities;
         for (size_t entityId = 0; entityId < m_entityManager.getNumEntities(); ++entityId) {
             if ((m_entitySignatures[entityId] & querySignature) == querySignature) {
@@ -188,18 +137,23 @@ public:
 
 private:
     EntityManager m_entityManager;
-
-    // Component arrays, indexed by component type ID
     std::vector<std::unique_ptr<IComponentArray>> m_componentArrays;
     std::unordered_map<std::type_index, std::unique_ptr<IResource>> m_resources;
-
-    // Track signatures of entities, which components they have
     std::vector<Signature> m_entitySignatures;
 
-    // Get or create component array for a type
+    // Helper to validate entity before performing actions
+    bool validateEntity(Entity entity) const {
+        if (!entity.isValid()) {
+            std::cerr << "[Error] ECSWorld: Invalid entity!\n";
+            return false;
+        }
+        return true;
+    }
+
+    // Helper to get or create a component array for a type
     template<typename T>
     ComponentArray<T>* getComponentArray() {
-        size_t index = GetComponentTypeId<T>();
+        size_t index = getComponentTypeId<T>();
         if (index >= m_componentArrays.size()) {
             m_componentArrays.resize(index + 1);
         }
@@ -211,18 +165,7 @@ private:
         return static_cast<ComponentArray<T>*>(m_componentArrays[index].get());
     }
 
-    // Const version of getComponentArray
-    template<typename T>
-    const ComponentArray<T>* getComponentArray() const {
-        size_t index = GetComponentTypeId<T>();
-        if (index < m_componentArrays.size() && m_componentArrays[index]) {
-            return static_cast<const ComponentArray<T>*>(m_componentArrays[index].get());
-        } else {
-            return nullptr;
-        }
-    }
-
-    // Resize all component arrays when EntityManager resizes
+    // Helper to resize all component arrays when EntityManager resizes
     void resizeAllComponentArrays(size_t newSize) {
         for (auto& array : m_componentArrays) {
             if (array) {
@@ -230,6 +173,19 @@ private:
             }
         }
         m_entitySignatures.resize(newSize);
+    }
+
+    // Helper to get component type ID using static variable for uniqueness
+    template<typename T>
+    static size_t getComponentTypeId() {
+        static size_t typeId = GetNextComponentTypeId();
+        return typeId;
+    }
+
+    static size_t GetNextComponentTypeId() {
+        static size_t nextId = 0;
+        assert(nextId < MAX_COMPONENTS && "Exceeded maximum number of component types!");
+        return nextId++;
     }
 };
 
