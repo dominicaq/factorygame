@@ -19,13 +19,24 @@ static const std::string TEXTURE_DIR = ASSET_DIR "textures/";
 namespace Scene {
     void loadScene(ECSWorld& world, LightSystem& lightSystem, GameObjectManager& gameObjectManager) {
         // ------------------------ Setup Camera ------------------------
-        Camera camera;
-        camera.position = glm::vec3(4.0f, 0.21f, 4.04f);
-        camera.eulerAngles = glm::vec3(-2.38f, 239.0f, 0.0f);
+        // Add PositionComponent and RotationComponent to the camera entity
+        Entity cameraEntity = world.createEntity();
+        world.addComponent<PositionComponent>(cameraEntity, { glm::vec3(4.0f, 0.21f, 4.04f) });
+        world.addComponent<RotationComponent>(cameraEntity, { glm::vec3(-2.38f, 239.0f, 0.0f) });
+
+        // Create a Camera object and set its projection properties
+        Camera camera(cameraEntity, &world);
         camera.setNearPlane(0.1f);
         camera.setFarPlane(100.0f);
         camera.setFov(50.0f);
+        camera.setAspectRatio(SCREEN_WIDTH, SCREEN_HEIGHT);
+
+        // Insert the camera as a resource in the ECS world
         world.insertResource<Camera>(camera);
+
+        // Use GameObjectManager to create and manage the GameObject for the camera
+        GameObject* cameraObject = gameObjectManager.createGameObject(cameraEntity);
+        cameraObject->addScript<FreeCamera>();
 
         // ------------------------ Shader Setup ------------------------
         std::string vertexPath = SHADER_DIR + "default.vs";
@@ -60,7 +71,6 @@ namespace Scene {
         Entity dummyEntity = world.createEntity();
         GameObject* dummyObject = gameObjectManager.createGameObject(dummyEntity);
         dummyObject->addScript<ViewFrameBuffers>();
-        dummyObject->addScript<FreeCamera>();
 
         // --------------------- Diablo Model ---------------------
         Entity diabloEntity = world.createEntity();

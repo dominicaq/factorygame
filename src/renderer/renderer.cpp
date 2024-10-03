@@ -378,8 +378,12 @@ void Renderer::lightPass(ECSWorld& world, const LightSystem& lightSystem) {
     // Use Light Pass Shader
     m_lightPassShader.use();
 
-    // Set camera position
-    m_lightPassShader.setVec3("u_CameraPosition", world.getResource<Camera>().position);
+    // Get the camera entity from the Camera resource
+    Camera& camera = world.getResource<Camera>();
+
+    // Set the camera position in the shader
+    m_lightPassShader.setVec3("u_CameraPosition", camera.getPosition());
+
 
     // Set the number of lights
     m_lightPassShader.setInt("numLights", lightSystem.size);
