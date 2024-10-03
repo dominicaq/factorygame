@@ -31,8 +31,8 @@ int main() {
     Scene::loadScene(world, lightSystem, gameObjectManager);
 
     // Batched queries from scene
-    std::vector<Entity> renderQuery = world.batchedQuery<Mesh, Transform, ModelMatrix>();
-    std::vector<Entity> modelQuery = world.batchedQuery<Transform, ModelMatrix>();
+    std::vector<Entity> renderQuery = world.batchedQuery<Mesh, ModelMatrix>();
+    std::vector<Entity> modelQuery = world.batchedQuery<ModelMatrix>();
 
     // Create renderer and send mesh data to GPU
     Renderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT, &world.getResource<Camera>());
@@ -82,7 +82,6 @@ int main() {
 
         // ------------------------ Core Update Logic ------------------------
 
-        // Update all scripts via GameObjectManager
         gameObjectManager.updateAll(deltaTime);
 
         // ------------------------ Rendering ------------------------

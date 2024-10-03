@@ -1,32 +1,47 @@
 #ifndef MODELMATRIX_H
 #define MODELMATRIX_H
 
+#include "glm.hpp"
+#include "gtc/matrix_transform.hpp"
+
 #include "ecs/ecs.h"
 #include "transform.h"
-
-#include "glm.hpp"
-
 #include <vector>
 
-// ModelMatrix component
 struct ModelMatrix {
     glm::mat4 matrix = glm::mat4(1.0f);
+    bool dirty = true;
 };
 
-inline void updateModelMatrices(ECSWorld& ecs, const std::vector<Entity>& modelMatrixQuery) {
-    for (Entity entity : modelMatrixQuery) {
-        Transform& transform = ecs.getComponent<Transform>(entity);
-        ModelMatrix& modelMatrix = ecs.getComponent<ModelMatrix>(entity);
+// System to update the ModelMatrix component
+inline void updateModelMatrices(ECSWorld& ecs, const std::vector<Entity>& entities) {
+    for (Entity entity : entities) {
+        auto& modelMatrix = ecs.getComponent<ModelMatrix>(entity);
 
-        // If the transform was updated
-        if (transform.isDirty()) {
-            // Recalculate the model matrix and update the ModelMatrix component
-            modelMatrix.matrix = transform.calculateModelMatrix();
+        // Only update if the model matrix is dirty
+        if (modelMatrix.dirty) {
+            auto& position = ecs.getComponent<PositionComponent>(entity);
+            auto& rotation = ecs.getComponent<RotationComponent>(entity);
+            auto& scale = ecs.getComponent<ScaleComponent>(entity);
 
-            // Clear the dirty flag after the model matrix is updated
-            transform.clearDirtyFlag();
+            glm::mat4 matrix = glm::mat4(1.0f);
+            matrix = glm::translate(matrix, position.position);
+
+            // Apply rotation (Euler angles)
+            matrix = glm::rotate(matrix, rotation.eulerAngles.x, glm::vec3(1, 0, 0));
+            matrix = glm::rotate(matrix, rotation.eulerAngles.y, glm::vec3(0, 1, 0));
+            matrix = glm::rotate(matrix, rotation.eulerAngles.z, glm::vec3(0, 0, 1));
+
+            // Apply scaling
+            matrix = glm::scale(matrix, scale.scale);
+
+            // Update the matrix in the ModelMatrix component
+            modelMatrix.matrix = matrix;
+
+            // Mark the matrix as clean
+            modelMatrix.dirty = false;
         }
     }
 }
 
-#endif
+#endif // MODELMATRIX_H

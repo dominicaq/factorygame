@@ -33,8 +33,7 @@ public:
 private:
     ECSWorld& m_world;
     std::vector<std::unique_ptr<GameObject>> m_gameObjects;
-    std::stack<int> m_freeList;  // Stack to store free Entity IDs
-    mutable std::mutex m_mutex;  // For thread-safety
+    mutable std::mutex m_mutex;
 };
 
 #endif // GAMEOBJECTMANAGER_H

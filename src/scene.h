@@ -34,8 +34,9 @@ namespace Scene {
 
         // --------------------- Stanford Bunny Model ---------------------
         Entity bunnyEntity = world.createEntity();
-        Transform bunnyTransform(glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(5.0f), glm::vec3(0.0f));
-        world.addComponent<Transform>(bunnyEntity, bunnyTransform);
+        world.addComponent<PositionComponent>(bunnyEntity, { glm::vec3(0.0f, -0.5f, 0.0f) });
+        world.addComponent<RotationComponent>(bunnyEntity, { glm::vec3(0.0f) });
+        world.addComponent<ScaleComponent>(bunnyEntity, { glm::vec3(5.0f) });
         world.addComponent<ModelMatrix>(bunnyEntity);
 
         Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
@@ -63,8 +64,9 @@ namespace Scene {
 
         // --------------------- Diablo Model ---------------------
         Entity diabloEntity = world.createEntity();
-        Transform diabloTransform(glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(2.0f), glm::vec3(0.0f));
-        world.addComponent<Transform>(diabloEntity, diabloTransform);
+        world.addComponent<PositionComponent>(diabloEntity, { glm::vec3(2.0f, 0.0f, -1.0f) });
+        world.addComponent<RotationComponent>(diabloEntity, { glm::vec3(0.0f) });
+        world.addComponent<ScaleComponent>(diabloEntity, { glm::vec3(2.0f) });
         world.addComponent<ModelMatrix>(diabloEntity);
 
         Mesh* diabloModel = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
@@ -89,8 +91,9 @@ namespace Scene {
         Shader* forwardShader = new Shader(forwardVertexPath, forwardFragmentPath);
 
         Entity cubeEntity = world.createEntity();
-        Transform cubeTransform(glm::vec3(0.0f, 2.0f, 0.0f), glm::vec3(0.5f), glm::vec3(0.0f));
-        world.addComponent<Transform>(cubeEntity, cubeTransform);
+        world.addComponent<PositionComponent>(cubeEntity, { glm::vec3(0.0f, 2.0f, 0.0f) });
+        world.addComponent<RotationComponent>(cubeEntity, { glm::vec3(0.0f) });
+        world.addComponent<ScaleComponent>(cubeEntity, { glm::vec3(0.5f) });
         world.addComponent<ModelMatrix>(cubeEntity);
 
         Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
@@ -119,7 +122,7 @@ namespace Scene {
 
         lightSystem.addLight(
             glm::vec3(-2.0f, 2.5f, 2.0f),  // Position for a point light
-            glm::vec3(0.0f, 0.0f, 0.5f),   // Green light color
+            glm::vec3(0.0f, 0.0f, 0.5f),   // Blue light color
             10.0f,                         // Light radius
             1.0f,                          // Light intensity
             false,                         // No shadows
@@ -127,4 +130,5 @@ namespace Scene {
         );
     }
 }
+
 #endif // SCENE_H

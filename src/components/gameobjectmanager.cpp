@@ -58,7 +58,6 @@ void GameObjectManager::removeGameObject(const Entity& entity) {
 
     // Perform any necessary cleanup on the GameObject
     m_gameObjects[entity.id].reset();  // Destroy the GameObject
-    m_freeList.push(entity.id);        // Add the slot to the free list
     m_world.destroyEntity(entity);     // Remove from ECSWorld
 }
 

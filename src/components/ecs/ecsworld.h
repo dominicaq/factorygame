@@ -9,9 +9,12 @@
 #include <typeindex>
 #include <memory>
 #include <cassert>
-
-// Resource map
+#include <bitset>
 #include <unordered_map>
+
+// Signature will represent the components an entity has
+constexpr size_t MAX_COMPONENTS = 64;
+using Signature = std::bitset<MAX_COMPONENTS>;
 
 // Helper struct to create a non-deduced context
 template <typename T>
@@ -32,6 +35,9 @@ size_t GetComponentTypeId() {
 class ECSWorld {
 public:
     ECSWorld() {
+        // Initialize entity signatures
+        m_entitySignatures.resize(100);
+
         // Register callback with EntityManager to resize component arrays
         m_entityManager.registerResizeCallback([this](size_t newSize) {
             resizeAllComponentArrays(newSize);
@@ -50,6 +56,9 @@ public:
 
     void destroyEntity(Entity entity) {
         m_entityManager.destroyEntity(entity);
+        // Clear the entity's signature
+        m_entitySignatures[entity.id].reset();
+
         // Remove all components associated with the entity
         for (auto& array : m_componentArrays) {
             if (array) {
@@ -59,14 +68,15 @@ public:
     }
 
     // Delete the function that allows implicit type deduction for value and universal references
-    template<typename T>
-    void addComponent(Entity entity, T&& component) = delete;
+    // template<typename T>
+    // void addComponent(Entity entity, T&& component) = delete;
 
     // **Explicitly add component stored by value**
     template<typename T>
     std::enable_if_t<!ShouldStoreAsPointer<T>::value, void>
     addComponent(Entity entity, const T& component, non_deduced<T> = {}) {
         getComponentArray<T>()->addComponent(entity.id, component);
+        m_entitySignatures[entity.id].set(GetComponentTypeId<T>());
     }
 
     // **Explicitly add component stored by pointer**
@@ -74,6 +84,7 @@ public:
     std::enable_if_t<ShouldStoreAsPointer<T>::value, void>
     addComponent(Entity entity, T* component, non_deduced<T> = {}) {
         getComponentArray<T>()->addComponent(entity.id, component);
+        m_entitySignatures[entity.id].set(GetComponentTypeId<T>());
     }
 
     // **Add component by default constructor (for value types)**
@@ -81,6 +92,7 @@ public:
     std::enable_if_t<!ShouldStoreAsPointer<T>::value, void>
     addComponent(Entity entity, non_deduced<T> = {}) {
         getComponentArray<T>()->addComponent(entity.id, T());
+        m_entitySignatures[entity.id].set(GetComponentTypeId<T>());
     }
 
     // **Add component by default constructor (for pointer types)**
@@ -88,6 +100,7 @@ public:
     std::enable_if_t<ShouldStoreAsPointer<T>::value, void>
     addComponent(Entity entity, non_deduced<T> = {}) {
         getComponentArray<T>()->addComponent(entity.id, new T());
+        m_entitySignatures[entity.id].set(GetComponentTypeId<T>());
     }
 
     // Retrieve component
@@ -100,6 +113,15 @@ public:
     template<typename T>
     void removeComponent(Entity entity) {
         getComponentArray<T>()->removeComponent(entity.id);
+        m_entitySignatures[entity.id].reset(GetComponentTypeId<T>());
+    }
+
+    template<typename T>
+    bool hasComponent(Entity entity) {
+        // Get the component array for the type T
+        const auto* componentArray = getComponentArray<T>();
+        // Check if the component array exists and whether the component is assigned to the entity
+        return componentArray && componentArray->hasComponent(entity.id);
     }
 
     // Add a resource to the world
@@ -118,14 +140,16 @@ public:
         return static_cast<ResourceHolder<T>*>(it->second.get())->m_resource;
     }
 
-    // **Batched Query: Retrieves entities that have all of the specified components**
+    // Retrieves entities that have all of the specified components**
     template<typename... Components>
     std::vector<Entity> batchedQuery() const {
         std::vector<Entity> matchingEntities;
+        Signature querySignature;
+        (querySignature.set(GetComponentTypeId<Components>()) , ...);
 
         // Iterate through all entities
         for (size_t entityId = 0; entityId < m_entityManager.getNumEntities(); ++entityId) {
-            if ((hasComponent<Components>(entityId) && ...)) {
+            if ((m_entitySignatures[entityId] & querySignature) == querySignature) {
                 matchingEntities.emplace_back(entityId);
             }
         }
@@ -139,6 +163,9 @@ private:
     // Component arrays, indexed by component type ID
     std::vector<std::unique_ptr<IComponentArray>> m_componentArrays;
     std::unordered_map<std::type_index, std::unique_ptr<IResource>> m_resources;
+
+    // Track signatures of entities, which components they have
+    std::vector<Signature> m_entitySignatures;
 
     // Get or create component array for a type
     template<typename T>
@@ -166,16 +193,6 @@ private:
         }
     }
 
-    // Check if an entity has a specific component
-    template<typename T>
-    bool hasComponent(size_t entityId) const {
-        const ComponentArray<T>* array = getComponentArray<T>();
-        if (array == nullptr) {
-            return false;
-        }
-        return array->hasComponent(entityId);
-    }
-
     // Resize all component arrays when EntityManager resizes
     void resizeAllComponentArrays(size_t newSize) {
         for (auto& array : m_componentArrays) {
@@ -183,6 +200,7 @@ private:
                 array->resize(newSize);
             }
         }
+        m_entitySignatures.resize(newSize);
     }
 };
 
