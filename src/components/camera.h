@@ -26,23 +26,23 @@ public:
 
     // Setters and getters for position
     glm::vec3 getPosition() const {
-        const auto& positionComponent = m_world->getComponent<PositionComponent>(m_cameraEntity);
+        const auto& positionComponent = m_world->getComponent<Position>(m_cameraEntity);
         return positionComponent.position;
     }
 
     void setPosition(const glm::vec3& newPosition) {
-        auto& positionComponent = m_world->getComponent<PositionComponent>(m_cameraEntity);
+        auto& positionComponent = m_world->getComponent<Position>(m_cameraEntity);
         positionComponent.position = newPosition;
     }
 
     // Setters and getters for rotation
     glm::vec3 getRotation() const {
-        const auto& rotationComponent = m_world->getComponent<RotationComponent>(m_cameraEntity);
+        const auto& rotationComponent = m_world->getComponent<Rotation>(m_cameraEntity);
         return rotationComponent.eulerAngles;
     }
 
     void setRotation(const glm::vec3& newRotation) {
-        auto& rotationComponent = m_world->getComponent<RotationComponent>(m_cameraEntity);
+        auto& rotationComponent = m_world->getComponent<Rotation>(m_cameraEntity);
         rotationComponent.eulerAngles = newRotation;
     }
 

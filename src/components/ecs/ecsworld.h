@@ -11,6 +11,10 @@
 #include <bitset>
 #include <cassert>
 
+// Filter exclusions
+template <typename... Components>
+struct Exclude {};
+
 // Signature will represent the components an entity has
 constexpr size_t MAX_COMPONENTS = 64;
 using Signature = std::bitset<MAX_COMPONENTS>;
@@ -120,19 +124,14 @@ public:
     }
 
     // Batched query for entities with specific components
-    template<typename... Components>
+    template <typename... Components>
     std::vector<Entity> batchedQuery() const {
-        Signature querySignature;
-        (querySignature.set(getComponentTypeId<Components>()), ...);
+        return batchedQueryImpl<Components...>(Exclude<>()); // No exclusions
+    }
 
-        std::vector<Entity> matchingEntities;
-        for (size_t entityId = 0; entityId < m_entityManager.getNumEntities(); ++entityId) {
-            if ((m_entitySignatures[entityId] & querySignature) == querySignature) {
-                matchingEntities.emplace_back(entityId);
-            }
-        }
-
-        return matchingEntities;
+    template <typename... Components, typename... Excludes>
+    std::vector<Entity> batchedQuery(Exclude<Excludes...>) const {
+        return batchedQueryImpl<Components...>(Exclude<Excludes...>());
     }
 
 private:
@@ -140,6 +139,31 @@ private:
     std::vector<std::unique_ptr<IComponentArray>> m_componentArrays;
     std::unordered_map<std::type_index, std::unique_ptr<IResource>> m_resources;
     std::vector<Signature> m_entitySignatures;
+
+    template <typename... Components, typename... Excludes>
+    std::vector<Entity> batchedQueryImpl(Exclude<Excludes...>) const {
+        Signature includeSignature;
+        (includeSignature.set(getComponentTypeId<Components>()), ...);
+
+        Signature excludeSignature;
+        (excludeSignature.set(getComponentTypeId<Excludes>()), ...);
+
+        std::vector<Entity> matchingEntities;
+        matchingEntities.reserve(m_entitySignatures.size()); // Optional: reserve space
+
+        for (size_t entityId = 0; entityId < m_entitySignatures.size(); ++entityId) {
+            const Signature& entitySignature = m_entitySignatures[entityId];
+            // Check if entity has all included components
+            if ((entitySignature & includeSignature) == includeSignature) {
+                // Check if entity has none of the excluded components
+                if ((entitySignature & excludeSignature).none()) {
+                    matchingEntities.emplace_back(entityId);
+                }
+            }
+        }
+
+        return matchingEntities;
+    }
 
     // Helper to validate entity before performing actions
     bool validateEntity(Entity entity) const {

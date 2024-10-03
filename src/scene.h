@@ -19,22 +19,16 @@ static const std::string TEXTURE_DIR = ASSET_DIR "textures/";
 namespace Scene {
     void loadScene(ECSWorld& world, LightSystem& lightSystem, GameObjectManager& gameObjectManager) {
         // ------------------------ Setup Camera ------------------------
-        // Add PositionComponent and RotationComponent to the camera entity
         Entity cameraEntity = world.createEntity();
-        world.addComponent<PositionComponent>(cameraEntity, { glm::vec3(4.0f, 0.21f, 4.04f) });
-        world.addComponent<RotationComponent>(cameraEntity, { glm::vec3(-2.38f, 239.0f, 0.0f) });
+        addTransform(world, cameraEntity, glm::vec3(4.0f, 0.21f, 4.04f), glm::vec3(-2.38f, 239.0f, 0.0f));
 
-        // Create a Camera object and set its projection properties
         Camera camera(cameraEntity, &world);
         camera.setNearPlane(0.1f);
         camera.setFarPlane(100.0f);
         camera.setFov(50.0f);
         camera.setAspectRatio(SCREEN_WIDTH, SCREEN_HEIGHT);
 
-        // Insert the camera as a resource in the ECS world
         world.insertResource<Camera>(camera);
-
-        // Use GameObjectManager to create and manage the GameObject for the camera
         GameObject* cameraObject = gameObjectManager.createGameObject(cameraEntity);
         cameraObject->addScript<FreeCamera>();
 
@@ -45,10 +39,7 @@ namespace Scene {
 
         // --------------------- Stanford Bunny Model ---------------------
         Entity bunnyEntity = world.createEntity();
-        world.addComponent<PositionComponent>(bunnyEntity, { glm::vec3(0.0f, -0.5f, 0.0f) });
-        world.addComponent<RotationComponent>(bunnyEntity, { glm::vec3(0.0f) });
-        world.addComponent<ScaleComponent>(bunnyEntity, { glm::vec3(5.0f) });
-        world.addComponent<ModelMatrix>(bunnyEntity);
+        addTransform(world, bunnyEntity, glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(0.0f), glm::vec3(5.0f));
 
         Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
         if (bunnyMesh != nullptr) {
@@ -61,23 +52,34 @@ namespace Scene {
 
             bunnyMesh->material = bunnyMaterial;
             world.addComponent<Mesh>(bunnyEntity, bunnyMesh);
+            world.addComponent<ModelMatrix>(bunnyEntity);
 
-            // Use GameObjectManager to create and manage the GameObject
             GameObject* bunnyObject = gameObjectManager.createGameObject(bunnyEntity);
             bunnyObject->addScript<MoveScript>();
         }
 
-        // --------------------- Dummy Entity (global scripts) ------------------
-        Entity dummyEntity = world.createEntity();
-        GameObject* dummyObject = gameObjectManager.createGameObject(dummyEntity);
-        dummyObject->addScript<ViewFrameBuffers>();
+        // --------------------- Cube as Child of Bunny ---------------------
+        Entity cubeChildEntity = world.createEntity();
+        addTransform(world, cubeChildEntity, glm::vec3(0.0f, 2.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.5f));
+
+        Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
+        if (cubeMesh != nullptr) {
+            Material* cubeMaterial = new Material(basicShader);
+            cubeMaterial->albedoColor = glm::vec3(0.2f, 0.7f, 0.2f);  // Greenish color
+            cubeMaterial->isDeferred = false;
+
+            cubeMesh->material = cubeMaterial;
+            world.addComponent<Mesh>(cubeChildEntity, cubeMesh);
+            world.addComponent<ModelMatrix>(cubeChildEntity);
+
+            // Attach cube as a child of the bunny
+            world.addComponent(cubeChildEntity, Parent{bunnyEntity});
+            world.addComponent(bunnyEntity, Children{std::vector<Entity>{cubeChildEntity}});
+        }
 
         // --------------------- Diablo Model ---------------------
         Entity diabloEntity = world.createEntity();
-        world.addComponent<PositionComponent>(diabloEntity, { glm::vec3(2.0f, 0.0f, -1.0f) });
-        world.addComponent<RotationComponent>(diabloEntity, { glm::vec3(0.0f) });
-        world.addComponent<ScaleComponent>(diabloEntity, { glm::vec3(2.0f) });
-        world.addComponent<ModelMatrix>(diabloEntity);
+        addTransform(world, diabloEntity, glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(0.0f), glm::vec3(2.0f));
 
         Mesh* diabloModel = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
         if (diabloModel != nullptr) {
@@ -93,32 +95,16 @@ namespace Scene {
 
             diabloModel->material = diabloMaterial;
             world.addComponent<Mesh>(diabloEntity, diabloModel);
+            world.addComponent<ModelMatrix>(diabloEntity);
+
+            GameObject* diabloObject = gameObjectManager.createGameObject(diabloEntity);
+            diabloObject->addScript<MoveScript>();
         }
 
-        // --------------------- Cube Model (Forward Rendering) ---------------------
-        std::string forwardVertexPath = SHADER_DIR + "default.vs";
-        std::string forwardFragmentPath = SHADER_DIR + "default.fs";
-        Shader* forwardShader = new Shader(forwardVertexPath, forwardFragmentPath);
-
-        Entity cubeEntity = world.createEntity();
-        world.addComponent<PositionComponent>(cubeEntity, { glm::vec3(0.0f, 2.0f, 0.0f) });
-        world.addComponent<RotationComponent>(cubeEntity, { glm::vec3(0.0f) });
-        world.addComponent<ScaleComponent>(cubeEntity, { glm::vec3(0.5f) });
-        world.addComponent<ModelMatrix>(cubeEntity);
-
-        Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
-        if (cubeMesh != nullptr) {
-            Material* cubeMaterial = new Material(forwardShader);
-            cubeMaterial->albedoColor = glm::vec3(0.2f, 0.7f, 0.2f);  // Greenish color
-            cubeMaterial->isDeferred = false;
-
-            cubeMesh->material = cubeMaterial;
-            world.addComponent<Mesh>(cubeEntity, cubeMesh);
-
-            // Use GameObjectManager to create and manage the GameObject
-            GameObject* cubeObject = gameObjectManager.createGameObject(cubeEntity);
-            cubeObject->addScript<MoveScript>();
-        }
+        // --------------------- Dummy Entity (global scripts) ------------------
+        Entity dummyEntity = world.createEntity();
+        GameObject* dummyObject = gameObjectManager.createGameObject(dummyEntity);
+        dummyObject->addScript<ViewFrameBuffers>();
 
         // --------------------- Light System ---------------------
         lightSystem.addLight(

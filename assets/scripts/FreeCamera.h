@@ -17,8 +17,8 @@ public:
 
     void update(float deltaTime) override {
         // Get the camera's position and rotation components from the ECS
-        auto positionComponent = gameObject->getComponent<PositionComponent>();
-        auto rotationComponent = gameObject->getComponent<RotationComponent>();
+        auto positionComponent = gameObject->getComponent<Position>();
+        auto rotationComponent = gameObject->getComponent<Rotation>();
 
         // Calculate camera front vector based on Euler angles
         glm::vec3 front;

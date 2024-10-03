@@ -88,7 +88,9 @@ int main() {
 
         // Get view matrix from the camera
         glm::mat4 view = world.getResource<Camera>().getViewMatrix();
-        updateModelMatrices(world, modelQuery);
+        // Transform::updateTransforms(world);
+        // Transform::updateChildObjects(world);
+        Transform::updateModelMatrices(world, modelQuery);
 
         // Deferred passes
         renderer.geometryPass(world, renderQuery, view);
