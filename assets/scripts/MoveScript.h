@@ -13,7 +13,7 @@ public:
     float rotationSpeed = 50.0f;  // Rotation speed in degrees per second
 
 private:
-    glm::vec3 eulerRotation;  // Euler rotation
+    glm::vec3 eulerRotation;
 
 public:
     void start() override {

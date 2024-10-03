@@ -27,6 +27,7 @@ public:
      * Window Management
      */
     void resize(int newWidth, int newHeight);
+    void setTitle(const std::string& title);
     GLFWwindow* getGLFWwindow();
 
     /*

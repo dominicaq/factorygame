@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <sstream> // For FPS display
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
@@ -59,11 +60,28 @@ int main() {
 
     gameObjectManager.startAll();
 
+    // ------------------------ FPS Counter Setup ------------------------
+    int frames = 0;
+    float fpsTimer = 0.0f;
+    float fps = 0.0f;
+
     // Game loop
     while (!window.shouldClose()) {
         // Calculate delta time
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
+
+        // FPS calculation
+        frames++;
+        fpsTimer += deltaTime;
+        if (fpsTimer >= 1.0f) {
+            fps = frames / fpsTimer; // FPS = frames per second
+            std::stringstream ss;
+            ss << "Factory Game - FPS: " << fps;
+            window.setTitle(ss.str());  // Update window title with FPS
+            frames = 0;
+            fpsTimer = 0.0f;
+        }
 
         // -------------- Temporary Logic (Camera & Input) --------------
 
@@ -88,8 +106,7 @@ int main() {
 
         // Get view matrix from the camera
         glm::mat4 view = world.getResource<Camera>().getViewMatrix();
-        // Transform::updateChildObjects(world);
-        Transform::updateModelMatrices(world, modelQuery);
+        Transform::updateTransforms(world);
 
         // Deferred passes
         renderer.geometryPass(world, renderQuery, view);

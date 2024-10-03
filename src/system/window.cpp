@@ -88,6 +88,10 @@ void Window::resize(int newWidth, int newHeight) {
     }
 }
 
+void Window::setTitle(const std::string& title) {
+    glfwSetWindowTitle(m_window, title.c_str());
+}
+
 GLFWwindow* Window::getGLFWwindow() {
     return m_window;
 }

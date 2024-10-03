@@ -20,7 +20,8 @@ namespace Scene {
     void loadScene(ECSWorld& world, LightSystem& lightSystem, GameObjectManager& gameObjectManager) {
         // ------------------------ Setup Camera ------------------------
         Entity cameraEntity = world.createEntity();
-        addTransform(world, cameraEntity, glm::vec3(4.0f, 0.21f, 4.04f), glm::vec3(-2.38f, 239.0f, 0.0f));
+        // Initialize with position and Euler angles (pitch, yaw, roll)
+        Transform::addTransform(world, cameraEntity, glm::vec3(4.0f, 0.21f, 4.04f), glm::vec3(-2.38f, 239.0f, 0.0f));
 
         Camera camera(cameraEntity, &world);
         camera.setNearPlane(0.1f);
@@ -39,7 +40,8 @@ namespace Scene {
 
         // --------------------- Stanford Bunny Model ---------------------
         Entity bunnyEntity = world.createEntity();
-        addTransform(world, bunnyEntity, glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(0.0f), glm::vec3(5.0f));
+        // Initialize bunny with position, rotation (Euler angles), and scale
+        Transform::addTransform(world, bunnyEntity, glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(0.0f), glm::vec3(5.0f));
 
         Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
         if (bunnyMesh != nullptr) {
@@ -52,7 +54,7 @@ namespace Scene {
 
             bunnyMesh->material = bunnyMaterial;
             world.addComponent<Mesh>(bunnyEntity, bunnyMesh);
-            world.addComponent<ModelMatrix>(bunnyEntity);
+            // ModelMatrix is already added by Transform::addTransform
 
             GameObject* bunnyObject = gameObjectManager.createGameObject(bunnyEntity);
             bunnyObject->addScript<MoveScript>();
@@ -60,7 +62,8 @@ namespace Scene {
 
         // --------------------- Cube as Child of Bunny ---------------------
         Entity cubeChildEntity = world.createEntity();
-        addTransform(world, cubeChildEntity, glm::vec3(0.0f, 2.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.5f));
+        // Initialize cube with position, rotation, and scale
+        Transform::addTransform(world, cubeChildEntity, glm::vec3(0.0f, 2.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.5f));
 
         Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
         if (cubeMesh != nullptr) {
@@ -70,16 +73,19 @@ namespace Scene {
 
             cubeMesh->material = cubeMaterial;
             world.addComponent<Mesh>(cubeChildEntity, cubeMesh);
-            world.addComponent<ModelMatrix>(cubeChildEntity);
+            // ModelMatrix is already added by Transform::addTransform
 
-            // Attach cube as a child of the bunny
-            world.addComponent(cubeChildEntity, Parent{bunnyEntity});
-            world.addComponent(bunnyEntity, Children{std::vector<Entity>{cubeChildEntity}});
+            GameObject* cubeObject = gameObjectManager.createGameObject(cubeChildEntity);
+            // cubeObject->addScript<MoveScript>(); // If cube has movement scripts
+
+            // Attach cube as a child of the bunny using Transform::setParent
+            Transform::setParent(world, cubeChildEntity, bunnyEntity);
         }
 
         // --------------------- Diablo Model ---------------------
         Entity diabloEntity = world.createEntity();
-        addTransform(world, diabloEntity, glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(0.0f), glm::vec3(2.0f));
+        // Initialize diablo with position, rotation, and scale
+        Transform::addTransform(world, diabloEntity, glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(0.0f), glm::vec3(2.0f));
 
         Mesh* diabloModel = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
         if (diabloModel != nullptr) {
@@ -95,7 +101,7 @@ namespace Scene {
 
             diabloModel->material = diabloMaterial;
             world.addComponent<Mesh>(diabloEntity, diabloModel);
-            world.addComponent<ModelMatrix>(diabloEntity);
+            // ModelMatrix is already added by Transform::addTransform
 
             GameObject* diabloObject = gameObjectManager.createGameObject(diabloEntity);
             diabloObject->addScript<MoveScript>();
@@ -110,10 +116,10 @@ namespace Scene {
         lightSystem.addLight(
             glm::vec3(-20.0f, 0.0f, 0.0f),  // Middle-left side
             glm::vec3(0.2f, 0.2f, 0.2f),    // Grayish White color
-            1.0f,                          // Light radius
-            3.0f,                           // Light intensity
-            false,                          // No shadows
-            false                           // Point light
+            1.0f,                            // Light radius
+            3.0f,                            // Light intensity
+            false,                           // No shadows
+            false                            // Point light
         );
 
         lightSystem.addLight(
@@ -124,7 +130,11 @@ namespace Scene {
             false,                         // No shadows
             false                          // Point light
         );
-    }
+
+        // --------------------- Update Transforms ---------------------
+        // After setting up the scene, ensure that all transforms are up-to-date
+        // Transform::updateTransforms(world);
+    };
 }
 
 #endif // SCENE_H
