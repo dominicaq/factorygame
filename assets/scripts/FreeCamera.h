@@ -16,15 +16,15 @@ public:
     }
 
     void update(float deltaTime) override {
-        // Get the camera's position and rotation components from the ECS
-        auto positionComponent = gameObject->getComponent<Position>();
-        auto rotationComponent = gameObject->getComponent<Rotation>();
+        // Get the camera's position and Euler angles from the GameObject
+        glm::vec3 position = gameObject->getPosition();
+        glm::vec3 eulerAngles = gameObject->getEuler();  // Use Euler angles instead of quaternions
 
         // Calculate camera front vector based on Euler angles
         glm::vec3 front;
-        front.x = cos(glm::radians(rotationComponent->eulerAngles.y)) * cos(glm::radians(rotationComponent->eulerAngles.x));
-        front.y = sin(glm::radians(rotationComponent->eulerAngles.x));
-        front.z = sin(glm::radians(rotationComponent->eulerAngles.y)) * cos(glm::radians(rotationComponent->eulerAngles.x));
+        front.x = cos(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
+        front.y = sin(glm::radians(eulerAngles.x));
+        front.z = sin(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
         front = glm::normalize(front);
 
         glm::vec3 right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
@@ -32,19 +32,22 @@ public:
 
         float dt = cameraSpeed * deltaTime;
 
-        // Handle movement
+        // Handle movement based on input
         if (inputManager.isKeyPressed(GLFW_KEY_W)) {
-            positionComponent->position += dt * front;
+            position += dt * front;
         }
         if (inputManager.isKeyPressed(GLFW_KEY_S)) {
-            positionComponent->position -= dt * front;
+            position -= dt * front;
         }
         if (inputManager.isKeyPressed(GLFW_KEY_A)) {
-            positionComponent->position -= right * dt;
+            position -= right * dt;
         }
         if (inputManager.isKeyPressed(GLFW_KEY_D)) {
-            positionComponent->position += right * dt;
+            position += right * dt;
         }
+
+        // Update the camera's position in the GameObject
+        gameObject->setPosition(position);
 
         // Mouse input for look rotation
         if (inputManager.isCursorDisabled()) {
@@ -52,16 +55,19 @@ public:
             float yOffset = inputManager.getMouseYOffset() * sensitivity;
 
             // Adjust camera angles
-            rotationComponent->eulerAngles.y += xOffset;
-            rotationComponent->eulerAngles.x += yOffset;
+            eulerAngles.y += xOffset;  // Yaw (left/right)
+            eulerAngles.x += yOffset;  // Pitch (up/down)
 
             // Constrain the pitch to avoid gimbal lock
-            if (rotationComponent->eulerAngles.x > 89.0f) {
-                rotationComponent->eulerAngles.x = 89.0f;
+            if (eulerAngles.x > 89.0f) {
+                eulerAngles.x = 89.0f;
             }
-            if (rotationComponent->eulerAngles.x < -89.0f) {
-                rotationComponent->eulerAngles.x = -89.0f;
+            if (eulerAngles.x < -89.0f) {
+                eulerAngles.x = -89.0f;
             }
+
+            // Update the Euler angles in the GameObject
+            gameObject->setEuler(eulerAngles);
         }
     }
 };

@@ -24,28 +24,6 @@ public:
     Camera(Entity cameraEntity, ECSWorld* world)
         : m_cameraEntity(cameraEntity), m_world(world) {}
 
-    // Setters and getters for position
-    glm::vec3 getPosition() const {
-        const auto& positionComponent = m_world->getComponent<Position>(m_cameraEntity);
-        return positionComponent.position;
-    }
-
-    void setPosition(const glm::vec3& newPosition) {
-        auto& positionComponent = m_world->getComponent<Position>(m_cameraEntity);
-        positionComponent.position = newPosition;
-    }
-
-    // Setters and getters for rotation
-    glm::vec3 getRotation() const {
-        const auto& rotationComponent = m_world->getComponent<Rotation>(m_cameraEntity);
-        return rotationComponent.eulerAngles;
-    }
-
-    void setRotation(const glm::vec3& newRotation) {
-        auto& rotationComponent = m_world->getComponent<Rotation>(m_cameraEntity);
-        rotationComponent.eulerAngles = newRotation;
-    }
-
     // Setters that mark projection as dirty
     void setNearPlane(float near) {
         m_nearPlane = near;
@@ -73,14 +51,19 @@ public:
     float getFov() const { return m_fov; }
     float getAspectRatio() const { return m_aspectRatio; }
 
+    glm::vec3 getPosition() const {
+        const auto& positionComponent = m_world->getComponent<Position>(m_cameraEntity);
+        return positionComponent.position;
+    }
+
     glm::mat4 getViewMatrix() const {
-        glm::vec3 rotation = getRotation();
-        glm::vec3 position = getPosition();
+        glm::vec3 eulerAngles = m_world->getComponent<EulerAngles>(m_cameraEntity).euler;
+        glm::vec3 position = m_world->getComponent<Position>(m_cameraEntity).position;
 
         glm::vec3 front;
-        front.x = cos(glm::radians(rotation.y)) * cos(glm::radians(rotation.x));
-        front.y = sin(glm::radians(rotation.x));
-        front.z = sin(glm::radians(rotation.y)) * cos(glm::radians(rotation.x));
+        front.x = cos(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
+        front.y = sin(glm::radians(eulerAngles.x));
+        front.z = sin(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
         front = glm::normalize(front);
 
         glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);

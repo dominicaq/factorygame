@@ -25,6 +25,9 @@ public:
         if (!m_world->hasComponent<Position>(m_entity)) {
             m_world->addComponent<Position>(m_entity);
         }
+        if (!m_world->hasComponent<EulerAngles>(m_entity)) {
+            m_world->addComponent<EulerAngles>(m_entity);
+        }
         if (!m_world->hasComponent<Rotation>(m_entity)) {
             m_world->addComponent<Rotation>(m_entity);
         }
@@ -91,12 +94,37 @@ public:
         m_world->getComponent<ModelMatrix>(m_entity).dirty = true;
     }
 
-    glm::vec3 getRotation() {
-        return m_world->getComponent<Rotation>(m_entity).eulerAngles;
+    // Get and set Euler angles for the user interface
+    glm::vec3 getEuler() {
+        return m_world->getComponent<EulerAngles>(m_entity).euler;
     }
 
-    void setRotation(const glm::vec3& rot) {
-        m_world->getComponent<Rotation>(m_entity).eulerAngles = rot;
+    // Set Euler angles and automatically update the quaternion
+    void setEuler(const glm::vec3& euler) {
+        auto& eulerComponent = m_world->getComponent<EulerAngles>(m_entity);
+        auto& rotationComponent = m_world->getComponent<Rotation>(m_entity);
+        eulerComponent.euler = euler;
+
+        // Convert Euler angles to quaternion
+        rotationComponent.quaternion = glm::quat(glm::radians(euler));
+
+        // Mark the ModelMatrix as dirty to ensure it gets updated
+        m_world->getComponent<ModelMatrix>(m_entity).dirty = true;
+    }
+
+    // Get and set Quaternion for the internal system
+    glm::quat getRotation() {
+        return m_world->getComponent<Rotation>(m_entity).quaternion;
+    }
+
+    // Set rotation directly using a quaternion (for advanced use)
+    void setRotation(const glm::quat& rotation) {
+        m_world->getComponent<Rotation>(m_entity).quaternion = rotation;
+
+        // Convert the quaternion back to Euler angles for consistency in the interface
+        m_world->getComponent<EulerAngles>(m_entity).euler = glm::degrees(glm::eulerAngles(rotation));
+
+        // Mark the ModelMatrix as dirty to ensure it gets updated
         m_world->getComponent<ModelMatrix>(m_entity).dirty = true;
     }
 

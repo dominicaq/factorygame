@@ -13,13 +13,13 @@ public:
     float rotationSpeed = 50.0f;  // Rotation speed in degrees per second
 
 private:
-    glm::vec3 rotation;
+    glm::vec3 eulerRotation;  // Euler rotation
 
 public:
     void start() override {
         std::cout << "MoveScript started for entity: " << gameObject->getEntity().id << "\n";
-        // Initialize the rotation from the GameObject's current rotation
-        rotation = gameObject->getRotation();
+        // Initialize the rotation from the GameObject's current Euler angles
+        eulerRotation = gameObject->getEuler();
     }
 
     void update(float deltaTime) override {
@@ -28,12 +28,14 @@ public:
             return;
         }
 
-        // Calculate the rotation amount in radians
-        float rotationAmount = glm::radians(rotationSpeed) * deltaTime;
+        // Calculate the rotation amount in degrees
+        float rotationAmount = rotationSpeed * deltaTime;
 
-        // Update the object's rotation around the specified axis
-        rotation += rotationAxis * rotationAmount;  // Apply rotation in radians
-        gameObject->setRotation(rotation);  // Update the rotation using GameObject's setter
+        // Update the object's Euler rotation around the specified axis
+        eulerRotation += rotationAxis * rotationAmount;  // Apply rotation in degrees
+
+        // Update the rotation using GameObject's setEuler method
+        gameObject->setEuler(eulerRotation);
     }
 };
 

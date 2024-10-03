@@ -88,7 +88,6 @@ int main() {
 
         // Get view matrix from the camera
         glm::mat4 view = world.getResource<Camera>().getViewMatrix();
-        // Transform::updateTransforms(world);
         // Transform::updateChildObjects(world);
         Transform::updateModelMatrices(world, modelQuery);
 
