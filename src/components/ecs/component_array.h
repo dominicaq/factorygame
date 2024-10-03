@@ -1,11 +1,12 @@
 #ifndef COMPONENT_ARRAY_H
 #define COMPONENT_ARRAY_H
 
+#include "component_traits.h"
+
 #include <vector>
 #include <optional>
 #include <iostream>
 #include <mutex>
-#include "component_traits.h"
 
 template<typename T>
 using OptionalType = std::optional<T>;

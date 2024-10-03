@@ -8,9 +8,8 @@
 #include <vector>
 #include <typeindex>
 #include <memory>
-#include <cassert>
 #include <bitset>
-#include <unordered_map>
+#include <cassert>
 
 // Signature will represent the components an entity has
 constexpr size_t MAX_COMPONENTS = 64;
@@ -67,10 +66,6 @@ public:
         }
     }
 
-    // Delete the function that allows implicit type deduction for value and universal references
-    // template<typename T>
-    // void addComponent(Entity entity, T&& component) = delete;
-
     // **Explicitly add component stored by value**
     template<typename T>
     std::enable_if_t<!ShouldStoreAsPointer<T>::value, void>
@@ -116,12 +111,10 @@ public:
         m_entitySignatures[entity.id].reset(GetComponentTypeId<T>());
     }
 
+    // Check if entity ID has component
     template<typename T>
-    bool hasComponent(Entity entity) {
-        // Get the component array for the type T
-        const auto* componentArray = getComponentArray<T>();
-        // Check if the component array exists and whether the component is assigned to the entity
-        return componentArray && componentArray->hasComponent(entity.id);
+    bool hasComponent(Entity entity) const {
+        return m_entitySignatures[entity.id].test(GetComponentTypeId<T>());
     }
 
     // Add a resource to the world
@@ -140,14 +133,14 @@ public:
         return static_cast<ResourceHolder<T>*>(it->second.get())->m_resource;
     }
 
-    // Retrieves entities that have all of the specified components**
     template<typename... Components>
     std::vector<Entity> batchedQuery() const {
-        std::vector<Entity> matchingEntities;
+        // Set the bits corresponding to each requested component
         Signature querySignature;
         (querySignature.set(GetComponentTypeId<Components>()) , ...);
 
-        // Iterate through all entities
+        // Iterate through all entities, check their signatures
+        std::vector<Entity> matchingEntities;
         for (size_t entityId = 0; entityId < m_entityManager.getNumEntities(); ++entityId) {
             if ((m_entitySignatures[entityId] & querySignature) == querySignature) {
                 matchingEntities.emplace_back(entityId);
