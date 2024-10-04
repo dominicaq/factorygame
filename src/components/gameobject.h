@@ -34,9 +34,6 @@ public:
         if (!m_world->hasComponent<Scale>(m_entity)) {
             m_world->addComponent<Scale>(m_entity);
         }
-        if (!m_world->hasComponent<ModelMatrix>(m_entity)) {
-            m_world->addComponent<ModelMatrix>(m_entity);
-        }
     }
 
     ~GameObject() {}
@@ -80,63 +77,57 @@ public:
     }
 
     /*
-    * ECS Components Accessors
+    * Transform
     */
     Entity getEntity() const { return m_entity; }
 
-    // Setters and getters for Position, Rotation, and Scale
-    glm::vec3 getPosition() {
-        return m_world->getComponent<Position>(m_entity).position;
+    glm::vec3& getPosition() {
+        return Transform::getPosition(m_world, m_entity);
     }
 
     void setPosition(const glm::vec3& pos) {
-        m_world->getComponent<Position>(m_entity).position = pos;
-        m_world->getComponent<ModelMatrix>(m_entity).dirty = true;
+        Transform::setPosition(m_world, m_entity, pos);
     }
 
-    // Get and set Euler angles for the user interface
-    glm::vec3 getEuler() {
-        return m_world->getComponent<EulerAngles>(m_entity).euler;
+    glm::vec3& getEuler() {
+        return Transform::getEuler(m_world, m_entity);
     }
 
-    // Set Euler angles and automatically update the quaternion
     void setEuler(const glm::vec3& euler) {
-        auto& eulerComponent = m_world->getComponent<EulerAngles>(m_entity);
-        auto& rotationComponent = m_world->getComponent<Rotation>(m_entity);
-        eulerComponent.euler = euler;
-
-        // Convert Euler angles to quaternion
-        rotationComponent.quaternion = glm::quat(glm::radians(euler));
-
-        // Mark the ModelMatrix as dirty to ensure it gets updated
-        m_world->getComponent<ModelMatrix>(m_entity).dirty = true;
+        Transform::setEuler(m_world, m_entity, euler);
     }
 
-    // Get and set Quaternion for the internal system
-    glm::quat getRotation() {
-        return m_world->getComponent<Rotation>(m_entity).quaternion;
+    glm::quat& getRotation() {
+        return Transform::getRotation(m_world, m_entity);
     }
 
-    // Set rotation directly using a quaternion (for advanced use)
     void setRotation(const glm::quat& rotation) {
-        m_world->getComponent<Rotation>(m_entity).quaternion = rotation;
-
-        // Convert the quaternion back to Euler angles for consistency in the interface
-        m_world->getComponent<EulerAngles>(m_entity).euler = glm::degrees(glm::eulerAngles(rotation));
-
-        // Mark the ModelMatrix as dirty to ensure it gets updated
-        m_world->getComponent<ModelMatrix>(m_entity).dirty = true;
+        Transform::setRotation(m_world, m_entity, rotation);
     }
 
-    glm::vec3 getScale() {
-        return m_world->getComponent<Scale>(m_entity).scale;
+    glm::vec3& getScale() {
+        return Transform::getScale(m_world, m_entity);
     }
 
-    void setScale(const glm::vec3& scl) {
-        m_world->getComponent<Scale>(m_entity).scale = scl;
-        m_world->getComponent<ModelMatrix>(m_entity).dirty = true;
+    void setScale(const glm::vec3& scale) {
+        Transform::setScale(m_world, m_entity, scale);
     }
 
+    glm::vec3 getForward() {
+        return Transform::getForward(m_world, m_entity);
+    }
+
+    glm::vec3 getUp() {
+        return Transform::getUp(m_world, m_entity);
+    }
+
+    glm::vec3 getRight() {
+        return Transform::getRight(m_world, m_entity);
+    }
+
+    /*
+    * ECS Accessors
+    */
     // Get ECS component from this GameObject by type
     template<typename ComponentType>
     ComponentType* getComponent() {

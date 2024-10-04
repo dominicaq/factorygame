@@ -22,8 +22,9 @@ struct Rotation {
     glm::quat quaternion = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 };
 
+// Euler angles in degrees (pitch, yaw, roll)
 struct EulerAngles {
-    glm::vec3 euler = glm::vec3(0.0f);  // Euler angles in degrees (pitch, yaw, roll)
+    glm::vec3 euler = glm::vec3(0.0f);
 };
 
 struct Scale {
@@ -69,34 +70,33 @@ inline void updateModelMatrices(ECSWorld& world, const std::vector<Entity>& enti
         auto& modelMatrix = world.getComponent<ModelMatrix>(entity);
 
         // Only update if the model matrix is dirty
-        if (modelMatrix.dirty) {
-            glm::mat4 localMatrix = glm::mat4(1.0f);
-
-            // Get local transformations
-            auto& position = world.getComponent<Position>(entity).position;
-            auto& rotation = world.getComponent<Rotation>(entity).quaternion;
-            auto& scale = world.getComponent<Scale>(entity).scale;
-
-            // Apply local transformations
-            localMatrix = glm::translate(glm::mat4(1.0f), position);
-            localMatrix *= glm::mat4_cast(rotation);
-            localMatrix = glm::scale(localMatrix, scale);
-
-            // If the entity has a parent, combine with the parent's model matrix
-            if (world.hasComponent<Parent>(entity)) {
-                Entity parent = world.getComponent<Parent>(entity).parent;
-                if (parent.isValid()) {
-                    auto& parentModelMatrix = world.getComponent<ModelMatrix>(parent).matrix;
-                    localMatrix = parentModelMatrix * localMatrix;
-                }
-            }
-
-            // Update the model matrix
-            modelMatrix.matrix = localMatrix;
-
-            // Mark the matrix as clean
-            modelMatrix.dirty = false;
+        if (!modelMatrix.dirty) {
+            continue;
         }
+
+        // Get local transformations
+        auto& position = world.getComponent<Position>(entity).position;
+        auto& rotation = world.getComponent<Rotation>(entity).quaternion;
+        auto& scale = world.getComponent<Scale>(entity).scale;
+
+        // Apply local transformations to matrix
+        glm::mat4 localMatrix = glm::mat4(1.0f);
+        localMatrix = glm::translate(glm::mat4(1.0f), position);
+        localMatrix *= glm::mat4_cast(rotation);
+        localMatrix = glm::scale(localMatrix, scale);
+
+        // If the entity has a parent, combine with the parent's model matrix
+        if (world.hasComponent<Parent>(entity)) {
+            Entity parent = world.getComponent<Parent>(entity).parent;
+            if (parent.isValid()) {
+                auto& parentModelMatrix = world.getComponent<ModelMatrix>(parent).matrix;
+                localMatrix = parentModelMatrix * localMatrix;
+            }
+        }
+
+        // Update the model matrix
+        modelMatrix.matrix = localMatrix;
+        modelMatrix.dirty = false;
     }
 }
 
@@ -157,13 +157,9 @@ namespace Transform {
                                             1.0f / parentWorldScale.y,
                                             1.0f / parentWorldScale.z);
 
-        // Calculate local position
+        // Calculate local transform
         glm::vec3 localPos = parentWorldRotInv * ((childWorldPos - parentWorldPos) * invParentScale);
-
-        // Calculate local rotation
         glm::quat localRot = parentWorldRotInv * childWorldRot;
-
-        // Calculate local scale
         glm::vec3 localScale = childWorldScale / parentWorldScale;
 
         // Update child's local transformation components
@@ -207,21 +203,71 @@ namespace Transform {
     }
 
     /*
+    * Setter and getter data
+    */
+    inline glm::vec3& getPosition(ECSWorld* world, Entity entity) {
+        return world->getComponent<Position>(entity).position;
+    }
+
+    inline void setPosition(ECSWorld* world, Entity entity, const glm::vec3& pos) {
+        world->getComponent<Position>(entity).position = pos;
+        world->getComponent<ModelMatrix>(entity).dirty = true;
+    }
+
+    inline glm::vec3& getEuler(ECSWorld* world, Entity entity) {
+        return world->getComponent<EulerAngles>(entity).euler;
+    }
+
+    inline void setEuler(ECSWorld* world, Entity entity, const glm::vec3& euler) {
+        auto& eulerComponent = world->getComponent<EulerAngles>(entity);
+        auto& rotationComponent = world->getComponent<Rotation>(entity);
+        eulerComponent.euler = euler;
+
+        // Convert Euler angles to quaternion
+        rotationComponent.quaternion = glm::quat(glm::radians(euler));
+
+        // Mark the ModelMatrix as dirty to ensure it gets updated
+        world->getComponent<ModelMatrix>(entity).dirty = true;
+    }
+
+    inline glm::quat& getRotation(ECSWorld* world, Entity entity) {
+        return world->getComponent<Rotation>(entity).quaternion;
+    }
+
+    inline void setRotation(ECSWorld* world, Entity entity, const glm::quat& rotation) {
+        world->getComponent<Rotation>(entity).quaternion = rotation;
+
+        // Convert the quaternion back to Euler angles for consistency
+        world->getComponent<EulerAngles>(entity).euler = glm::degrees(glm::eulerAngles(rotation));
+
+        // Mark the ModelMatrix as dirty to ensure it gets updated
+        world->getComponent<ModelMatrix>(entity).dirty = true;
+    }
+
+    inline glm::vec3& getScale(ECSWorld* world, Entity entity) {
+        return world->getComponent<Scale>(entity).scale;
+    }
+
+    inline void setScale(ECSWorld* world, Entity entity, const glm::vec3& scale) {
+        world->getComponent<Scale>(entity).scale = scale;
+        world->getComponent<ModelMatrix>(entity).dirty = true;
+    }
+
+    /*
     * Directional Vectors
     */
-
-    inline glm::vec3 getForward(ECSWorld& world, Entity entity) {
-        auto& rotation = world.getComponent<Rotation>(entity).quaternion;
+    inline glm::vec3 getForward(ECSWorld* world, Entity entity) {
+        auto& rotation = world->getComponent<Rotation>(entity).quaternion;
         return rotation * glm::vec3(0, 0, 1);
     }
 
-    inline glm::vec3 getUp(ECSWorld& world, Entity entity) {
-        auto& rotation = world.getComponent<Rotation>(entity).quaternion;
+    inline glm::vec3 getUp(ECSWorld* world, Entity entity) {
+        auto& rotation = world->getComponent<Rotation>(entity).quaternion;
         return rotation * glm::vec3(0, 1, 0);
     }
 
-    inline glm::vec3 getRight(ECSWorld& world, Entity entity) {
-        auto& rotation = world.getComponent<Rotation>(entity).quaternion;
+    inline glm::vec3 getRight(ECSWorld* world, Entity entity) {
+        auto& rotation = world->getComponent<Rotation>(entity).quaternion;
         return rotation * glm::vec3(1, 0, 0);
     }
 }
