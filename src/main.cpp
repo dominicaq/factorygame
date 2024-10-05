@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include <iostream>
-#include <sstream> 
+#include <sstream>
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
@@ -106,7 +106,7 @@ int main() {
 
         // Get view matrix from the camera
         glm::mat4 view = world.getResource<Camera>().getViewMatrix();
-        Transform::updateTransforms(world);
+        Transform::updateTransformsSystem(world);
 
         // Deferred passes
         renderer.geometryPass(world, renderQuery, view);

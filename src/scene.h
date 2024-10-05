@@ -21,7 +21,7 @@ namespace Scene {
         // ------------------------ Setup Camera ------------------------
         Entity cameraEntity = world.createEntity();
         // Initialize with position and Euler angles (pitch, yaw, roll)
-        Transform::addTransform(world, cameraEntity, glm::vec3(4.0f, 0.21f, 4.04f), glm::vec3(-2.38f, 239.0f, 0.0f));
+        Transform::addTransformComponents(world, cameraEntity, glm::vec3(4.0f, 0.21f, 4.04f), glm::vec3(-2.38f, 239.0f, 0.0f));
 
         Camera camera(cameraEntity, &world);
         camera.setNearPlane(0.1f);
@@ -41,7 +41,7 @@ namespace Scene {
         // --------------------- Stanford Bunny Model ---------------------
         Entity bunnyEntity = world.createEntity();
         // Initialize bunny with position, rotation (Euler angles), and scale
-        Transform::addTransform(world, bunnyEntity, glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(0.0f), glm::vec3(5.0f));
+        Transform::addTransformComponents(world, bunnyEntity, glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(0.0f), glm::vec3(5.0f));
 
         Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
         if (bunnyMesh != nullptr) {
@@ -54,7 +54,7 @@ namespace Scene {
 
             bunnyMesh->material = bunnyMaterial;
             world.addComponent<Mesh>(bunnyEntity, bunnyMesh);
-            // ModelMatrix is already added by Transform::addTransform
+            // ModelMatrix is already added by Transform::addTransformComponents
 
             GameObject* bunnyObject = gameObjectManager.createGameObject(bunnyEntity);
             bunnyObject->addScript<MoveScript>();
@@ -63,7 +63,7 @@ namespace Scene {
         // --------------------- Cube as Child of Bunny ---------------------
         Entity cubeChildEntity = world.createEntity();
         // Initialize cube with position, rotation, and scale
-        Transform::addTransform(world, cubeChildEntity, glm::vec3(0.0f, 2.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.5f));
+        Transform::addTransformComponents(world, cubeChildEntity, glm::vec3(0.0f, 2.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.5f));
 
         Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
         if (cubeMesh != nullptr) {
@@ -73,7 +73,7 @@ namespace Scene {
 
             cubeMesh->material = cubeMaterial;
             world.addComponent<Mesh>(cubeChildEntity, cubeMesh);
-            // ModelMatrix is already added by Transform::addTransform
+            // ModelMatrix is already added by Transform::addTransformComponents
 
             GameObject* cubeObject = gameObjectManager.createGameObject(cubeChildEntity);
             // cubeObject->addScript<MoveScript>(); // If cube has movement scripts
@@ -85,7 +85,7 @@ namespace Scene {
         // --------------------- Diablo Model ---------------------
         Entity diabloEntity = world.createEntity();
         // Initialize diablo with position, rotation, and scale
-        Transform::addTransform(world, diabloEntity, glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(0.0f), glm::vec3(2.0f));
+        Transform::addTransformComponents(world, diabloEntity, glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(0.0f), glm::vec3(2.0f));
 
         Mesh* diabloModel = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
         if (diabloModel != nullptr) {
@@ -101,7 +101,7 @@ namespace Scene {
 
             diabloModel->material = diabloMaterial;
             world.addComponent<Mesh>(diabloEntity, diabloModel);
-            // ModelMatrix is already added by Transform::addTransform
+            // ModelMatrix is already added by Transform::addTransformComponents
 
             GameObject* diabloObject = gameObjectManager.createGameObject(diabloEntity);
             diabloObject->addScript<MoveScript>();
