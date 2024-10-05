@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include <iostream>
-#include <sstream> // For FPS display
+#include <sstream> 
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
@@ -110,7 +110,7 @@ int main() {
 
         // Deferred passes
         renderer.geometryPass(world, renderQuery, view);
-        renderer.lightPass(world, lightSystem);
+        // renderer.lightPass(world, lightSystem);
 
         // Debug rendering
         if (DEBUG_view_framebuffers >= 0) {
