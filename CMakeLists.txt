@@ -6,7 +6,7 @@ project(FactoryGame)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-if(MSVC)
+if(WIN32 AND MSVC)
     set(CMAKE_C_RUNTIME_LIBRARY "MultiThreaded")
     set(CMAKE_CXX_RUNTIME_LIBRARY "MultiThreaded")
 endif()
@@ -24,15 +24,21 @@ include_directories(${CMAKE_SOURCE_DIR}/assets/scripts)
 find_package(OpenGL REQUIRED)
 message(STATUS "OpenGL found.")
 
-# Set up GLFW and its libraries for Windows only
-if(WIN32)
-  set(GLFW_ROOT "${CMAKE_SOURCE_DIR}/external/glfw-3.4")
-  set(GLFW_LIB_DIR "${GLFW_ROOT}/lib-vc2022")
-
-  # Add include directory for GLFW headers
-  include_directories("${GLFW_ROOT}/include")
-  link_directories("${GLFW_LIB_DIR}")
+# Set OpenGL preference for Apple
+if(APPLE)
+    set(OpenGL_GL_PREFERENCE LEGACY)
 endif()
+
+# Set up GLFW and its libraries
+set(GLFW_ROOT "${CMAKE_SOURCE_DIR}/external/glfw-3.4")
+include_directories("${GLFW_ROOT}/include")
+
+if(WIN32)
+    set(GLFW_LIB_DIR "${GLFW_ROOT}/lib-vc2022")
+elseif(APPLE)
+    set(GLFW_LIB_DIR "${GLFW_ROOT}/lib-arm64")
+endif()
+link_directories("${GLFW_LIB_DIR}")
 
 # Find all .cpp files in src/ and its subdirectories
 file(GLOB_RECURSE SOURCES "${CMAKE_SOURCE_DIR}/src/*.cpp")
@@ -54,8 +60,13 @@ add_library(glad STATIC ${CMAKE_SOURCE_DIR}/external/glad/src/glad.c)
 # Add executable
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-# Link against glad, glfw3_mt (static version), and OpenGL
-target_link_libraries(${PROJECT_NAME} glad "${GLFW_LIB_DIR}/glfw3_mt.lib" OpenGL::GL)
+# Link against glad, glfw3 (for macOS), and OpenGL
+target_link_libraries(${PROJECT_NAME} glad OpenGL::GL)
+if(WIN32 AND MSVC)
+    target_link_libraries(${PROJECT_NAME} "${GLFW_LIB_DIR}/glfw3_mt.lib")
+else()
+    target_link_libraries(${PROJECT_NAME} "${GLFW_LIB_DIR}/libglfw.3.dylib")
+endif()
 
 # Define ASSET_DIR macro globally for source files
 target_compile_definitions(${PROJECT_NAME} PRIVATE ASSET_DIR="${ASSET_DIR}")
