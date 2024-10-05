@@ -8,6 +8,11 @@
 #include "gtc/quaternion.hpp"
 #include <vector>
 
+// Forward declare non user functions
+inline void updateModelMatrices(ECSWorld& world, const std::vector<Entity>& entities);
+inline void markChildrenDirty(ECSWorld& world, const Entity& parent);
+
+#pragma region Transform Components
 struct ModelMatrix {
     // TODO: Potential performance gain in the future
     // make a new bitset component to hold state for things like this
@@ -42,82 +47,19 @@ struct Parent {
 struct Children {
     std::vector<Entity> children;
 };
-
-// Function to update the quaternion from Euler angles (whenever Euler angles are changed)
-inline void updateQuaternionFromEuler(ECSWorld& world, Entity entity) {
-    auto& eulerAngles = world.getComponent<EulerAngles>(entity).euler;
-    auto& rotation = world.getComponent<Rotation>(entity).quaternion;
-
-    // Update quaternion from Euler angles
-    rotation = glm::quat(glm::radians(eulerAngles));
-}
-
-// Mark the child entity as dirty if its parent is dirty
-inline void markDirtyIfParentDirty(ECSWorld& world, Entity entity) {
-    if (!world.hasComponent<Parent>(entity)) {
-        return;
-    }
-
-    const Entity& parent = world.getComponent<Parent>(entity).parent;
-    const auto& parentModelMatrix = world.getComponent<ModelMatrix>(parent);
-    if (parentModelMatrix.dirty) {
-        auto& modelMatrix = world.getComponent<ModelMatrix>(entity);
-        modelMatrix.dirty = true;
-    }
-}
-
-// Recursively mark all children as dirty if their parent is dirty
-inline void markChildrenDirty(ECSWorld& world, const Entity& parent) {
-    if (!world.hasComponent<Children>(parent)) {
-        return;
-    }
-
-    for (Entity child : world.getComponent<Children>(parent).children) {
-        auto& modelMatrix = world.getComponent<ModelMatrix>(child);
-        modelMatrix.dirty = true;
-        // Recursively mark all grand children
-        markChildrenDirty(world, child);
-    }
-}
-
-// System to update the ModelMatrix component if marked as dirty
-inline void updateModelMatrices(ECSWorld& world, const std::vector<Entity>& entities) {
-    for (Entity entity : entities) {
-        auto& modelMatrix = world.getComponent<ModelMatrix>(entity);
-
-        // Only update if the model matrix is dirty
-        if (!modelMatrix.dirty) {
-            continue;
-        }
-
-        // Get local transformations
-        auto& position = world.getComponent<Position>(entity).position;
-        auto& rotation = world.getComponent<Rotation>(entity).quaternion;
-        auto& scale = world.getComponent<Scale>(entity).scale;
-
-        // Apply local transformations to matrix
-        glm::mat4 localMatrix = glm::mat4(1.0f);
-        localMatrix = glm::translate(localMatrix, position);
-        localMatrix *= glm::mat4_cast(rotation);
-        localMatrix = glm::scale(localMatrix, scale);
-
-        // If the entity has a parent, combine with the parent's model matrix
-        if (world.hasComponent<Parent>(entity)) {
-            Entity parent = world.getComponent<Parent>(entity).parent;
-            const auto& parentModelMatrix = world.getComponent<ModelMatrix>(parent).matrix;
-            localMatrix = parentModelMatrix * localMatrix;
-        }
-
-        // Update the model matrix
-        modelMatrix.matrix = localMatrix;
-        modelMatrix.dirty = false;
-    }
-}
+#pragma endregion
 
 /*
 * Transform compoents utility
 */
 namespace Transform {
+    inline bool hasTransformComponents(ECSWorld& world, Entity entity) {
+        return world.hasComponent<ModelMatrix>(entity) &&
+            world.hasComponent<Position>(entity) &&
+            world.hasComponent<Rotation>(entity) &&
+            world.hasComponent<Scale>(entity);
+    }
+
     // Helper function to add transformation components to an entity
     inline void addTransformComponents(ECSWorld& world, Entity entity,
         const glm::vec3& position = glm::vec3(0.0f),
@@ -133,22 +75,9 @@ namespace Transform {
 
     // Function to set parent while preserving world transform
     inline void setParent(ECSWorld& world, Entity child, Entity newParent) {
-        // Ensure the child has transform components
-        if (!world.hasComponent<ModelMatrix>(child) ||
-            !world.hasComponent<Position>(child) ||
-            !world.hasComponent<Rotation>(child) ||
-            !world.hasComponent<Scale>(child)) {
+        // Ensure both entities have transform components
+        if (!hasTransformComponents(world, child) || !hasTransformComponents(world, newParent)) {
             return;
-        }
-
-        // If setting a new parent, ensure it has transform components
-        if (newParent.isValid()) {
-            if (!world.hasComponent<ModelMatrix>(newParent) ||
-                !world.hasComponent<Position>(newParent) ||
-                !world.hasComponent<Rotation>(newParent) ||
-                !world.hasComponent<Scale>(newParent)) {
-                return;
-            }
         }
 
         // Get child's current world transform components
@@ -184,6 +113,8 @@ namespace Transform {
         glm::vec3 euler = glm::degrees(glm::eulerAngles(glm::normalize(localRot)));
         world.getComponent<EulerAngles>(child).euler = euler;
 
+        // Set parent/child relations
+
         // Set the new parent
         world.addComponent(child, Parent{newParent});
 
@@ -199,9 +130,15 @@ namespace Transform {
 
     // System to mark children as dirty and update model matrices
     inline void updateTransformsSystem(ECSWorld& world) {
+        // Mark dirty if parent is dirty
         auto parentEntities = world.batchedQuery<Parent>();
         for (Entity entity : parentEntities) {
-            markDirtyIfParentDirty(world, entity);
+            const Entity& parent = world.getComponent<Parent>(entity).parent;
+            const auto& parentModelMatrix = world.getComponent<ModelMatrix>(parent);
+            if (parentModelMatrix.dirty) {
+                auto& modelMatrix = world.getComponent<ModelMatrix>(entity);
+                modelMatrix.dirty = true;
+            }
         }
 
         // Update all dirty model matrices
@@ -277,5 +214,55 @@ namespace Transform {
         return rotation * glm::vec3(1, 0, 0);
     }
 }
+
+#pragma region Misc Functions
+// System to update the ModelMatrix component if marked as dirty
+inline void updateModelMatrices(ECSWorld& world, const std::vector<Entity>& entities) {
+    for (Entity entity : entities) {
+        auto& modelMatrix = world.getComponent<ModelMatrix>(entity);
+
+        // Only update if the model matrix is dirty
+        if (!modelMatrix.dirty) {
+            continue;
+        }
+
+        // Get local transformations
+        auto& position = world.getComponent<Position>(entity).position;
+        auto& rotation = world.getComponent<Rotation>(entity).quaternion;
+        auto& scale = world.getComponent<Scale>(entity).scale;
+
+        // Apply local transformations to matrix
+        glm::mat4 localMatrix = glm::mat4(1.0f);
+        localMatrix = glm::translate(localMatrix, position);
+        localMatrix *= glm::mat4_cast(rotation);
+        localMatrix = glm::scale(localMatrix, scale);
+
+        // If the entity has a parent, combine with the parent's model matrix
+        if (world.hasComponent<Parent>(entity)) {
+            Entity parent = world.getComponent<Parent>(entity).parent;
+            const auto& parentModelMatrix = world.getComponent<ModelMatrix>(parent).matrix;
+            localMatrix = parentModelMatrix * localMatrix;
+        }
+
+        // Update the model matrix
+        modelMatrix.matrix = localMatrix;
+        modelMatrix.dirty = false;
+    }
+}
+
+// Recursively mark all children as dirty if their parent is dirty
+inline void markChildrenDirty(ECSWorld& world, const Entity& parent) {
+    if (!world.hasComponent<Children>(parent)) {
+        return;
+    }
+
+    for (Entity child : world.getComponent<Children>(parent).children) {
+        auto& modelMatrix = world.getComponent<ModelMatrix>(child);
+        modelMatrix.dirty = true;
+        // Recursively mark all grand children
+        markChildrenDirty(world, child);
+    }
+}
+#pragma endregion
 
 #endif // TRANSFORM_H
