@@ -9,7 +9,7 @@
 #include <vector>
 
 // Forward declare non user functions
-inline void updateModelMatrices(ECSWorld& world, const std::vector<Entity>& entities);
+inline void updateDirtyMatrices(ECSWorld& world);
 inline void markChildrenDirty(ECSWorld& world, const Entity& parent);
 
 #pragma region Transform Components
@@ -128,7 +128,7 @@ namespace Transform {
         markChildrenDirty(world, child);
     }
 
-    // System to mark children as dirty and update model matrices
+    // System to mark children as dirty and update dirty model matrices
     inline void updateTransformsSystem(ECSWorld& world) {
         // Mark dirty if parent is dirty
         auto parentEntities = world.batchedQuery<Parent>();
@@ -141,9 +141,8 @@ namespace Transform {
             }
         }
 
-        // Update all dirty model matrices
-        auto dirtyEntities = world.batchedQuery<ModelMatrix>();
-        updateModelMatrices(world, dirtyEntities);
+        // Update model matrices
+        updateDirtyMatrices(world);
     }
 }
 
@@ -217,7 +216,8 @@ namespace Transform {
 
 #pragma region Misc Functions
 // System to update the ModelMatrix component if marked as dirty
-inline void updateModelMatrices(ECSWorld& world, const std::vector<Entity>& entities) {
+inline void updateDirtyMatrices(ECSWorld& world) {
+    auto entities = world.batchedQuery<ModelMatrix>();
     for (Entity entity : entities) {
         auto& modelMatrix = world.getComponent<ModelMatrix>(entity);
 
