@@ -110,7 +110,7 @@ int main() {
 
         // Deferred passes
         renderer.geometryPass(world, renderQuery, view);
-        // renderer.lightPass(world, lightSystem);
+        renderer.lightPass(world, lightSystem);
 
         // Debug rendering
         if (DEBUG_view_framebuffers >= 0) {

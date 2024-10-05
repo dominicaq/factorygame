@@ -6,11 +6,6 @@
 #include "system/input_manager.h"
 #include "globals.h"
 
-// Renderer
-#include "renderer/shader.h"
-#include "renderer/renderer.h"
-#include "renderer/texture.h"
-
 // ECS Components
 #include "components/ecs/ecs.h"
 #include "components/camera.h"
@@ -26,5 +21,10 @@
 // Resources
 #include "resources/meshgen.h"
 #include "resources/resource_loader.h"
+
+// Renderer
+#include "renderer/shader.h"
+#include "renderer/texture.h"
+#include "renderer/renderer.h"
 
 #endif // ENGINE_H
