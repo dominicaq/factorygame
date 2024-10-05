@@ -13,27 +13,48 @@
 InputManager inputManager;
 int DEBUG_view_framebuffers = -1;
 
+// ------------------------ FPS Counter Setup ------------------------
+void fpsCounter(Window& window, float deltaTime) {
+    // FPS calculation
+    static float fpsTimer = 0.0f;
+    static int frames = 0;
+
+    frames++;
+    fpsTimer += deltaTime;
+    if (fpsTimer >= 1.0f) {
+        float fps = frames / fpsTimer;
+        std::string title = "Factory Game - FPS: " + std::to_string(fps);
+        // Update window title with FPS
+        window.setTitle(title);
+        frames = 0;
+        fpsTimer = 0.0f;
+    }
+}
+
 int main() {
     // Initialize window
     Window window("Factory Game", SCREEN_WIDTH, SCREEN_HEIGHT);
     if (!window.init()) {
         return -1;
     }
-
-    // Scene data
-    ECSWorld world;
-    LightSystem lightSystem;
     inputManager.init(window.getGLFWwindow());
 
-    // Initialize GameObjectManager
+    // ------------------------ Scene Setup --------------------------
+    ECSWorld world;
+    // TODO: thinking about turning gameobject into a component, not sure
     GameObjectManager gameObjectManager(world);
+
+    // TODO: deprecate lightsystem
+    LightSystem lightSystem;
 
     // Load the scene data
     Scene::loadScene(world, lightSystem, gameObjectManager);
 
-    // Batched queries from scene
+     // ------------------------ Systems Setup --------------------------
+    TransformSystem transformSystem(world);
+
+     // ------------------------ Renderer Setup --------------------------
     std::vector<Entity> renderQuery = world.batchedQuery<Mesh, ModelMatrix>();
-    std::vector<Entity> modelQuery = world.batchedQuery<ModelMatrix>();
 
     // Create renderer and send mesh data to GPU
     Renderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT, &world.getResource<Camera>());
@@ -55,15 +76,10 @@ int main() {
     debugShader.setFloat("u_Far",  world.getResource<Camera>().getFarPlane());
     // ---------------------------------------------------------------
 
-    float deltaTime = 0.0f;
-    float lastFrame = 0.0f;
-
     gameObjectManager.startAll();
 
-    // ------------------------ FPS Counter Setup ------------------------
-    int frames = 0;
-    float fpsTimer = 0.0f;
-    float fps = 0.0f;
+    float deltaTime = 0.0f;
+    float lastFrame = 0.0f;
 
     // Game loop
     while (!window.shouldClose()) {
@@ -71,20 +87,9 @@ int main() {
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
 
-        // FPS calculation
-        frames++;
-        fpsTimer += deltaTime;
-        if (fpsTimer >= 1.0f) {
-            fps = frames / fpsTimer; // FPS = frames per second
-            std::stringstream ss;
-            ss << "Factory Game - FPS: " << fps;
-            window.setTitle(ss.str());  // Update window title with FPS
-            frames = 0;
-            fpsTimer = 0.0f;
-        }
+        fpsCounter(window, deltaTime);
 
         // -------------- Temporary Logic (Camera & Input) --------------
-
         inputManager.update();
 
         // TEMPORARY: Exit on ESC key
@@ -104,11 +109,10 @@ int main() {
 
         // ------------------------ Rendering ------------------------
 
-        // Get view matrix from the camera
-        glm::mat4 view = world.getResource<Camera>().getViewMatrix();
-        Transform::updateTransformsSystem(world);
+        transformSystem.updateTransformComponents();
 
         // Deferred passes
+        glm::mat4 view = world.getResource<Camera>().getViewMatrix();
         renderer.geometryPass(world, renderQuery, view);
         renderer.lightPass(world, lightSystem);
 

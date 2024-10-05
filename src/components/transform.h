@@ -8,10 +8,6 @@
 #include "gtc/quaternion.hpp"
 #include <vector>
 
-// Forward declare non user functions
-inline void updateDirtyMatrices(ECSWorld& world);
-inline void markChildrenDirty(ECSWorld& world, const Entity& parent);
-
 #pragma region Transform Components
 struct ModelMatrix {
     // TODO: Potential performance gain in the future
@@ -47,104 +43,8 @@ struct Parent {
 struct Children {
     std::vector<Entity> children;
 };
+
 #pragma endregion
-
-/*
-* Transform compoents utility
-*/
-namespace Transform {
-    inline bool hasTransformComponents(ECSWorld& world, Entity entity) {
-        return world.hasComponent<ModelMatrix>(entity) &&
-            world.hasComponent<Position>(entity) &&
-            world.hasComponent<Rotation>(entity) &&
-            world.hasComponent<Scale>(entity);
-    }
-
-    // Helper function to add transformation components to an entity
-    inline void addTransformComponents(ECSWorld& world, Entity entity,
-        const glm::vec3& position = glm::vec3(0.0f),
-        const glm::vec3& rotationEuler = glm::vec3(0.0f),
-        const glm::vec3& scale = glm::vec3(1.0f))
-    {
-        world.addComponent(entity, Position{position});
-        world.addComponent(entity, EulerAngles{rotationEuler});
-        world.addComponent(entity, Rotation{glm::quat(glm::radians(rotationEuler))});
-        world.addComponent(entity, Scale{scale});
-        world.addComponent(entity, ModelMatrix{});  // Ensure ModelMatrix is added
-    }
-
-    // Function to set parent while preserving world transform
-    inline void setParent(ECSWorld& world, Entity child, Entity newParent) {
-        // Ensure both entities have transform components
-        if (!hasTransformComponents(world, child) || !hasTransformComponents(world, newParent)) {
-            return;
-        }
-
-        // Get child's current world transform components
-        glm::vec3 childWorldPos = world.getComponent<Position>(child).position;
-        glm::quat childWorldRot = world.getComponent<Rotation>(child).quaternion;
-        glm::vec3 childWorldScale = world.getComponent<Scale>(child).scale;
-
-        glm::vec3 parentWorldPos = glm::vec3(0.0f);
-        glm::quat parentWorldRot = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-        glm::vec3 parentWorldScale = glm::vec3(1.0f);
-
-        parentWorldPos = world.getComponent<Position>(newParent).position;
-        parentWorldRot = world.getComponent<Rotation>(newParent).quaternion;
-        parentWorldScale = world.getComponent<Scale>(newParent).scale;
-
-        // Compute inverse of parent's rotation and scale
-        glm::quat parentWorldRotInv = glm::inverse(parentWorldRot);
-        glm::vec3 invParentScale = glm::vec3(1.0f / parentWorldScale.x,
-                                            1.0f / parentWorldScale.y,
-                                            1.0f / parentWorldScale.z);
-
-        // Calculate local transform
-        glm::vec3 localPos = parentWorldRotInv * ((childWorldPos - parentWorldPos) * invParentScale);
-        glm::quat localRot = parentWorldRotInv * childWorldRot;
-        glm::vec3 localScale = childWorldScale / parentWorldScale;
-
-        // Update child's local transformation components
-        world.getComponent<Position>(child).position = localPos;
-        world.getComponent<Rotation>(child).quaternion = glm::normalize(localRot);
-        world.getComponent<Scale>(child).scale = localScale;
-
-        // Update EulerAngles based on the new local rotation
-        glm::vec3 euler = glm::degrees(glm::eulerAngles(glm::normalize(localRot)));
-        world.getComponent<EulerAngles>(child).euler = euler;
-
-        // Set parent/child relations
-
-        // Set the new parent
-        world.addComponent(child, Parent{newParent});
-
-        // Add child to parent's hildren component
-        if (!world.hasComponent<Children>(newParent)) {
-            world.addComponent(newParent, Children{});
-        }
-        world.getComponent<Children>(newParent).children.push_back(child);
-
-        // Mark the child and its descendants as dirty
-        markChildrenDirty(world, child);
-    }
-
-    // System to mark children as dirty and update dirty model matrices
-    inline void updateTransformsSystem(ECSWorld& world) {
-        // Mark dirty if parent is dirty
-        auto parentEntities = world.batchedQuery<Parent>();
-        for (Entity entity : parentEntities) {
-            const Entity& parent = world.getComponent<Parent>(entity).parent;
-            const auto& parentModelMatrix = world.getComponent<ModelMatrix>(parent);
-            if (parentModelMatrix.dirty) {
-                auto& modelMatrix = world.getComponent<ModelMatrix>(entity);
-                modelMatrix.dirty = true;
-            }
-        }
-
-        // Update model matrices
-        updateDirtyMatrices(world);
-    }
-}
 
 /*
 * Setter and getter data
@@ -214,44 +114,12 @@ namespace Transform {
     }
 }
 
-#pragma region Misc Functions
-// System to update the ModelMatrix component if marked as dirty
-inline void updateDirtyMatrices(ECSWorld& world) {
-    auto entities = world.batchedQuery<ModelMatrix>();
-    for (Entity entity : entities) {
-        auto& modelMatrix = world.getComponent<ModelMatrix>(entity);
+/*
+* Helper(s)
+*/
 
-        // Only update if the model matrix is dirty
-        if (!modelMatrix.dirty) {
-            continue;
-        }
-
-        // Get local transformations
-        auto& position = world.getComponent<Position>(entity).position;
-        auto& rotation = world.getComponent<Rotation>(entity).quaternion;
-        auto& scale = world.getComponent<Scale>(entity).scale;
-
-        // Apply local transformations to matrix
-        glm::mat4 localMatrix = glm::mat4(1.0f);
-        localMatrix = glm::translate(localMatrix, position);
-        localMatrix *= glm::mat4_cast(rotation);
-        localMatrix = glm::scale(localMatrix, scale);
-
-        // If the entity has a parent, combine with the parent's model matrix
-        if (world.hasComponent<Parent>(entity)) {
-            Entity parent = world.getComponent<Parent>(entity).parent;
-            const auto& parentModelMatrix = world.getComponent<ModelMatrix>(parent).matrix;
-            localMatrix = parentModelMatrix * localMatrix;
-        }
-
-        // Update the model matrix
-        modelMatrix.matrix = localMatrix;
-        modelMatrix.dirty = false;
-    }
-}
-
-// Recursively mark all children as dirty if their parent is dirty
-inline void markChildrenDirty(ECSWorld& world, const Entity& parent) {
+// Recursively mark all children dirty
+inline void markChildrenDirty(ECSWorld& world, Entity& parent) {
     if (!world.hasComponent<Children>(parent)) {
         return;
     }
@@ -263,6 +131,177 @@ inline void markChildrenDirty(ECSWorld& world, const Entity& parent) {
         markChildrenDirty(world, child);
     }
 }
-#pragma endregion
+
+/*
+* Transform compoents utility
+*/
+namespace Transform {
+    inline bool hasTransformComponents(ECSWorld& world, Entity entity) {
+        return world.hasComponent<ModelMatrix>(entity) &&
+            world.hasComponent<Position>(entity) &&
+            world.hasComponent<Rotation>(entity) &&
+            world.hasComponent<Scale>(entity);
+    }
+
+    // Helper function to add transformation components to an entity
+    inline void addTransformComponents(ECSWorld& world, Entity entity,
+        const glm::vec3& position = glm::vec3(0.0f),
+        const glm::vec3& rotationEuler = glm::vec3(0.0f),
+        const glm::vec3& scale = glm::vec3(1.0f))
+    {
+        world.addComponent(entity, Position{position});
+        world.addComponent(entity, EulerAngles{rotationEuler});
+        world.addComponent(entity, Rotation{glm::quat(glm::radians(rotationEuler))});
+        world.addComponent(entity, Scale{scale});
+        world.addComponent(entity, ModelMatrix{});
+    }
+
+    // Function to set parent while preserving world transform
+    inline void setParent(ECSWorld& world, Entity child, Entity newParent) {
+        // Ensure both entities have transform components
+        if (!hasTransformComponents(world, child) || !hasTransformComponents(world, newParent)) {
+            return;
+        }
+
+        // Get child's current world transform components
+        glm::vec3 childWorldPos = world.getComponent<Position>(child).position;
+        glm::quat childWorldRot = world.getComponent<Rotation>(child).quaternion;
+        glm::vec3 childWorldScale = world.getComponent<Scale>(child).scale;
+
+        glm::vec3 parentWorldPos = glm::vec3(0.0f);
+        glm::quat parentWorldRot = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+        glm::vec3 parentWorldScale = glm::vec3(1.0f);
+
+        parentWorldPos = world.getComponent<Position>(newParent).position;
+        parentWorldRot = world.getComponent<Rotation>(newParent).quaternion;
+        parentWorldScale = world.getComponent<Scale>(newParent).scale;
+
+        // Compute inverse of parent's rotation and scale
+        glm::quat parentWorldRotInv = glm::inverse(parentWorldRot);
+        glm::vec3 invParentScale = glm::vec3(1.0f / parentWorldScale.x,
+                                            1.0f / parentWorldScale.y,
+                                            1.0f / parentWorldScale.z);
+
+        // Calculate local transform
+        glm::vec3 localPos = parentWorldRotInv * ((childWorldPos - parentWorldPos) * invParentScale);
+        glm::quat localRot = parentWorldRotInv * childWorldRot;
+        glm::vec3 localScale = childWorldScale / parentWorldScale;
+
+        // Update child's local transformation components
+        world.getComponent<Position>(child).position = localPos;
+        world.getComponent<Rotation>(child).quaternion = glm::normalize(localRot);
+        world.getComponent<Scale>(child).scale = localScale;
+
+        // Update EulerAngles based on the new local rotation
+        glm::vec3 euler = glm::degrees(glm::eulerAngles(glm::normalize(localRot)));
+        world.getComponent<EulerAngles>(child).euler = euler;
+
+        // Set parent/child relations
+
+        // Set the new parent
+        world.addComponent(child, Parent{newParent});
+
+        // Add child to parent's hildren component
+        if (!world.hasComponent<Children>(newParent)) {
+            world.addComponent(newParent, Children{});
+        }
+        world.getComponent<Children>(newParent).children.push_back(child);
+
+        // Mark the child and its descendants as dirty
+        markChildrenDirty(world, child);
+    }
+}
+
+/*
+* System Class
+*/
+class TransformSystem {
+public:
+    TransformSystem(ECSWorld& world) : m_world(world) {}
+    ~TransformSystem() = default;
+
+    // TODO: TEMPORARY (if I decide to keep this, make single var m_cacheUpdate)
+    // IDEA: Manage the caches in create/destroy gameobject functions
+    inline void forceCacheUpdate() {
+        m_dirtyModelCache = true;
+        m_dirtyParentCache = true;
+    }
+
+    inline void updateTransformComponents() {
+        // Mark entites dirty if their parents are dirty
+        checkDirtyParents();
+        // Update dirty model matrices
+        updateDirtyMatrices();
+    }
+
+private:
+    /*
+    * Cached Systems
+    */
+
+    // System to update the ModelMatrix component if marked as dirty
+    inline void updateDirtyMatrices() {
+        if (m_dirtyModelCache) {
+            m_modelEntityCache = m_world.batchedQuery<ModelMatrix>();
+            m_dirtyModelCache = false;
+        }
+
+        for (Entity entity : m_modelEntityCache) {
+            auto& modelMatrix = m_world.getComponent<ModelMatrix>(entity);
+
+            // Only update if the model matrix is dirty
+            if (!modelMatrix.dirty) {
+                continue;
+            }
+
+            // Get local transformations
+            auto& position = m_world.getComponent<Position>(entity).position;
+            auto& rotation = m_world.getComponent<Rotation>(entity).quaternion;
+            auto& scale = m_world.getComponent<Scale>(entity).scale;
+
+            // Apply local transformations to matrix
+            glm::mat4 localMatrix = glm::mat4(1.0f);
+            localMatrix = glm::translate(localMatrix, position);
+            localMatrix *= glm::mat4_cast(rotation);
+            localMatrix = glm::scale(localMatrix, scale);
+
+            // If the entity has a parent, combine with the parent's model matrix
+            if (m_world.hasComponent<Parent>(entity)) {
+                Entity parent = m_world.getComponent<Parent>(entity).parent;
+                const auto& parentModelMatrix = m_world.getComponent<ModelMatrix>(parent).matrix;
+                localMatrix = parentModelMatrix * localMatrix;
+            }
+
+            // Update the model matrix
+            modelMatrix.matrix = localMatrix;
+            modelMatrix.dirty = false;
+        }
+    }
+
+    // System to mark entity dirty if parent is dirty
+    inline void checkDirtyParents() {
+        if (m_dirtyParentCache) {
+            m_parentEntityCache = m_world.batchedQuery<Parent>();
+            m_dirtyParentCache = false;
+        }
+
+        for (Entity entity : m_parentEntityCache) {
+            const Entity& parent = m_world.getComponent<Parent>(entity).parent;
+            const auto& parentModelMatrix = m_world.getComponent<ModelMatrix>(parent);
+
+            if (parentModelMatrix.dirty) {
+                auto& modelMatrix = m_world.getComponent<ModelMatrix>(entity);
+                modelMatrix.dirty = true;
+            }
+        }
+    }
+
+    // Entity caching
+    ECSWorld& m_world;
+    std::vector<Entity> m_parentEntityCache;
+    std::vector<Entity> m_modelEntityCache;
+    bool m_dirtyParentCache = true;
+    bool m_dirtyModelCache = true;
+};
 
 #endif // TRANSFORM_H
