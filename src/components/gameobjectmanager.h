@@ -1,26 +1,24 @@
-
 #ifndef GAMEOBJECTMANAGER_H
 #define GAMEOBJECTMANAGER_H
 
 #include "gameobject.h"
-#include "ecs/entity.h"
-#include <vector>
+#include <entt/entt.hpp>
+#include <unordered_map>
 #include <memory>
-#include <stack>
 #include <mutex>
 
 class GameObjectManager {
 public:
     // Constructor
-    GameObjectManager(ECSWorld& world);
+    GameObjectManager(entt::registry& registry);
 
     // Destructor
     ~GameObjectManager();
 
-    // Gameobject management
-    GameObject* createGameObject(const Entity& entity, bool runScripts = false);
-    GameObject* getGameObject(const Entity& entity) const;
-    void removeGameObject(const Entity& entity);
+    // GameObject management
+    GameObject* createGameObject(entt::entity entity, bool runScripts = false);
+    GameObject* getGameObject(entt::entity entity) const;
+    void removeGameObject(entt::entity entity);
 
     // Start() and Update() calls
     void startAll();
@@ -31,8 +29,8 @@ public:
     size_t getTotalGameObjects() const;
 
 private:
-    ECSWorld& m_world;
-    std::vector<std::unique_ptr<GameObject>> m_gameObjects;
+    entt::registry& m_registry;
+    std::unordered_map<entt::entity, std::unique_ptr<GameObject>> m_gameObjects;
     mutable std::mutex m_mutex;
 };
 

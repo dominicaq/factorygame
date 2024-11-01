@@ -40,43 +40,39 @@ int main() {
     inputManager.init(window.getGLFWwindow());
 
     // ------------------------ Scene Setup --------------------------
-    ECSWorld world;
-    // TODO: thinking about turning gameobject into a component, not sure
-    GameObjectManager gameObjectManager(world);
+    Scene scene;
+    entt::registry registry;
 
     // TODO: deprecate lightsystem
     LightSystem lightSystem;
-
-    // Load the scene data
-    Scene::loadScene(world, lightSystem, gameObjectManager);
-
-     // ------------------------ Systems Setup --------------------------
-    TransformSystem transformSystem(world);
+    GameObjectManager gameObjectManager(registry);
+    loadScene(scene, registry, lightSystem, gameObjectManager);
+    TransformSystem transformSystem(registry);
 
      // ------------------------ Renderer Setup --------------------------
-    std::vector<Entity> renderQuery = world.batchedQuery<Mesh, ModelMatrix>();
 
     // Create renderer and send mesh data to GPU
-    Renderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT, &world.getResource<Camera>());
+    Camera camera = getPrimaryCamera(scene, registry);
+    Renderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT, &camera);
     window.setRenderer(&renderer);
-    for (Entity entity : renderQuery) {
-        Mesh* mesh = world.getComponent<Mesh>(entity);
-        if (mesh) {
-            renderer.initMeshBuffers(mesh);
-        }
-    }
+
+    // Init all meshses
+    auto renderQuery = registry.view<Mesh*, ModelMatrix>();
+    renderQuery.each([&](auto entity, Mesh* mesh, ModelMatrix&) {
+        renderer.initMeshBuffers(mesh);
+    });
 
     // ------------------------ Debug Setup --------------------------
-    // Debug Pass Shader (for visualizing G-buffer)
     std::string debugVertexPath = SHADER_DIR + "deferred/debug_gbuff.vs";
     std::string debugFragmentPath = SHADER_DIR + "deferred/debug_gbuff.fs";
     Shader debugShader(debugVertexPath, debugFragmentPath);
     debugShader.use();
-    debugShader.setFloat("u_Near", world.getResource<Camera>().getNearPlane());
-    debugShader.setFloat("u_Far",  world.getResource<Camera>().getFarPlane());
+    debugShader.setFloat("u_Near", camera.getNearPlane());
+    debugShader.setFloat("u_Far",  camera.getFarPlane());
     // ---------------------------------------------------------------
 
     gameObjectManager.startAll();
+    transformSystem.updateTransformComponents();
 
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
@@ -111,10 +107,9 @@ int main() {
 
         transformSystem.updateTransformComponents();
 
-        // Deferred passes
-        glm::mat4 view = world.getResource<Camera>().getViewMatrix();
-        renderer.geometryPass(world, renderQuery, view);
-        renderer.lightPass(world, lightSystem);
+        glm::mat4 view = camera.getViewMatrix();
+        renderer.geometryPass(registry, view);
+        renderer.lightPass(registry, lightSystem);
 
         // Debug rendering
         if (DEBUG_view_framebuffers >= 0) {
@@ -122,10 +117,10 @@ int main() {
         }
 
         // Render forward pass
-        renderer.forwardPass(world, renderQuery, view);
+        renderer.forwardPass(registry, view);
 
         // Forward pass skybox
-        renderer.skyboxPass(view, world.getResource<Camera>().getProjectionMatrix());
+        renderer.skyboxPass(view, camera.getProjectionMatrix());
 
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();

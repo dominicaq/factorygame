@@ -2,7 +2,7 @@
 #define OBJLOADER_H
 
 #include "../components/mesh.h"
-#include <glm.hpp>
+#include <glm/glm.hpp>
 
 #include <string>
 #include <vector>

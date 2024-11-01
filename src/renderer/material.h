@@ -4,10 +4,7 @@
 #include "shader.h"
 #include "texture.h"
 
-#include <glm.hpp>
-#include <memory>
-
-#include <glm.hpp>
+#include <glm/glm.hpp>
 #include <memory>
 
 struct Material {

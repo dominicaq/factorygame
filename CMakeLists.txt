@@ -13,8 +13,7 @@ endif()
 
 # Include external directories
 include_directories(${CMAKE_SOURCE_DIR}/external/glad/include)
-include_directories(${CMAKE_SOURCE_DIR}/external/glm)
-include_directories(${CMAKE_SOURCE_DIR}/external/stb)
+include_directories(${CMAKE_SOURCE_DIR}/external/)
 
 # Include src directory and assets/scripts directory recursively
 include_directories(${CMAKE_SOURCE_DIR}/src)
@@ -67,6 +66,9 @@ if(WIN32 AND MSVC)
 else()
     target_link_libraries(${PROJECT_NAME} "${GLFW_LIB_DIR}/libglfw.3.dylib")
 endif()
+
+# Silence deprecated warnings from entt
+target_compile_options(FactoryGame PRIVATE -Wno-deprecated-declarations)
 
 # Define ASSET_DIR macro globally for source files
 target_compile_definitions(${PROJECT_NAME} PRIVATE ASSET_DIR="${ASSET_DIR}")
