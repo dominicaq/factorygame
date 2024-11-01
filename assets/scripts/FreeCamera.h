@@ -20,7 +20,7 @@ public:
     void update(float deltaTime) override {
         // Get the camera's position and Euler angles from the GameObject
         glm::vec3 position = gameObject->getPosition();
-        glm::vec3 eulerAngles = gameObject->getEuler();  // Use Euler angles instead of quaternions
+        glm::vec3 eulerAngles = gameObject->getEuler();
 
         // Calculate camera front vector based on Euler angles
         glm::vec3 front;

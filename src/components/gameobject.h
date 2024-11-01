@@ -19,25 +19,11 @@ private:
     entt::registry& m_registry;
     std::vector<std::unique_ptr<Script>> m_scripts;
 
-public:
-    GameObject(entt::entity entity, entt::registry& registry)
-        : m_entity(entity), m_registry(registry) {
-        // Automatically add transform components if not already present
-        if (!m_registry.all_of<Position>(m_entity)) {
-            m_registry.emplace<Position>(m_entity);
-        }
-        if (!m_registry.all_of<EulerAngles>(m_entity)) {
-            m_registry.emplace<EulerAngles>(m_entity);
-        }
-        if (!m_registry.all_of<Rotation>(m_entity)) {
-            m_registry.emplace<Rotation>(m_entity);
-        }
-        if (!m_registry.all_of<Scale>(m_entity)) {
-            m_registry.emplace<Scale>(m_entity);
-        }
-    }
+    void markChildrenDirty(entt::entity parent);
 
-    ~GameObject() {}
+public:
+    GameObject(entt::entity entity, entt::registry& registry);
+    ~GameObject();
 
     /*
     * Script management
@@ -61,75 +47,35 @@ public:
         return nullptr;
     }
 
-    void updateScripts(float deltaTime) {
-        for (const auto& script : m_scripts) {
-            if (script->isActive) {
-                script->update(deltaTime);
-            }
-        }
-    }
-
-    void startScripts() {
-        for (const auto& script : m_scripts) {
-            if (script->isActive) {
-                script->start();
-            }
-        }
-    }
+    void startScripts();
+    void updateScripts(float deltaTime);
 
     /*
     * Transform
     */
     entt::entity getEntity() const { return m_entity; }
 
-    glm::vec3& getPosition() {
-        return Transform::getPosition(m_registry, m_entity);
-    }
+    void setParent(entt::entity newParent);
 
-    void setPosition(const glm::vec3& pos) {
-        Transform::setPosition(m_registry, m_entity, pos);
-    }
+    glm::vec3& getPosition();
+    void setPosition(const glm::vec3& pos);
 
-    glm::vec3& getEuler() {
-        return Transform::getEuler(m_registry, m_entity);
-    }
+    glm::vec3& getEuler();
+    void setEuler(const glm::vec3& euler);
 
-    void setEuler(const glm::vec3& euler) {
-        Transform::setEuler(m_registry, m_entity, euler);
-    }
+    glm::quat& getRotation();
+    void setRotation(const glm::quat& rotation);
 
-    glm::quat& getRotation() {
-        return Transform::getRotation(m_registry, m_entity);
-    }
+    glm::vec3& getScale();
+    void setScale(const glm::vec3& scale);
 
-    void setRotation(const glm::quat& rotation) {
-        Transform::setRotation(m_registry, m_entity, rotation);
-    }
-
-    glm::vec3& getScale() {
-        return Transform::getScale(m_registry, m_entity);
-    }
-
-    void setScale(const glm::vec3& scale) {
-        Transform::setScale(m_registry, m_entity, scale);
-    }
-
-    glm::vec3 getForward() {
-        return Transform::getForward(m_registry, m_entity);
-    }
-
-    glm::vec3 getUp() {
-        return Transform::getUp(m_registry, m_entity);
-    }
-
-    glm::vec3 getRight() {
-        return Transform::getRight(m_registry, m_entity);
-    }
+    glm::vec3 getForward();
+    glm::vec3 getUp();
+    glm::vec3 getRight();
 
     /*
     * ECS Accessors
     */
-    // Get ECS component from this GameObject by type
     template<typename ComponentType>
     ComponentType& getComponent() {
         return m_registry.get<ComponentType>(m_entity);

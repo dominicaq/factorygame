@@ -66,7 +66,7 @@ void loadScene(Scene& scene, entt::registry& registry, LightSystem& lightSystem,
         // cubeObject->addScript<MoveScript>(); // If cube has movement scripts
 
         // Attach cube as a child of the bunny using Transform::setParent
-        Transform::setParent(registry, cubeEntity, bunnyEntity);
+        cubeObject->setParent(bunnyEntity);
     }
 
     // --------------------- Diablo Model ---------------------

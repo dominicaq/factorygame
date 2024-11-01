@@ -42,7 +42,6 @@ void TransformSystem::updateDirtyMatrices() {
 
 void TransformSystem::checkDirtyParents() {
     auto parentEntityCache = m_registry.view<Parent>();
-
     parentEntityCache.each([&](auto entity, Parent& parent) {
         const auto& parentModelMatrix = m_registry.get<ModelMatrix>(parent.parent);
 
