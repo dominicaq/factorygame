@@ -17,11 +17,6 @@ GameObject::GameObject(entt::entity entity, entt::registry& registry)
     }
 }
 
-GameObject::~GameObject() {
-    m_scripts.clear();
-    m_registry.destroy(m_entity);
-}
-
 /*
 * Script Management
 */
@@ -39,6 +34,13 @@ void GameObject::updateScripts(float deltaTime) {
             script->update(deltaTime);
         }
     }
+}
+
+void GameObject::destroyScripts() {
+    for (auto& script : m_scripts) {
+        script->onDestroy();
+    }
+    m_scripts.clear();
 }
 
 /*

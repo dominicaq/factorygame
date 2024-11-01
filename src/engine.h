@@ -10,13 +10,12 @@
 #include "entt/entt.hpp"
 #include "components/camera.h"
 #include "components/mesh.h"
-#include "components/transform.h"
 #include "components/light.h"
 #include "components/gameobject.h"
-#include "components/gameobjectmanager.h"
 
 #include "components/script.h"
 
+#include "components/systems/gameobject_system.h"
 #include "components/systems/transform_system.h"
 
 // Resources

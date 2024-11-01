@@ -18,6 +18,7 @@ public:
     // Virtual functions with default implementations
     virtual void start() {}
     virtual void update(float deltaTime) {}
+    virtual void onDestroy() {}
 
     // Protected constructor to prevent direct instantiation
     Script() = default;

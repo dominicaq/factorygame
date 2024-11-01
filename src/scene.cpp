@@ -6,17 +6,17 @@
 #include "ViewFramebuffers.h"
 #include "FreeCamera.h"
 
-void loadScene(Scene& scene, entt::registry& registry, LightSystem& lightSystem, GameObjectManager& gameObjectManager) {
+void loadScene(Scene& scene, entt::registry& registry, LightSystem& lightSystem) {
     // ------------------------ Setup Camera ------------------------
     entt::entity cameraEntity = registry.create();
-    Transform::addTransformComponents(registry, cameraEntity,
+    addTransformComponents(registry, cameraEntity,
                                       glm::vec3(4.0f, 0.21f, 4.04f),
                                       glm::vec3(-2.38f, 239.0f, 0.0f));
 
     Camera cameraComponent(cameraEntity, registry);
     registry.emplace<Camera>(cameraEntity, std::move(cameraComponent));
 
-    GameObject* cameraObject = gameObjectManager.createGameObject(cameraEntity);
+    GameObject* cameraObject = addGameObjectComponent(registry, cameraEntity);
     cameraObject->addScript<FreeCamera>();
 
     // Track the camera entity and set it as primary
@@ -30,8 +30,10 @@ void loadScene(Scene& scene, entt::registry& registry, LightSystem& lightSystem,
 
     // --------------------- Stanford Bunny Model ---------------------
     entt::entity bunnyEntity = registry.create();
-    Transform::addTransformComponents(registry, bunnyEntity,
-                                      glm::vec3(0.0f, -0.5f, 0.0f), glm::vec3(0.0f), glm::vec3(5.0f));
+    addTransformComponents(registry, bunnyEntity,
+                                      glm::vec3(0.0f, -0.5f, 0.0f),
+                                      glm::vec3(0.0f),
+                                      glm::vec3(5.0f));
 
     Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
     if (bunnyMesh != nullptr) {
@@ -45,14 +47,16 @@ void loadScene(Scene& scene, entt::registry& registry, LightSystem& lightSystem,
         bunnyMesh->material = bunnyMaterial;
         registry.emplace<Mesh*>(bunnyEntity, bunnyMesh);
 
-        GameObject* bunnyObject = gameObjectManager.createGameObject(bunnyEntity);
+        GameObject* bunnyObject = addGameObjectComponent(registry, bunnyEntity);
         bunnyObject->addScript<MoveScript>();
     }
 
     // --------------------- Cube as Child of Bunny ---------------------
     entt::entity cubeEntity = registry.create();
-    Transform::addTransformComponents(registry, cubeEntity,
-                                      glm::vec3(0.0f, 2.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.5f));
+    addTransformComponents(registry, cubeEntity,
+                                      glm::vec3(0.0f, 2.0f, 0.0f),
+                                      glm::vec3(0.0f),
+                                      glm::vec3(0.5f));
 
     Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
     if (cubeMesh != nullptr) {
@@ -62,17 +66,16 @@ void loadScene(Scene& scene, entt::registry& registry, LightSystem& lightSystem,
         cubeMesh->material = cubeMaterial;
         registry.emplace<Mesh*>(cubeEntity, cubeMesh);
 
-        GameObject* cubeObject = gameObjectManager.createGameObject(cubeEntity);
-        // cubeObject->addScript<MoveScript>(); // If cube has movement scripts
-
-        // Attach cube as a child of the bunny using Transform::setParent
+        GameObject* cubeObject = addGameObjectComponent(registry, cubeEntity);
         cubeObject->setParent(bunnyEntity);
     }
 
     // --------------------- Diablo Model ---------------------
     entt::entity diabloEntity = registry.create();
-    Transform::addTransformComponents(registry, diabloEntity,
-                                      glm::vec3(2.0f, 0.0f, -1.0f), glm::vec3(0.0f), glm::vec3(2.0f));
+    addTransformComponents(registry, diabloEntity,
+                                      glm::vec3(2.0f, 0.0f, -1.0f),
+                                      glm::vec3(0.0f),
+                                      glm::vec3(2.0f));
 
     Mesh* diabloMesh = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
     if (diabloMesh != nullptr) {
@@ -89,13 +92,13 @@ void loadScene(Scene& scene, entt::registry& registry, LightSystem& lightSystem,
         diabloMesh->material = diabloMaterial;
         registry.emplace<Mesh*>(diabloEntity, diabloMesh);
 
-        GameObject* diabloObject = gameObjectManager.createGameObject(diabloEntity);
+        GameObject* diabloObject = addGameObjectComponent(registry, diabloEntity);
         diabloObject->addScript<MoveScript>();
     }
 
     // --------------------- Dummy Entity (global scripts) ------------------
     entt::entity dummyEntity = registry.create();
-    GameObject* dummyObject = gameObjectManager.createGameObject(dummyEntity);
+    GameObject* dummyObject = addGameObjectComponent(registry, dummyEntity);
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light System ---------------------
@@ -122,4 +125,31 @@ void loadScene(Scene& scene, entt::registry& registry, LightSystem& lightSystem,
 
 Camera& getPrimaryCamera(const Scene& scene, entt::registry& registry) {
     return registry.get<Camera>(scene.primaryCameraEntity);
+}
+
+/*
+* Component Helpers
+*/
+bool hasTransformComponents(entt::registry& registry, entt::entity entity) {
+    return registry.all_of<ModelMatrix, Position, Rotation, Scale>(entity);
+}
+
+void addTransformComponents(entt::registry& registry, entt::entity entity,
+    const glm::vec3& position,
+    const glm::vec3& rotationEuler,
+    const glm::vec3& scale)
+{
+    registry.emplace<Position>(entity, position);
+    registry.emplace<EulerAngles>(entity, rotationEuler);
+    registry.emplace<Rotation>(entity, glm::quat(glm::radians(rotationEuler)));
+    registry.emplace<Scale>(entity, scale);
+    registry.emplace<ModelMatrix>(entity);
+}
+
+GameObject* addGameObjectComponent(entt::registry& registry, entt::entity entity) {
+    if (!registry.valid(entity)) {
+        return nullptr;
+    }
+
+    return &registry.emplace<GameObject>(entity, entity, registry);
 }

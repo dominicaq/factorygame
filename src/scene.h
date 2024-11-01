@@ -20,8 +20,16 @@ struct Scene {
 };
 
 // Functions for Scene Management
-void loadScene(Scene& scene, entt::registry& registry, LightSystem& lightSystem, GameObjectManager& gameObjectManager);
+void loadScene(Scene& scene, entt::registry& registry, LightSystem& lightSystem);
 void setPrimaryCamera(Scene& scene, entt::entity cameraEntity);
 Camera& getPrimaryCamera(const Scene& scene, entt::registry& registry);
+
+// Component Helpers
+bool hasTransformComponents(entt::registry& registry, entt::entity entity);
+void addTransformComponents(entt::registry& registry, entt::entity entity,
+    const glm::vec3& position = glm::vec3(0.0f),
+    const glm::vec3& rotationEuler = glm::vec3(0.0f),
+    const glm::vec3& scale = glm::vec3(1.0f));
+GameObject* addGameObjectComponent(entt::registry& registry, entt::entity entity);
 
 #endif // SCENE_H

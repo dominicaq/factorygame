@@ -45,9 +45,7 @@ int main() {
 
     // TODO: deprecate lightsystem
     LightSystem lightSystem;
-    GameObjectManager gameObjectManager(registry);
-    loadScene(scene, registry, lightSystem, gameObjectManager);
-    TransformSystem transformSystem(registry);
+    loadScene(scene, registry, lightSystem);
 
      // ------------------------ Renderer Setup --------------------------
 
@@ -71,7 +69,10 @@ int main() {
     debugShader.setFloat("u_Far",  camera.getFarPlane());
     // ---------------------------------------------------------------
 
-    gameObjectManager.startAll();
+    GameObjectSystem gameObjectSystem(registry);
+    TransformSystem transformSystem(registry);
+
+    gameObjectSystem.startAll();
 
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
@@ -100,7 +101,7 @@ int main() {
 
         // ------------------------ Core Update Logic ------------------------
 
-        gameObjectManager.updateAll(deltaTime);
+        gameObjectSystem.updateAll(deltaTime);
 
         // ------------------------ Rendering ------------------------
 

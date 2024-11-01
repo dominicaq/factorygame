@@ -1,7 +1,6 @@
 #ifndef TRANSFORM_SYSTEM_H
 #define TRANSFORM_SYSTEM_H
 
-#include "../transform.h"
 #include "../transform_components.h"
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>

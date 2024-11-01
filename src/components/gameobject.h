@@ -3,7 +3,6 @@
 
 #include "script.h"
 #include "transform_components.h"
-#include "transform.h"
 
 #include <vector>
 #include <memory>
@@ -17,13 +16,13 @@ public:
 private:
     entt::entity m_entity;
     entt::registry& m_registry;
-    std::vector<std::unique_ptr<Script>> m_scripts;
+    std::vector<std::shared_ptr<Script>> m_scripts;
 
     void markChildrenDirty(entt::entity parent);
 
 public:
     GameObject(entt::entity entity, entt::registry& registry);
-    ~GameObject();
+    ~GameObject() = default;
 
     /*
     * Script management
@@ -49,6 +48,7 @@ public:
 
     void startScripts();
     void updateScripts(float deltaTime);
+    void destroyScripts();
 
     /*
     * Transform
