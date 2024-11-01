@@ -48,13 +48,11 @@ public:
     /*
      * Render Passes
      */
-    void geometryPass(ECSWorld& world,
-        const std::vector<Entity>& entities,
-        const glm::mat4& view);
+    void geometryPass(entt::registry& registry, const glm::mat4& view);
 
-    void lightPass(ECSWorld& world, const LightSystem& lightSystem);
+    void lightPass(entt::registry& registry, const LightSystem& lightSystem);
 
-    void forwardPass(ECSWorld& world, const std::vector<Entity>& entities, const glm::mat4& view) ;
+    void forwardPass(entt::registry& registry, const glm::mat4& view);
 
     /*
      * Skybox

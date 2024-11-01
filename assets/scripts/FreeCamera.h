@@ -2,8 +2,10 @@
 #define FREE_CAMERA_H
 
 #include "engine.h"
-#include "glm.hpp"
-#include "gtc/matrix_transform.hpp"
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include <iostream>
 
 class FreeCamera : public Script {
@@ -18,7 +20,7 @@ public:
     void update(float deltaTime) override {
         // Get the camera's position and Euler angles from the GameObject
         glm::vec3 position = gameObject->getPosition();
-        glm::vec3 eulerAngles = gameObject->getEuler();  // Use Euler angles instead of quaternions
+        glm::vec3 eulerAngles = gameObject->getEuler();
 
         // Calculate camera front vector based on Euler angles
         glm::vec3 front;

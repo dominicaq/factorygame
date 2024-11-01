@@ -1,16 +1,13 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
-#include "glm.hpp"
-#include "gtc/matrix_transform.hpp"
-#include "ecs/ecs.h"
-#include "transform.h"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <entt/entt.hpp>
+#include "transform_components.h"
 
 class Camera {
 private:
-    Entity m_cameraEntity;  // The ECS entity for the camera
-    ECSWorld* m_world;      // Reference to the ECS world
-
     float m_nearPlane = 0.1f;
     float m_farPlane = 100.0f;
     float m_fov = 45.0f;
@@ -19,19 +16,23 @@ private:
     mutable glm::mat4 m_projection;
     mutable bool m_dirtyProjection = true;
 
+    // EnTT components
+    entt::entity m_cameraEntity;
+    entt::registry& m_registry;
+
 public:
     // Constructor
-    Camera(Entity cameraEntity, ECSWorld* world)
-        : m_cameraEntity(cameraEntity), m_world(world) {}
+    Camera(entt::entity cameraEntity, entt::registry& registry)
+        : m_cameraEntity(cameraEntity), m_registry(registry) {}
 
     // Setters that mark projection as dirty
-    void setNearPlane(float near) {
-        m_nearPlane = near;
+    void setNearPlane(float nearPlane) {
+        m_nearPlane = nearPlane;
         m_dirtyProjection = true;
     }
 
-    void setFarPlane(float far) {
-        m_farPlane = far;
+    void setFarPlane(float farPlane) {
+        m_farPlane = farPlane;
         m_dirtyProjection = true;
     }
 
@@ -52,13 +53,13 @@ public:
     float getAspectRatio() const { return m_aspectRatio; }
 
     glm::vec3 getPosition() const {
-        const auto& positionComponent = m_world->getComponent<Position>(m_cameraEntity);
+        const auto& positionComponent = m_registry.get<Position>(m_cameraEntity);
         return positionComponent.position;
     }
 
     glm::mat4 getViewMatrix() const {
-        glm::vec3 eulerAngles = m_world->getComponent<EulerAngles>(m_cameraEntity).euler;
-        glm::vec3 position = m_world->getComponent<Position>(m_cameraEntity).position;
+        const auto& eulerAngles = m_registry.get<EulerAngles>(m_cameraEntity).euler;
+        const auto& position = m_registry.get<Position>(m_cameraEntity).position;
 
         glm::vec3 front;
         front.x = cos(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));

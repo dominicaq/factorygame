@@ -2,41 +2,27 @@
 #define GAMEOBJECT_H
 
 #include "script.h"
-#include "ecs/ecs.h"
-#include "transform.h"
+#include "transform_components.h"
 
 #include <vector>
 #include <memory>
 #include <iostream>
+#include <entt/entt.hpp>
 
 class GameObject {
 public:
     bool isActive = true;
 
 private:
-    Entity m_entity;
-    ECSWorld* m_world;
-    std::vector<std::unique_ptr<Script>> m_scripts;
+    entt::entity m_entity;
+    entt::registry& m_registry;
+    std::vector<std::shared_ptr<Script>> m_scripts;
+
+    void markChildrenDirty(entt::entity parent);
 
 public:
-    GameObject(Entity entity, ECSWorld* world)
-        : m_entity(entity), m_world(world) {
-        // Automatically add transform components if not already present
-        if (!m_world->hasComponent<Position>(m_entity)) {
-            m_world->addComponent<Position>(m_entity);
-        }
-        if (!m_world->hasComponent<EulerAngles>(m_entity)) {
-            m_world->addComponent<EulerAngles>(m_entity);
-        }
-        if (!m_world->hasComponent<Rotation>(m_entity)) {
-            m_world->addComponent<Rotation>(m_entity);
-        }
-        if (!m_world->hasComponent<Scale>(m_entity)) {
-            m_world->addComponent<Scale>(m_entity);
-        }
-    }
-
-    ~GameObject() {}
+    GameObject(entt::entity entity, entt::registry& registry);
+    ~GameObject() = default;
 
     /*
     * Script management
@@ -60,87 +46,59 @@ public:
         return nullptr;
     }
 
-    void updateScripts(float deltaTime) {
-        for (const auto& script : m_scripts) {
-            if (script->isActive) {
-                script->update(deltaTime);
-            }
-        }
-    }
-
-    void startScripts() {
-        for (const auto& script : m_scripts) {
-            if (script->isActive) {
-                script->start();
-            }
-        }
-    }
+    void startScripts();
+    void updateScripts(float deltaTime);
+    void destroyScripts();
 
     /*
     * Transform
     */
-    Entity getEntity() const { return m_entity; }
+    entt::entity getEntity() const { return m_entity; }
 
-    glm::vec3& getPosition() {
-        return Transform::getPosition(m_world, m_entity);
-    }
+    void setParent(entt::entity newParent);
 
-    void setPosition(const glm::vec3& pos) {
-        Transform::setPosition(m_world, m_entity, pos);
-    }
+    glm::vec3& getPosition();
+    void setPosition(const glm::vec3& pos);
 
-    glm::vec3& getEuler() {
-        return Transform::getEuler(m_world, m_entity);
-    }
+    glm::vec3& getEuler();
+    void setEuler(const glm::vec3& euler);
 
-    void setEuler(const glm::vec3& euler) {
-        Transform::setEuler(m_world, m_entity, euler);
-    }
+    glm::quat& getRotation();
+    void setRotation(const glm::quat& rotation);
 
-    glm::quat& getRotation() {
-        return Transform::getRotation(m_world, m_entity);
-    }
+    glm::vec3& getScale();
+    void setScale(const glm::vec3& scale);
 
-    void setRotation(const glm::quat& rotation) {
-        Transform::setRotation(m_world, m_entity, rotation);
-    }
-
-    glm::vec3& getScale() {
-        return Transform::getScale(m_world, m_entity);
-    }
-
-    void setScale(const glm::vec3& scale) {
-        Transform::setScale(m_world, m_entity, scale);
-    }
-
-    glm::vec3 getForward() {
-        return Transform::getForward(m_world, m_entity);
-    }
-
-    glm::vec3 getUp() {
-        return Transform::getUp(m_world, m_entity);
-    }
-
-    glm::vec3 getRight() {
-        return Transform::getRight(m_world, m_entity);
-    }
+    glm::vec3 getForward();
+    glm::vec3 getUp();
+    glm::vec3 getRight();
 
     /*
     * ECS Accessors
     */
-    // Get ECS component from this GameObject by type
     template<typename ComponentType>
-    ComponentType* getComponent() {
-        if constexpr (ShouldStoreAsPointer<ComponentType>::value) {
-            return m_world->getComponent<ComponentType>(m_entity);
-        } else {
-            return &(m_world->getComponent<ComponentType>(m_entity));
-        }
+    ComponentType& getComponent() {
+        return m_registry.get<ComponentType>(m_entity);
+    }
+
+    template<typename ComponentType>
+    bool hasComponent() const {
+        return m_registry.all_of<ComponentType>(m_entity);
+    }
+
+    template<typename ComponentType, typename... Args>
+    ComponentType& addComponent(Args&&... args) {
+        return m_registry.emplace<ComponentType>(m_entity, std::forward<Args>(args)...);
     }
 
     template<typename ResourceType>
     ResourceType& getResource() {
-        return m_world->getResource<ResourceType>();
+        // Access the context and retrieve the resource
+        auto* resourcePtr = m_registry.ctx().find<ResourceType>();
+        if (!resourcePtr) {
+            throw std::runtime_error("Resource not found in registry context.");
+        }
+        return *resourcePtr;
     }
 };
 

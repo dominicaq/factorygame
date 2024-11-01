@@ -1,13 +1,66 @@
 #ifndef LIGHT_H
 #define LIGHT_H
 
-#include "glm.hpp"
-#include "gtc/matrix_transform.hpp"
+#include "engine.h"
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <vector>
 #include <limits>
 
-// Max number of lights based on 2-byte IDs (will prob change when I test it)
-#define MAX_LIGHTS (std::numeric_limits<unsigned short>::max())
+// enum class LightType {
+//     Point,
+//     Spotlight,
+//     Directional
+// };
+
+// struct Light {
+//     glm::vec3 color;
+//     float intensity;
+//     union {
+//         float range;
+//         struct {
+//             float spotAngle;
+//             float outerSpotAngle;
+//         };
+//     };
+//     float attenuation[3];
+//     bool castsShadows;
+//     bool isActive;
+//     LightType type;
+//     uint8_t padding[1];
+//     unsigned int shadowMapTexture;
+// };
+
+// struct LightSpaceMatrix {
+//     glm::mat4 matrix;
+//     bool dirty = false;
+// };
+
+// #define MAX_LIGHTS 100
+// static int NUM_LIGHTS = 0;
+
+// class LightSystems {
+// public:
+//     inline void updateLights(ECSWorld& world) {
+//         // Only query if it changed
+//         if (!m_validCache) {
+//             m_entityCache = world.batchedQuery<Light>();
+//             m_validCache = true;
+//         }
+
+//         for (Entity entity : m_entityCache) {
+
+//         }
+//     }
+
+// private:
+//     ECSWorld& m_world;
+//     std::vector<Entity> m_entityCache;
+//     bool m_validCache = false;
+// };
+
+#define MAX_LIGHTS 100
 
 struct LightSystem {
     // Matrices (64 bytes each)

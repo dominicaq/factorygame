@@ -1,6 +1,6 @@
 #include "meshgen.h"
 
-#include <glm.hpp>
+#include <glm/glm.hpp>
 
 Mesh* MeshGen::createCube() {
     Mesh* cubeMesh = new Mesh();

@@ -2,8 +2,10 @@
 #define MOVESCRIPT_H
 
 #include "engine.h"
-#include "glm.hpp"
-#include "gtc/matrix_transform.hpp"
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include <iostream>
 
 class MoveScript : public Script {
@@ -17,14 +19,14 @@ private:
 
 public:
     void start() override {
-        std::cout << "MoveScript started for entity: " << gameObject->getEntity().id << "\n";
+        std::cout << "MoveScript started for entity: " << "\n";
         // Initialize the rotation from the GameObject's current Euler angles
         eulerRotation = gameObject->getEuler();
     }
 
     void update(float deltaTime) override {
         if (!gameObject) {
-            std::cout << "MoveScript: No GameObject for entity: " << gameObject->getEntity().id << "\n";
+            std::cout << "MoveScript: No GameObject for entity: " << "\n";
             return;
         }
 

@@ -1,5 +1,5 @@
 #define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+#include <stb/stb_image.h>
 #include "resource_loader.h"
 
 // Loaders

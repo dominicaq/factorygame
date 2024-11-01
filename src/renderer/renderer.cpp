@@ -3,8 +3,6 @@
 #include <iostream>
 #include <memory>
 
-#include "../components/ecs/ecs.h"
-
 // Define the number of G-buffer attachments
 #define NUM_ATTACHMENTS 4
 
@@ -324,9 +322,7 @@ void Renderer::resizeGBuffer(int width, int height) {
 /*
  * Render Passes
  */
-void Renderer::geometryPass(ECSWorld& world,
-    const std::vector<Entity>& entities,
-    const glm::mat4& view) {
+void Renderer::geometryPass(entt::registry& registry, const glm::mat4& view) {
     // Bind G-buffer framebuffer
     m_gBuffer->bind();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -334,22 +330,22 @@ void Renderer::geometryPass(ECSWorld& world,
     // Use Geometry Pass Shader
     m_gBufferShader.use();
     m_gBufferShader.setMat4("u_View", view);
-    m_gBufferShader.setMat4("u_Projection", world.getResource<Camera>().getProjectionMatrix());
+    m_gBufferShader.setMat4("u_Projection", m_camera->getProjectionMatrix());
 
-    // Loop through both arrays (meshes and transforms) together
-    for (Entity entity : entities) {
-        // Retrieve Mesh and Transform components
-        Mesh* mesh = world.getComponent<Mesh>(entity);
-
+    // Loop through all entities with Mesh and ModelMatrix components
+    // This is bad, but for now query for meshes in the individual passes
+    auto viewMesh = registry.view<Mesh*, ModelMatrix>();
+    for (auto entity : viewMesh) {
+        const auto& mesh = registry.get<Mesh*>(entity);
         // Skip forward rendering materials
-        if (mesh->material->isDeferred == false) {
+        if (!mesh->material->isDeferred) {
             continue;
         }
 
-        ModelMatrix& modelMatrix = world.getComponent<ModelMatrix>(entity);
+        const auto& modelMatrix = registry.get<ModelMatrix>(entity);
         m_gBufferShader.setMat4("u_Model", modelMatrix.matrix);
-        mesh->material->bind(&m_gBufferShader);
 
+        mesh->material->bind(&m_gBufferShader);
         draw(mesh);
     }
 
@@ -362,12 +358,12 @@ void Renderer::geometryPass(ECSWorld& world,
     m_gBuffer->unbind();
 }
 
-void Renderer::lightPass(ECSWorld& world, const LightSystem& lightSystem) {
+void Renderer::lightPass(entt::registry& registry, const LightSystem& lightSystem) {
     // Bind default framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // Screen space light calculation, dont need depth
+    // Screen space light calculation, don't need depth
     glDisable(GL_DEPTH_TEST);
 
     // Enable additive blending for lighting accumulation
@@ -378,12 +374,8 @@ void Renderer::lightPass(ECSWorld& world, const LightSystem& lightSystem) {
     // Use Light Pass Shader
     m_lightPassShader.use();
 
-    // Get the camera entity from the Camera resource
-    Camera& camera = world.getResource<Camera>();
-
     // Set the camera position in the shader
-    m_lightPassShader.setVec3("u_CameraPosition", camera.getPosition());
-
+    m_lightPassShader.setVec3("u_CameraPosition", m_camera->getPosition());
 
     // Set the number of lights
     m_lightPassShader.setInt("numLights", lightSystem.size);
@@ -425,14 +417,15 @@ void Renderer::lightPass(ECSWorld& world, const LightSystem& lightSystem) {
     glEnable(GL_DEPTH_TEST);
 }
 
-void Renderer::forwardPass(ECSWorld& world, const std::vector<Entity>& entities, const glm::mat4& view) {
+void Renderer::forwardPass(entt::registry& registry, const glm::mat4& view) {
     // Enable depth testing for forward pass
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    for (Entity entity : entities) {
-        Mesh* mesh = world.getComponent<Mesh>(entity);
-        ModelMatrix& modelMatrix = world.getComponent<ModelMatrix>(entity);
+    auto viewMesh = registry.view<Mesh*, ModelMatrix>();
+    for (auto entity : viewMesh) {
+        const auto& mesh = registry.get<Mesh*>(entity);
+        const auto& modelMatrix = registry.get<ModelMatrix>(entity);
 
         // Skip deferred rendering materials
         if (mesh->material->isDeferred) {
@@ -444,12 +437,10 @@ void Renderer::forwardPass(ECSWorld& world, const std::vector<Entity>& entities,
 
         // Set transformation matrices
         shader->setMat4("u_View", view);
-        shader->setMat4("u_Projection", world.getResource<Camera>().getProjectionMatrix());
+        shader->setMat4("u_Projection", m_camera->getProjectionMatrix());
         shader->setMat4("u_Model", modelMatrix.matrix);
 
         mesh->material->bind();
-
-        // Draw the forward-rendered mesh
         draw(mesh);
     }
 }
