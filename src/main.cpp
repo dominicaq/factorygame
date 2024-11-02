@@ -42,10 +42,7 @@ int main() {
     // ------------------------ Scene Setup --------------------------
     Scene scene;
     entt::registry registry;
-
-    // TODO: deprecate lightsystem
-    LightSystem lightSystem;
-    loadScene(scene, registry, lightSystem);
+    loadScene(scene, registry);
 
      // ------------------------ Renderer Setup --------------------------
 
@@ -93,12 +90,6 @@ int main() {
             glfwSetWindowShouldClose(window.getGLFWwindow(), true);
         }
 
-        // Light movement (temporary, can move into another system later)
-        float radius = 5.0f;
-        float speed = 1.0f;
-        lightSystem.positions[0].x = cos(currentFrame * speed) * radius;
-        lightSystem.positions[0].z = sin(currentFrame * speed) * radius;
-
         // ------------------------ Core Update Logic ------------------------
 
         gameObjectSystem.updateAll(deltaTime);
@@ -109,7 +100,7 @@ int main() {
 
         glm::mat4 view = camera.getViewMatrix();
         renderer.geometryPass(registry, view);
-        renderer.lightPass(registry, lightSystem);
+        renderer.lightPass(registry);
 
         // Debug rendering
         if (DEBUG_view_framebuffers >= 0) {

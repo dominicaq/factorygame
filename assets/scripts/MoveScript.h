@@ -1,5 +1,4 @@
-#ifndef MOVESCRIPT_H
-#define MOVESCRIPT_H
+#pragma once
 
 #include "engine.h"
 
@@ -11,17 +10,16 @@
 class MoveScript : public Script {
 public:
     // Public Script Properties
-    glm::vec3 rotationAxis = glm::vec3(0.0f, 1.0f, 0.0f);  // Axis of rotation
-    float rotationSpeed = 50.0f;  // Rotation speed in degrees per second
+    glm::vec3 rotationAxis = glm::vec3(0.0f, 1.0f, 0.0f);
+    float rotationSpeed = 50.0f;
 
 private:
-    glm::vec3 eulerRotation;
+    glm::vec3 m_eulerRotation;
 
 public:
     void start() override {
         std::cout << "MoveScript started for entity: " << "\n";
-        // Initialize the rotation from the GameObject's current Euler angles
-        eulerRotation = gameObject->getEuler();
+        m_eulerRotation = gameObject->getEuler();
     }
 
     void update(float deltaTime) override {
@@ -34,11 +32,7 @@ public:
         float rotationAmount = rotationSpeed * deltaTime;
 
         // Update the object's Euler rotation around the specified axis
-        eulerRotation += rotationAxis * rotationAmount;  // Apply rotation in degrees
-
-        // Update the rotation using GameObject's setEuler method
-        gameObject->setEuler(eulerRotation);
+        m_eulerRotation += rotationAxis * rotationAmount;
+        gameObject->setEuler(m_eulerRotation);
     }
 };
-
-#endif // MOVESCRIPT_H

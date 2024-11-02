@@ -31,7 +31,7 @@ public:
     void addScript() {
         static_assert(std::is_base_of<Script, ScriptType>::value, "ScriptType must derive from Script");
 
-        auto script = std::make_unique<ScriptType>();
+        auto script = std::make_shared<ScriptType>();
         script->gameObject = this;
         m_scripts.push_back(std::move(script));
     }

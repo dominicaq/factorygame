@@ -1,6 +1,6 @@
 # OpenGL Deferred Renderer (WIP)
 
-This project is an OpenGL deferred renderer with plans to become a game engine, currently in development. It features a simple entity-component system (ECS) that is also a work in progress.
+This project is an OpenGL deferred renderer with plans to become a game engine, currently in development.
 
 <div style="text-align: center;">
     <img src="./resources/demo.gif" alt="Demo" style="display: block; margin: 0 auto; border: none;">
@@ -9,9 +9,9 @@ This project is an OpenGL deferred renderer with plans to become a game engine, 
 
 ## Features
 
-- **Deferred Rendering**: 
+- **Deferred Rendering**:
     - G-buffers: Position, Normal, and Color.
-- **Skybox**: 
+- **Skybox**:
     - Rendering of environment skybox.
 - **Entity-Component System (WIP)**:
     - Custom ECS for managing scene entities.

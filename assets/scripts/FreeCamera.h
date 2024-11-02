@@ -1,5 +1,4 @@
-#ifndef FREE_CAMERA_H
-#define FREE_CAMERA_H
+#pragma once
 
 #include "engine.h"
 
@@ -73,5 +72,3 @@ public:
         }
     }
 };
-
-#endif // FREE_CAMERA_H

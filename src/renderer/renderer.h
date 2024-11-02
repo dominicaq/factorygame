@@ -50,7 +50,7 @@ public:
      */
     void geometryPass(entt::registry& registry, const glm::mat4& view);
 
-    void lightPass(entt::registry& registry, const LightSystem& lightSystem);
+    void lightPass(entt::registry& registry);
 
     void forwardPass(entt::registry& registry, const glm::mat4& view);
 

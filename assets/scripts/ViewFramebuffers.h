@@ -1,5 +1,4 @@
-#ifndef VIEW_FRAME_BUFFERS_H
-#define VIEW_FRAME_BUFFERS_H
+#pragma once
 
 #include "engine.h"
 
@@ -32,5 +31,3 @@ public:
         cycleModes();
     }
 };
-
-#endif // VIEW_FRAME_BUFFERS_H

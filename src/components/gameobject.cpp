@@ -2,7 +2,6 @@
 
 GameObject::GameObject(entt::entity entity, entt::registry& registry)
     : m_entity(entity), m_registry(registry) {
-    // Automatically add transform components if not already present
     if (!m_registry.all_of<Position>(m_entity)) {
         m_registry.emplace<Position>(m_entity);
     }
@@ -121,7 +120,7 @@ void GameObject::setScale(const glm::vec3& scale) {
 
 glm::vec3 GameObject::getForward() {
     auto& rotation = m_registry.get<Rotation>(m_entity).quaternion;
-    return rotation * glm::vec3(0, 0, 1);
+    return rotation * glm::vec3(0, 0, -1);
 }
 
 glm::vec3 GameObject::getUp() {
@@ -131,7 +130,7 @@ glm::vec3 GameObject::getUp() {
 
 glm::vec3 GameObject::getRight() {
     auto& rotation = m_registry.get<Rotation>(m_entity).quaternion;
-    return rotation * glm::vec3(0, 0, 1);
+    return rotation * glm::vec3(1, 0, 0);
 }
 
 void GameObject::markChildrenDirty(entt::entity parent) {

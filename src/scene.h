@@ -5,9 +5,11 @@
 #include <entt/entt.hpp>
 #include "engine.h"
 
-// Paths and screen dimensions
+// Screen dimensions
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
+
+// File paths (assets dir is parent)
 static const std::string SHADER_DIR = ASSET_DIR "shaders/";
 static const std::string MODEL_DIR = ASSET_DIR "models/";
 static const std::string TEXTURE_DIR = ASSET_DIR "textures/";
@@ -19,17 +21,19 @@ struct Scene {
     std::vector<entt::entity> gameEntities;
 };
 
+// Meta data is the data saved to disk
+struct MetaData {
+    glm::vec3 position = glm::vec3(0.0f);
+    glm::vec3 scale = glm::vec3(1.0f);
+    glm::vec3 eulerAngles = glm::vec3(0.0f);
+};
+
 // Functions for Scene Management
-void loadScene(Scene& scene, entt::registry& registry, LightSystem& lightSystem);
+void loadScene(Scene& scene, entt::registry& registry);
 void setPrimaryCamera(Scene& scene, entt::entity cameraEntity);
 Camera& getPrimaryCamera(const Scene& scene, entt::registry& registry);
 
 // Component Helpers
-bool hasTransformComponents(entt::registry& registry, entt::entity entity);
-void addTransformComponents(entt::registry& registry, entt::entity entity,
-    const glm::vec3& position = glm::vec3(0.0f),
-    const glm::vec3& rotationEuler = glm::vec3(0.0f),
-    const glm::vec3& scale = glm::vec3(1.0f));
-GameObject* addGameObjectComponent(entt::registry& registry, entt::entity entity);
+GameObject* addGameObjectComponent(entt::registry& registry, entt::entity entity, const MetaData& data);
 
 #endif // SCENE_H

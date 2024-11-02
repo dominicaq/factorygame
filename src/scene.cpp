@@ -6,18 +6,17 @@
 #include "ViewFramebuffers.h"
 #include "FreeCamera.h"
 
-void loadScene(Scene& scene, entt::registry& registry, LightSystem& lightSystem) {
+void loadScene(Scene& scene, entt::registry& registry) {
     // ------------------------ Setup Camera ------------------------
     entt::entity cameraEntity = registry.create();
-    addTransformComponents(registry, cameraEntity,
-                                      glm::vec3(4.0f, 0.21f, 4.04f),
-                                      glm::vec3(-2.38f, 239.0f, 0.0f));
+    MetaData meta_cameraData;
+    meta_cameraData.position = glm::vec3(4.0f, 0.21f, 4.04f);
+    meta_cameraData.eulerAngles = glm::vec3(-2.38f, 239.0f, 0.0f);
+    GameObject* cameraObject = addGameObjectComponent(registry, cameraEntity, meta_cameraData);
+    cameraObject->addScript<FreeCamera>();
 
     Camera cameraComponent(cameraEntity, registry);
     registry.emplace<Camera>(cameraEntity, std::move(cameraComponent));
-
-    GameObject* cameraObject = addGameObjectComponent(registry, cameraEntity);
-    cameraObject->addScript<FreeCamera>();
 
     // Track the camera entity and set it as primary
     scene.cameraEntities.push_back(cameraEntity);
@@ -30,10 +29,11 @@ void loadScene(Scene& scene, entt::registry& registry, LightSystem& lightSystem)
 
     // --------------------- Stanford Bunny Model ---------------------
     entt::entity bunnyEntity = registry.create();
-    addTransformComponents(registry, bunnyEntity,
-                                      glm::vec3(0.0f, -0.5f, 0.0f),
-                                      glm::vec3(0.0f),
-                                      glm::vec3(5.0f));
+    MetaData meta_bunnyData;
+    meta_bunnyData.position = glm::vec3(0.0f, -0.5f, 0.0f);
+    meta_bunnyData.scale = glm::vec3(5.0f);
+    GameObject* bunnyObject = addGameObjectComponent(registry, bunnyEntity, meta_bunnyData);
+    bunnyObject->addScript<MoveScript>();
 
     Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
     if (bunnyMesh != nullptr) {
@@ -46,17 +46,15 @@ void loadScene(Scene& scene, entt::registry& registry, LightSystem& lightSystem)
 
         bunnyMesh->material = bunnyMaterial;
         registry.emplace<Mesh*>(bunnyEntity, bunnyMesh);
-
-        GameObject* bunnyObject = addGameObjectComponent(registry, bunnyEntity);
-        bunnyObject->addScript<MoveScript>();
     }
 
     // --------------------- Cube as Child of Bunny ---------------------
     entt::entity cubeEntity = registry.create();
-    addTransformComponents(registry, cubeEntity,
-                                      glm::vec3(0.0f, 2.0f, 0.0f),
-                                      glm::vec3(0.0f),
-                                      glm::vec3(0.5f));
+    MetaData meta_cubeData;
+    meta_cubeData.position = glm::vec3(0.0f, 2.0f, 0.0f);
+    meta_cubeData.scale = glm::vec3(0.5f);
+    GameObject* cubeObject = addGameObjectComponent(registry, cubeEntity, meta_cubeData);
+    cubeObject->setParent(bunnyEntity);
 
     Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
     if (cubeMesh != nullptr) {
@@ -65,17 +63,15 @@ void loadScene(Scene& scene, entt::registry& registry, LightSystem& lightSystem)
         cubeMaterial->isDeferred = false;
         cubeMesh->material = cubeMaterial;
         registry.emplace<Mesh*>(cubeEntity, cubeMesh);
-
-        GameObject* cubeObject = addGameObjectComponent(registry, cubeEntity);
-        cubeObject->setParent(bunnyEntity);
     }
 
     // --------------------- Diablo Model ---------------------
     entt::entity diabloEntity = registry.create();
-    addTransformComponents(registry, diabloEntity,
-                                      glm::vec3(2.0f, 0.0f, -1.0f),
-                                      glm::vec3(0.0f),
-                                      glm::vec3(2.0f));
+    MetaData meta_diabloData;
+    meta_diabloData.position = glm::vec3(2.0f, 0.0f, -1.0f);
+    meta_diabloData.scale = glm::vec3(2.0f);
+    GameObject* diabloObject = addGameObjectComponent(registry, diabloEntity, meta_diabloData);
+    diabloObject->addScript<MoveScript>();
 
     Mesh* diabloMesh = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
     if (diabloMesh != nullptr) {
@@ -91,65 +87,60 @@ void loadScene(Scene& scene, entt::registry& registry, LightSystem& lightSystem)
 
         diabloMesh->material = diabloMaterial;
         registry.emplace<Mesh*>(diabloEntity, diabloMesh);
-
-        GameObject* diabloObject = addGameObjectComponent(registry, diabloEntity);
-        diabloObject->addScript<MoveScript>();
     }
 
     // --------------------- Dummy Entity (global scripts) ------------------
     entt::entity dummyEntity = registry.create();
-    GameObject* dummyObject = addGameObjectComponent(registry, dummyEntity);
+    MetaData meta_dummyData;
+    GameObject* dummyObject = addGameObjectComponent(registry, dummyEntity, meta_dummyData);
     dummyObject->addScript<ViewFrameBuffers>();
 
-    // --------------------- Light System ---------------------
-    entt::entity lightEntity = registry.create();
-    lightSystem.addLight(
-        glm::vec3(-20.0f, 0.0f, 0.0f),
-        glm::vec3(0.2f, 0.2f, 0.2f),
-        1.0f,
-        3.0f,
-        false,
-        false
-    );
+    // --------------------- Light Circle ---------------------
+    int n = 1;
+    float circleRadius = 10.0f;
+    float yPosition = 2.0f;
 
-    entt::entity lightEntity2 = registry.create();
-    lightSystem.addLight(
-        glm::vec3(-2.0f, 2.5f, 2.0f),
-        glm::vec3(0.0f, 0.0f, 0.5f),
-        10.0f,
-        1.0f,
-        false,
-        false
-    );
+    for (int i = 0; i < n; ++i) {
+        float angle = i * (360.0f / n);
+        float radians = glm::radians(angle);
+        float x = circleRadius * std::cos(radians);
+        float z = circleRadius * std::sin(radians);
+
+        entt::entity lightEntity = registry.create();
+        MetaData meta_lightData;
+        meta_lightData.position = glm::vec3(x, yPosition, z);
+        GameObject* lightObject = addGameObjectComponent(registry, lightEntity, meta_lightData);
+
+        Light lightData;
+        lightData.color = glm::vec3(1.0f);
+        lightData.intensity = 1.0f;
+        lightData.radius = 1.0f;
+        lightData.type = LightType::Point;
+        lightData.castsShadows = false;
+        lightData.isActive = true;
+        registry.emplace<Light>(lightEntity, lightData);
+    }
 }
 
 Camera& getPrimaryCamera(const Scene& scene, entt::registry& registry) {
     return registry.get<Camera>(scene.primaryCameraEntity);
 }
 
+void setPrimaryCamera(Scene& scene, entt::entity cameraEntity) {}
+
 /*
 * Component Helpers
 */
-bool hasTransformComponents(entt::registry& registry, entt::entity entity) {
-    return registry.all_of<ModelMatrix, Position, Rotation, Scale>(entity);
-}
-
-void addTransformComponents(entt::registry& registry, entt::entity entity,
-    const glm::vec3& position,
-    const glm::vec3& rotationEuler,
-    const glm::vec3& scale)
-{
-    registry.emplace<Position>(entity, position);
-    registry.emplace<EulerAngles>(entity, rotationEuler);
-    registry.emplace<Rotation>(entity, glm::quat(glm::radians(rotationEuler)));
-    registry.emplace<Scale>(entity, scale);
-    registry.emplace<ModelMatrix>(entity);
-}
-
-GameObject* addGameObjectComponent(entt::registry& registry, entt::entity entity) {
+GameObject* addGameObjectComponent(entt::registry& registry, entt::entity entity, const MetaData& data) {
     if (!registry.valid(entity)) {
         return nullptr;
     }
+
+    registry.emplace<Position>(entity, data.position);
+    registry.emplace<EulerAngles>(entity, data.eulerAngles);
+    registry.emplace<Rotation>(entity, glm::quat(glm::radians(data.eulerAngles)));
+    registry.emplace<Scale>(entity, data.scale);
+    registry.emplace<ModelMatrix>(entity);
 
     return &registry.emplace<GameObject>(entity, entity, registry);
 }

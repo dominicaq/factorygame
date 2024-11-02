@@ -358,7 +358,7 @@ void Renderer::geometryPass(entt::registry& registry, const glm::mat4& view) {
     m_gBuffer->unbind();
 }
 
-void Renderer::lightPass(entt::registry& registry, const LightSystem& lightSystem) {
+void Renderer::lightPass(entt::registry& registry) {
     // Bind default framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -378,20 +378,28 @@ void Renderer::lightPass(entt::registry& registry, const LightSystem& lightSyste
     m_lightPassShader.setVec3("u_CameraPosition", m_camera->getPosition());
 
     // Set the number of lights
-    m_lightPassShader.setInt("numLights", lightSystem.size);
+    auto lightView = registry.view<Light>();
+    size_t numLights = lightView.size();
+
+    m_lightPassShader.setInt("numLights", numLights);
 
     // Pass each light's data to the shader
-    for (int i = 0; i < lightSystem.size; ++i) {
+    size_t i = 0;
+    for (auto entity : lightView) {
         std::string indexStr = "[" + std::to_string(i) + "]";
 
-        m_lightPassShader.setVec3("lights" + indexStr + ".position", lightSystem.positions[i]);
-        m_lightPassShader.setVec3("lights" + indexStr + ".color", lightSystem.colors[i]);
-        m_lightPassShader.setFloat("lights" + indexStr + ".intensity", lightSystem.lightIntensities[i]);
-        m_lightPassShader.setBool("lights" + indexStr + ".isDirectional", lightSystem.directionalFlags[i]);
+        const auto& lightComponent = registry.get<Light>(entity);
+        const auto& positionComponent = registry.get<Position>(entity);
 
-        if (lightSystem.directionalFlags[i]) {
-            m_lightPassShader.setVec3("lights" + indexStr + ".direction", lightSystem.directions[i]);
-        }
+        m_lightPassShader.setVec3("lights" + indexStr + ".position", positionComponent.position);
+        m_lightPassShader.setVec3("lights" + indexStr + ".color", lightComponent.color);
+        m_lightPassShader.setFloat("lights" + indexStr + ".intensity", lightComponent.intensity);
+        // m_lightPassShader.setBool("lights" + indexStr + ".isDirectional", lightSystem.directionalFlags[i]);
+
+        // if (lightSystem.directionalFlags[i]) {
+            // m_lightPassShader.setVec3("lights" + indexStr + ".direction", lightSystem.directions[i]);
+        // }
+        ++i;
     }
 
     // Setup G-buffer textures for lighting
