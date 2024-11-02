@@ -41,18 +41,17 @@ int main() {
 
     // ------------------------ Scene Setup --------------------------
     Scene scene;
-    entt::registry registry;
-    loadScene(scene, registry);
+    scene.loadScene();
 
-     // ------------------------ Renderer Setup --------------------------
+    // ----------------------- Renderer Setup -----------------------
 
     // Create renderer and send mesh data to GPU
-    Camera camera = getPrimaryCamera(scene, registry);
+    Camera& camera = scene.getPrimaryCamera();
     Renderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT, &camera);
     window.setRenderer(&renderer);
 
     // Init all meshses
-    auto renderQuery = registry.view<Mesh*, ModelMatrix>();
+    auto renderQuery = scene.registry.view<Mesh*, ModelMatrix>();
     renderQuery.each([&](auto entity, Mesh* mesh, ModelMatrix&) {
         renderer.initMeshBuffers(mesh);
     });
@@ -66,8 +65,8 @@ int main() {
     debugShader.setFloat("u_Far",  camera.getFarPlane());
     // ---------------------------------------------------------------
 
-    GameObjectSystem gameObjectSystem(registry);
-    TransformSystem transformSystem(registry);
+    GameObjectSystem gameObjectSystem(scene.registry);
+    TransformSystem transformSystem(scene.registry);
 
     gameObjectSystem.startAll();
 
@@ -76,13 +75,11 @@ int main() {
 
     // Game loop
     while (!window.shouldClose()) {
-        // Calculate delta time
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
-
         fpsCounter(window, deltaTime);
 
-        // -------------- Temporary Logic (Camera & Input) --------------
+        // -------------- Input Management -----------
         inputManager.update();
 
         // TEMPORARY: Exit on ESC key
@@ -90,28 +87,22 @@ int main() {
             glfwSetWindowShouldClose(window.getGLFWwindow(), true);
         }
 
-        // ------------------------ Core Update Logic ------------------------
+        // -------------- System updates ------------
 
         gameObjectSystem.updateAll(deltaTime);
-
-        // ------------------------ Rendering ------------------------
-
         transformSystem.updateTransformComponents();
 
+        // ------------------------ Rendering ------------------------
         glm::mat4 view = camera.getViewMatrix();
-        renderer.geometryPass(registry, view);
-        renderer.lightPass(registry);
+        renderer.geometryPass(scene.registry, view);
+        renderer.lightPass(scene.registry);
+        renderer.forwardPass(scene.registry, view);
+        renderer.skyboxPass(view, camera.getProjectionMatrix());
 
-        // Debug rendering
+        // DEBUG MODE
         if (DEBUG_view_framebuffers >= 0) {
             renderer.debugGBufferPass(debugShader, DEBUG_view_framebuffers);
         }
-
-        // Render forward pass
-        renderer.forwardPass(registry, view);
-
-        // Forward pass skybox
-        renderer.skyboxPass(view, camera.getProjectionMatrix());
 
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();

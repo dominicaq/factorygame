@@ -2,11 +2,17 @@
 
 #include <stdexcept>
 
+#include "CircularRotation.h"
+#include "FreeCamera.h"
 #include "MoveScript.h"
 #include "ViewFramebuffers.h"
-#include "FreeCamera.h"
 
-void loadScene(Scene& scene, entt::registry& registry) {
+/*
+* Scene Management
+*/
+
+// TODO: In the future, this will be a virtual func for multiple user created scenes
+void Scene::loadScene() {
     // ------------------------ Setup Camera ------------------------
     entt::entity cameraEntity = registry.create();
     MetaData meta_cameraData;
@@ -17,10 +23,7 @@ void loadScene(Scene& scene, entt::registry& registry) {
 
     Camera cameraComponent(cameraEntity, registry);
     registry.emplace<Camera>(cameraEntity, std::move(cameraComponent));
-
-    // Track the camera entity and set it as primary
-    scene.cameraEntities.push_back(cameraEntity);
-    scene.primaryCameraEntity = cameraEntity;
+    setPrimaryCamera(cameraEntity);
 
     // ------------------------ Shader Setup ------------------------
     std::string vertexPath = SHADER_DIR + "default.vs";
@@ -96,8 +99,8 @@ void loadScene(Scene& scene, entt::registry& registry) {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 1;
-    float circleRadius = 10.0f;
+    int n = 3;
+    float circleRadius = 5.0f;
     float yPosition = 2.0f;
 
     for (int i = 0; i < n; ++i) {
@@ -108,30 +111,58 @@ void loadScene(Scene& scene, entt::registry& registry) {
 
         entt::entity lightEntity = registry.create();
         MetaData meta_lightData;
+        meta_lightData.scale = glm::vec3(0.1f);
         meta_lightData.position = glm::vec3(x, yPosition, z);
         GameObject* lightObject = addGameObjectComponent(registry, lightEntity, meta_lightData);
+        lightObject->addScript<CircularRotation>();
+        CircularRotation* rotationScript = lightObject->getScript<CircularRotation>();
+        if (rotationScript != nullptr) {
+            rotationScript->radius = circleRadius;
+            rotationScript->center = glm::vec3(0.0f, yPosition, 0.0f);
+            rotationScript->rotationSpeed = 1.5f;
+        }
 
         Light lightData;
-        lightData.color = glm::vec3(1.0f);
+        glm::vec3 color;
+        switch (i % n) {
+            case 0: color = glm::vec3(1.0f, 0.0f, 0.0f); break; // Red
+            case 1: color = glm::vec3(0.0f, 1.0f, 0.0f); break; // Green
+            case 2: color = glm::vec3(0.0f, 0.0f, 1.0f); break; // Blue
+            default: color = glm::vec3(1.0f); break;            // White
+        }
+        lightData.color = color;
         lightData.intensity = 1.0f;
         lightData.radius = 1.0f;
         lightData.type = LightType::Point;
         lightData.castsShadows = false;
         lightData.isActive = true;
         registry.emplace<Light>(lightEntity, lightData);
+
+        Mesh* lightCube = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
+        if (lightCube != nullptr) {
+            Material* cubeMaterial = new Material(basicShader);
+            cubeMaterial->albedoColor = color;
+            cubeMaterial->albedoMap = nullptr;
+            cubeMaterial->normalMap = nullptr;
+            cubeMaterial->isDeferred = false;
+            lightCube->material = cubeMaterial;
+            registry.emplace<Mesh*>(lightEntity, lightCube);
+        }
     }
 }
 
-Camera& getPrimaryCamera(const Scene& scene, entt::registry& registry) {
-    return registry.get<Camera>(scene.primaryCameraEntity);
+Camera& Scene::getPrimaryCamera() {
+    return registry.get<Camera>(m_primaryCameraEntity);
 }
 
-void setPrimaryCamera(Scene& scene, entt::entity cameraEntity) {}
+void Scene::setPrimaryCamera(entt::entity cameraEntity) {
+    m_primaryCameraEntity = cameraEntity;
+}
 
 /*
 * Component Helpers
 */
-GameObject* addGameObjectComponent(entt::registry& registry, entt::entity entity, const MetaData& data) {
+GameObject* Scene::addGameObjectComponent(entt::registry& registry, entt::entity entity, const MetaData& data) {
     if (!registry.valid(entity)) {
         return nullptr;
     }

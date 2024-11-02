@@ -14,13 +14,6 @@ static const std::string SHADER_DIR = ASSET_DIR "shaders/";
 static const std::string MODEL_DIR = ASSET_DIR "models/";
 static const std::string TEXTURE_DIR = ASSET_DIR "textures/";
 
-struct Scene {
-    entt::entity primaryCameraEntity = entt::null;
-    std::vector<entt::entity> cameraEntities;
-    std::vector<entt::entity> lightEntities;
-    std::vector<entt::entity> gameEntities;
-};
-
 // Meta data is the data saved to disk
 struct MetaData {
     glm::vec3 position = glm::vec3(0.0f);
@@ -28,12 +21,19 @@ struct MetaData {
     glm::vec3 eulerAngles = glm::vec3(0.0f);
 };
 
-// Functions for Scene Management
-void loadScene(Scene& scene, entt::registry& registry);
-void setPrimaryCamera(Scene& scene, entt::entity cameraEntity);
-Camera& getPrimaryCamera(const Scene& scene, entt::registry& registry);
+class Scene {
+public:
+    // Scene management
+    void loadScene();
+    Camera& getPrimaryCamera();
+    void setPrimaryCamera(entt::entity cameraEntity);
 
-// Component Helpers
-GameObject* addGameObjectComponent(entt::registry& registry, entt::entity entity, const MetaData& data);
+    // Component Helpers
+    GameObject* addGameObjectComponent(entt::registry& registry, entt::entity entity, const MetaData& data);
+
+    entt::registry registry;
+private:
+    entt::entity m_primaryCameraEntity = entt::null;
+};
 
 #endif // SCENE_H
