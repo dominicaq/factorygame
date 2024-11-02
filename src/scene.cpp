@@ -99,7 +99,7 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 3;
+    int n = 100;
     float circleRadius = 5.0f;
     float yPosition = 2.0f;
 
@@ -138,16 +138,16 @@ void Scene::loadScene() {
         lightData.isActive = true;
         registry.emplace<Light>(lightEntity, lightData);
 
-        Mesh* lightCube = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
-        if (lightCube != nullptr) {
-            Material* cubeMaterial = new Material(basicShader);
-            cubeMaterial->albedoColor = color;
-            cubeMaterial->albedoMap = nullptr;
-            cubeMaterial->normalMap = nullptr;
-            cubeMaterial->isDeferred = false;
-            lightCube->material = cubeMaterial;
-            registry.emplace<Mesh*>(lightEntity, lightCube);
-        }
+        // Mesh* lightCube = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
+        // if (lightCube != nullptr) {
+        //     Material* cubeMaterial = new Material(basicShader);
+        //     cubeMaterial->albedoColor = color;
+        //     cubeMaterial->albedoMap = nullptr;
+        //     cubeMaterial->normalMap = nullptr;
+        //     cubeMaterial->isDeferred = false;
+        //     lightCube->material = cubeMaterial;
+        //     registry.emplace<Mesh*>(lightEntity, lightCube);
+        // }
     }
 }
 

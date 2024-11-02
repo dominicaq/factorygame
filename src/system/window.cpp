@@ -19,8 +19,8 @@ bool Window::init() {
     }
 
     // Set GLFW window hints for OpenGL version and profile
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 #ifdef __APPLE__
@@ -45,6 +45,16 @@ bool Window::init() {
     // Load all OpenGL function pointers with GLAD
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         std::cerr << "Failed to initialize GLAD" << "\n";
+        return false;
+    }
+
+    // Check if the loaded OpenGL version is at least 4.0
+    int major, minor;
+    glGetIntegerv(GL_MAJOR_VERSION, &major);
+    glGetIntegerv(GL_MINOR_VERSION, &minor);
+    if (major < 4 || (major == 4 && minor < 0)) {
+        std::cerr << "[Error] OpenGL 4.0 or higher is required, but your system only supports "
+                  << major << "." << minor << "\n";
         return false;
     }
 

@@ -5,6 +5,7 @@
 
 // Define the number of G-buffer attachments
 #define NUM_ATTACHMENTS 4
+#define MAX_LIGHTS 100
 
 void Renderer::setupRenderGraph() {
     // Init shaders
@@ -52,6 +53,20 @@ Renderer::Renderer(int width, int height, Camera* camera) {
 
     // Set up render passes directly in the RenderGraph
     setupRenderGraph();
+
+    // Generate and bind the light buffer
+    glGenBuffers(1, &m_lightSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_lightSSBO);
+
+    // Allocate buffer with maximum expected size
+    size_t bufferSize = sizeof(PointLight) * MAX_LIGHTS;
+    glBufferData(GL_SHADER_STORAGE_BUFFER, bufferSize, nullptr, GL_DYNAMIC_DRAW);
+
+    // Bind to binding point 0
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_lightSSBO);
+
+    // Unbind the buffer
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 Renderer::~Renderer() {
@@ -363,46 +378,62 @@ void Renderer::lightPass(entt::registry& registry) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // Screen space light calculation, don't need depth
+    // Screen-space calculations; disable depth test
     glDisable(GL_DEPTH_TEST);
 
-    // Enable additive blending for lighting accumulation
+    // Enable additive blending for light accumulation
     glEnable(GL_BLEND);
     glBlendEquation(GL_FUNC_ADD);
     glBlendFunc(GL_ONE, GL_ONE);
 
-    // Use Light Pass Shader
+    // Use the light pass shader
     m_lightPassShader.use();
 
-    // Set the camera position in the shader
+    // Set camera position uniform
     m_lightPassShader.setVec3("u_CameraPosition", m_camera->getPosition());
 
-    // Set the number of lights
-    auto lightView = registry.view<Light>();
-    size_t numLights = lightView.size();
+    // Collect light data from ECS
+    auto lightView = registry.view<Light, Position>();
+    std::vector<PointLight> lights;
+    // lights.reserve(lightView.size());
 
-    m_lightPassShader.setInt("numLights", numLights);
-
-    // Pass each light's data to the shader
-    size_t i = 0;
     for (auto entity : lightView) {
-        std::string indexStr = "[" + std::to_string(i) + "]";
+        const auto& lightComponent = lightView.get<Light>(entity);
+        const auto& positionComponent = lightView.get<Position>(entity);
 
-        const auto& lightComponent = registry.get<Light>(entity);
-        const auto& positionComponent = registry.get<Position>(entity);
+        // Only process point lights
+        if (lightComponent.type != LightType::Point) {
+            continue;
+        }
 
-        m_lightPassShader.setVec3("lights" + indexStr + ".position", positionComponent.position);
-        m_lightPassShader.setVec3("lights" + indexStr + ".color", lightComponent.color);
-        m_lightPassShader.setFloat("lights" + indexStr + ".intensity", lightComponent.intensity);
-        // m_lightPassShader.setBool("lights" + indexStr + ".isDirectional", lightSystem.directionalFlags[i]);
+        PointLight lightData;
+        lightData.position = glm::vec4(positionComponent.position, 1.0f);
+        lightData.color = glm::vec4(lightComponent.color, 1.0f);
+        lightData.intensity = glm::vec4(lightComponent.intensity, 0.0f, 0.0f, 0.0f);
 
-        // if (lightSystem.directionalFlags[i]) {
-            // m_lightPassShader.setVec3("lights" + indexStr + ".direction", lightSystem.directions[i]);
-        // }
-        ++i;
+        lights.push_back(lightData);
     }
 
-    // Setup G-buffer textures for lighting
+    // Update SSBO with light data
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_lightSSBO);
+
+    // Allocate buffer if needed
+    static size_t currentBufferSize = 0;
+    size_t requiredBufferSize = lights.size() * sizeof(PointLight);
+
+    if (requiredBufferSize > currentBufferSize) {
+        glBufferData(GL_SHADER_STORAGE_BUFFER, requiredBufferSize, lights.data(), GL_DYNAMIC_DRAW);
+        currentBufferSize = requiredBufferSize;
+    } else {
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, requiredBufferSize, lights.data());
+    }
+
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_lightSSBO);
+
+    // Set the number of lights
+    m_lightPassShader.setInt("numLights", static_cast<int>(lights.size()));
+
+    // Bind G-buffer textures
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_gBuffer->getColorAttachment(0)); // Position
     m_lightPassShader.setInt("gPosition", 0);
@@ -415,14 +446,15 @@ void Renderer::lightPass(entt::registry& registry) {
     glBindTexture(GL_TEXTURE_2D, m_gBuffer->getColorAttachment(2)); // Albedo
     m_lightPassShader.setInt("gAlbedo", 2);
 
-    // Draw the screen-aligned quad for lighting
+    // Draw full-screen quad
     drawScreenQuad();
 
-    // Disable blending after the lighting pass
+    // Disable blending after lighting pass
     glDisable(GL_BLEND);
 
     // Re-enable depth testing for subsequent passes
     glEnable(GL_DEPTH_TEST);
+    exit(0);
 }
 
 void Renderer::forwardPass(entt::registry& registry, const glm::mat4& view) {

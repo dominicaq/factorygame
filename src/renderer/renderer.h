@@ -94,6 +94,9 @@ private:
     Shader m_gBufferShader;
     Shader m_lightPassShader;
 
+    GLuint m_lightSSBO;
+    size_t m_numLights = 0;
+
     /*
      * Mesh buffer storage
      */
