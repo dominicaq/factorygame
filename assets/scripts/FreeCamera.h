@@ -9,9 +9,14 @@
 
 class FreeCamera : public Script {
 public:
-    float cameraSpeed = 2.5f;
+    float defaultSpeed = 2.5f;
+    float boostSpeed = 10.0f;
     float sensitivity = 0.1f;
 
+private:
+    float cameraSpeed = defaultSpeed;
+
+public:
     void start() override {
         inputManager.setCursorMode(GLFW_CURSOR_DISABLED);
     }
@@ -21,15 +26,8 @@ public:
         glm::vec3 position = gameObject->getPosition();
         glm::vec3 eulerAngles = gameObject->getEuler();
 
-        // Calculate camera front vector based on Euler angles
-        glm::vec3 front;
-        front.x = cos(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
-        front.y = sin(glm::radians(eulerAngles.x));
-        front.z = sin(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
-        front = glm::normalize(front);
-
-        glm::vec3 right = glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
-        glm::vec3 up = glm::normalize(glm::cross(right, front));
+        glm::vec3 front = gameObject->getForward();
+        glm::vec3 right = gameObject->getRight();
 
         float dt = cameraSpeed * deltaTime;
 
@@ -45,6 +43,11 @@ public:
         }
         if (inputManager.isKeyPressed(GLFW_KEY_D)) {
             position += right * dt;
+        }
+        if (inputManager.isKeyPressed(GLFW_KEY_LEFT_SHIFT)) {
+            cameraSpeed = boostSpeed;
+        } else {
+            cameraSpeed = defaultSpeed;
         }
 
         // Update the camera's position in the GameObject

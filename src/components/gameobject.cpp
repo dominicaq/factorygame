@@ -104,8 +104,13 @@ glm::quat& GameObject::getRotation() {
 }
 
 void GameObject::setRotation(const glm::quat& rotation) {
-    m_registry.get<Rotation>(m_entity).quaternion = rotation;
-    m_registry.get<EulerAngles>(m_entity).euler = glm::degrees(glm::eulerAngles(rotation));
+    auto& rotationComponent = m_registry.get<Rotation>(m_entity);
+    auto& eulerComponent = m_registry.get<EulerAngles>(m_entity);
+
+    rotationComponent.quaternion = rotation;
+    eulerComponent.euler = glm::degrees(glm::eulerAngles(rotation));
+
+    // Mark the model matrix as dirty
     m_registry.get<ModelMatrix>(m_entity).dirty = true;
 }
 
@@ -119,18 +124,24 @@ void GameObject::setScale(const glm::vec3& scale) {
 }
 
 glm::vec3 GameObject::getForward() {
-    auto& rotation = m_registry.get<Rotation>(m_entity).quaternion;
-    return rotation * glm::vec3(0, 0, -1);
+    glm::vec3 eulerAngles = m_registry.get<EulerAngles>(m_entity).euler;
+
+    glm::vec3 front;
+    front.x = cos(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
+    front.y = sin(glm::radians(eulerAngles.x));
+    front.z = sin(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
+    return glm::normalize(front);
 }
 
 glm::vec3 GameObject::getUp() {
-    auto& rotation = m_registry.get<Rotation>(m_entity).quaternion;
-    return rotation * glm::vec3(0, 1, 0);
+    glm::vec3 front = getForward();
+    glm::vec3 right = getRight();
+    return glm::normalize(glm::cross(right, front));
 }
 
 glm::vec3 GameObject::getRight() {
-    auto& rotation = m_registry.get<Rotation>(m_entity).quaternion;
-    return rotation * glm::vec3(1, 0, 0);
+    glm::vec3 front = getForward();
+    return glm::normalize(glm::cross(front, glm::vec3(0, 1, 0)));
 }
 
 void GameObject::markChildrenDirty(entt::entity parent) {
