@@ -30,13 +30,31 @@ void Scene::loadScene() {
     std::string fragmentPath = SHADER_DIR + "default.fs";
     Shader* basicShader = new Shader(vertexPath, fragmentPath);
 
+    // --------------------- Beetle Car ---------------------
+    entt::entity carEntity = registry.create();
+    MetaData meta_carData;
+    meta_carData.position = glm::vec3(6.0f, -2.5f, -0.5f);
+    meta_carData.scale = glm::vec3(5.0f);
+    GameObject* carObject = addGameObjectComponent(registry, carEntity, meta_carData);
+    carObject->addScript<MoveScript>();
+
+    Mesh* carMesh = ResourceLoader::loadMesh(MODEL_DIR + "../obj-assets/data/beetle.obj");
+    if (carMesh != nullptr) {
+        Material* carMaterial = new Material(basicShader);
+        carMaterial->albedoColor = glm::vec3(0.2f, 0.7f, 0.2f);
+        carMaterial->isDeferred = true;
+        carMesh->material = carMaterial;
+        registry.emplace<Mesh*>(carEntity, carMesh);
+    }
+
     // --------------------- Stanford Bunny Model ---------------------
     entt::entity bunnyEntity = registry.create();
     MetaData meta_bunnyData;
-    meta_bunnyData.position = glm::vec3(0.0f, -0.5f, 0.0f);
+    meta_bunnyData.position = glm::vec3(6.0f, -0.5f, 0.0f);
     meta_bunnyData.scale = glm::vec3(5.0f);
     GameObject* bunnyObject = addGameObjectComponent(registry, bunnyEntity, meta_bunnyData);
-    bunnyObject->addScript<MoveScript>();
+    // Parent bunny to car
+    bunnyObject->setParent(carEntity);
 
     Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
     if (bunnyMesh != nullptr) {
@@ -51,27 +69,10 @@ void Scene::loadScene() {
         registry.emplace<Mesh*>(bunnyEntity, bunnyMesh);
     }
 
-    // --------------------- Cube as Child of Bunny ---------------------
-    entt::entity cubeEntity = registry.create();
-    MetaData meta_cubeData;
-    meta_cubeData.position = glm::vec3(0.0f, 2.0f, 0.0f);
-    meta_cubeData.scale = glm::vec3(0.5f);
-    GameObject* cubeObject = addGameObjectComponent(registry, cubeEntity, meta_cubeData);
-    cubeObject->setParent(bunnyEntity);
-
-    Mesh* cubeMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
-    if (cubeMesh != nullptr) {
-        Material* cubeMaterial = new Material(basicShader);
-        cubeMaterial->albedoColor = glm::vec3(0.2f, 0.7f, 0.2f);
-        cubeMaterial->isDeferred = false;
-        cubeMesh->material = cubeMaterial;
-        registry.emplace<Mesh*>(cubeEntity, cubeMesh);
-    }
-
     // --------------------- Diablo Model ---------------------
     entt::entity diabloEntity = registry.create();
     MetaData meta_diabloData;
-    meta_diabloData.position = glm::vec3(2.0f, 0.0f, -1.0f);
+    meta_diabloData.position = glm::vec3(0.0f, 0.0f, -1.0f);
     meta_diabloData.scale = glm::vec3(2.0f);
     GameObject* diabloObject = addGameObjectComponent(registry, diabloEntity, meta_diabloData);
     diabloObject->addScript<MoveScript>();
