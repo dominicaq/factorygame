@@ -1,5 +1,6 @@
 #include "engine.h"
-#include "scene.h"
+#include "debugging/profiler.h"
+#include "imgui/imgui.h"
 
 #include <string>
 #include <vector>
@@ -12,24 +13,6 @@
 // Define globals
 InputManager inputManager;
 int DEBUG_view_framebuffers = -1;
-
-// ------------------------ FPS Counter Setup ------------------------
-void fpsCounter(Window& window, float deltaTime) {
-    // FPS calculation
-    static float fpsTimer = 0.0f;
-    static int frames = 0;
-
-    frames++;
-    fpsTimer += deltaTime;
-    if (fpsTimer >= 1.0f) {
-        float fps = frames / fpsTimer;
-        std::string title = "Factory Game - FPS: " + std::to_string(fps);
-        // Update window title with FPS
-        window.setTitle(title);
-        frames = 0;
-        fpsTimer = 0.0f;
-    }
-}
 
 int main() {
     // Initialize window
@@ -73,13 +56,15 @@ int main() {
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
 
+    Profiler profiler;
+
     // Game loop
     while (!window.shouldClose()) {
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
-        fpsCounter(window, deltaTime);
 
         // -------------- Input Management -----------
+        profiler.start("Frame");
         inputManager.update();
 
         // TEMPORARY: Exit on ESC key
@@ -89,20 +74,32 @@ int main() {
 
         // -------------- System updates ------------
 
+        profiler.start("Systems");
         gameObjectSystem.updateAll(deltaTime);
         transformSystem.updateTransformComponents();
+        profiler.end("Systems");
 
         // ------------------------ Rendering ------------------------
+        profiler.start("Rendering");
         glm::mat4 view = camera.getViewMatrix();
         renderer.geometryPass(scene.registry, view);
         renderer.lightPass(scene.registry);
         renderer.forwardPass(scene.registry, view);
         renderer.skyboxPass(view, camera.getProjectionMatrix());
+        profiler.end("Rendering");
 
         // DEBUG MODE
         if (DEBUG_view_framebuffers >= 0) {
             renderer.debugGBufferPass(debugShader, DEBUG_view_framebuffers);
         }
+
+        profiler.end("Frame");
+
+        // ------------------ ImGui Rendering ------------------
+        window.beginImGuiFrame();
+        profiler.record(1.0f / deltaTime);
+        profiler.display();
+        window.endImGuiFrame();
 
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();

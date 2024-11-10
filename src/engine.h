@@ -27,4 +27,6 @@
 #include "renderer/texture.h"
 #include "renderer/renderer.h"
 
+#include "scene.h"
+
 #endif // ENGINE_H

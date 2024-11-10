@@ -35,6 +35,12 @@ public:
      */
     void setRenderer(void* renderer);
 
+    /*
+    * ImGUI
+    */
+   void beginImGuiFrame();
+   void endImGuiFrame();
+
 private:
     // GLFW window object
     GLFWwindow* m_window;

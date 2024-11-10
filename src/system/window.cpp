@@ -1,11 +1,22 @@
 #include "window.h"
 #include "../renderer/renderer.h"
 
+#include "imgui/imgui.h"
+#include "imgui/backends/imgui_impl_glfw.h"
+#include "imgui/backends/imgui_impl_opengl3.h"
+#include "implot/implot.h"
+
 // Constructor and Destructor
 Window::Window(const char *title, int width, int height)
     : m_title(title), m_width(width), m_height(height), m_window(nullptr), m_renderer(nullptr) {}
 
 Window::~Window() {
+    // Cleanup ImGui
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImPlot::DestroyContext();
+    ImGui::DestroyContext();
+
     glfwTerminate();
 }
 
@@ -47,6 +58,22 @@ bool Window::init() {
         std::cerr << "Failed to initialize GLAD" << "\n";
         return false;
     }
+
+    // Setup ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+    // Setup ImPlot extension
+    ImPlot::CreateContext();
+
+    // Setup ImGui style
+    ImGui::StyleColorsDark();
+
+    // Initialize ImGui for GLFW and OpenGL3
+    ImGui_ImplGlfw_InitForOpenGL(m_window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
 
     return true;
 }
@@ -116,4 +143,18 @@ void Window::framebufferSizeCallback(GLFWwindow* window, int width, int height) 
         Renderer* renderer = static_cast<Renderer*>(windowPtr->m_renderer);
         renderer->resizeGBuffer(width, height);
     }
+}
+
+/*
+ * ImGui Frame Control
+ */
+void Window::beginImGuiFrame() {
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+}
+
+void Window::endImGuiFrame() {
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }

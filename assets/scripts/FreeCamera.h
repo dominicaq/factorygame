@@ -18,7 +18,7 @@ private:
 
 public:
     void start() override {
-        inputManager.setCursorMode(GLFW_CURSOR_DISABLED);
+        // inputManager.setCursorMode(GLFW_CURSOR_DISABLED);
     }
 
     void update(float deltaTime) override {
