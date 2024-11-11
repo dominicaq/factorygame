@@ -13,11 +13,12 @@
 #include "components/light.h"
 #include "components/gameobject.h"
 #include "components/metadata.h"
-
 #include "components/script.h"
 
 #include "components/systems/gameobject_system.h"
 #include "components/systems/transform_system.h"
+
+#include "components/resources.h"
 
 // Resources
 #include "resources/meshgen.h"

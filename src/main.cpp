@@ -1,4 +1,11 @@
 #include "engine.h"
+
+// Render passes
+#include "renderer/rendergraph/geometrypass.h"
+#include "renderer/rendergraph/lightpass.h"
+#include "renderer/rendergraph/forwardpass.h"
+#include "renderer/rendergraph/rendergraph.h"
+
 #include "debugging/profiler.h"
 #include "imgui/imgui.h"
 
@@ -33,12 +40,18 @@ int main() {
     Renderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT, &camera);
     window.setRenderer(&renderer);
 
+    FrameGraph frameGraph;
+    frameGraph.addRenderPass(std::make_unique<GeometryPass>());
+    frameGraph.addRenderPass(std::make_unique<LightPass>());
+    frameGraph.addRenderPass(std::make_unique<ForwardPass>());
+
     // Init all meshses
     auto renderQuery = scene.registry.view<Mesh*, ModelMatrix>();
     renderQuery.each([&](auto entity, Mesh* mesh, ModelMatrix&) {
         renderer.initMeshBuffers(mesh);
     });
 
+    frameGraph.setupPasses();
     // ------------------------ Debug Setup --------------------------
     std::string debugVertexPath = SHADER_DIR + "deferred/debug_gbuff.vs";
     std::string debugFragmentPath = SHADER_DIR + "deferred/debug_gbuff.fs";
@@ -81,11 +94,10 @@ int main() {
 
         // ------------------------ Rendering ------------------------
         profiler.start("Rendering");
-        glm::mat4 view = camera.getViewMatrix();
-        renderer.geometryPass(scene.registry, view);
-        renderer.lightPass(scene.registry);
-        renderer.forwardPass(scene.registry, view);
-        renderer.skyboxPass(view, camera.getProjectionMatrix());
+        // TODO: currently each pass calculates the view matrix.
+        // later update a single resource per frame (the view matrix) to each pass
+        frameGraph.executePasses(renderer, scene.registry);
+        renderer.skyboxPass(camera.getViewMatrix(), camera.getProjectionMatrix());
         profiler.end("Rendering");
 
         // DEBUG MODE

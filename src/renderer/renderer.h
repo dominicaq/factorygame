@@ -4,7 +4,6 @@
 #include "../engine.h"
 
 #include "framebuffer.h"
-#include "rendergraph.h"
 #include "cube_map.h"
 
 #include <glad/glad.h>
@@ -15,7 +14,6 @@
 class Mesh;
 class ECSWorld;
 class Entity;
-class LightSystem;
 class Camera;
 
 /*
@@ -28,6 +26,15 @@ public:
     ~Renderer();
 
     /*
+    * Getters
+    */
+    std::pair<int, int> getScreenDimensions() const {
+        return {m_width, m_height};
+    }
+    Framebuffer* getFramebuffer() const { return m_gBuffer.get(); }
+    Camera* getCamera() const { return m_camera; }
+
+    /*
      * Initialize and manage mesh buffers
      */
     void draw(const Mesh* mesh);
@@ -38,21 +45,11 @@ public:
      * Quad rendering (used for post-processing, G-buffer display, etc.)
      */
     void drawScreenQuad();
-    void initScreenQuad();
 
     /*
      * Recreate G-buffer with new dimensions
      */
     void resizeGBuffer(int width, int height);
-
-    /*
-     * Render Passes
-     */
-    void geometryPass(entt::registry& registry, const glm::mat4& view);
-
-    void lightPass(entt::registry& registry);
-
-    void forwardPass(entt::registry& registry, const glm::mat4& view);
 
     /*
      * Skybox
@@ -72,12 +69,15 @@ private:
     int m_width;
     int m_height;
 
-    void setupRenderGraph();
-
     /*
      * Initialize OpenGL state (depth testing, face culling, etc.)
      */
     void initOpenGLState();
+
+    /*
+    * Init mesh buffer for screen quad
+    */
+    void initScreenQuad();
 
     /*
     * Viewport
@@ -87,12 +87,6 @@ private:
 
     // List of framebuffers (in the future)
     std::unique_ptr<Framebuffer> m_gBuffer;
-
-    /*
-     * Shaders for the rendering passes
-     */
-    Shader m_gBufferShader;
-    Shader m_lightPassShader;
 
     /*
      * Mesh buffer storage

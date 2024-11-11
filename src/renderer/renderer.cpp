@@ -6,21 +6,6 @@
 // Define the number of G-buffer attachments
 #define NUM_ATTACHMENTS 4
 
-void Renderer::setupRenderGraph() {
-    // Init shaders
-    std::string gBufferVertexPath = ASSET_DIR "shaders/core/deferred/gbuff.vs";
-    std::string gBufferFragmentPath = ASSET_DIR "shaders/core/deferred/gbuff.fs";
-    if (!m_gBufferShader.load(gBufferVertexPath, gBufferFragmentPath)) {
-        std::cerr << "[Error] Renderer::Renderer: Failed to create gBufferShader!\n";
-    }
-
-    std::string lightVertexPath = ASSET_DIR "shaders/core/deferred/lightpass.vs";
-    std::string lightFragmentPath = ASSET_DIR "shaders/core/deferred/lightpass.fs";
-    if (!m_lightPassShader.load(lightVertexPath, lightFragmentPath)) {
-        std::cerr << "[Error] Renderer::Renderer: Failed to create lightPassShader!\n";
-    }
-}
-
 Renderer::Renderer(int width, int height, Camera* camera) {
     m_camera = camera;
     m_width = width;
@@ -49,9 +34,6 @@ Renderer::Renderer(int width, int height, Camera* camera) {
         ASSET_DIR "textures/skyboxes/bspace/4.png"
     };
     initSkybox(faces);
-
-    // Set up render passes directly in the RenderGraph
-    setupRenderGraph();
 }
 
 Renderer::~Renderer() {
@@ -316,140 +298,6 @@ void Renderer::resizeGBuffer(int width, int height) {
     m_gBuffer->resize(width, height);
     if (m_camera) {
         m_camera->setAspectRatio(static_cast<float>(width), static_cast<float>(height));
-    }
-}
-
-/*
- * Render Passes
- */
-void Renderer::geometryPass(entt::registry& registry, const glm::mat4& view) {
-    // Bind G-buffer framebuffer
-    m_gBuffer->bind();
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // Use Geometry Pass Shader
-    m_gBufferShader.use();
-    m_gBufferShader.setMat4("u_View", view);
-    m_gBufferShader.setMat4("u_Projection", m_camera->getProjectionMatrix());
-
-    // Loop through all entities with Mesh and ModelMatrix components
-    // This is bad, but for now query for meshes in the individual passes
-    auto viewMesh = registry.view<Mesh*, ModelMatrix>();
-    for (auto entity : viewMesh) {
-        const auto& mesh = registry.get<Mesh*>(entity);
-        // Skip forward rendering materials
-        if (!mesh->material->isDeferred) {
-            continue;
-        }
-
-        const auto& modelMatrix = registry.get<ModelMatrix>(entity);
-        m_gBufferShader.setMat4("u_Model", modelMatrix.matrix);
-
-        mesh->material->bind(&m_gBufferShader);
-        draw(mesh);
-    }
-
-    // Copy depth buffer from G-buffer to default framebuffer
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);  // Default framebuffer (the screen)
-    glBlitFramebuffer(
-        0, 0, m_width, m_height,
-        0, 0, m_width, m_height,
-        GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-    m_gBuffer->unbind();
-}
-
-void Renderer::lightPass(entt::registry& registry) {
-    // Bind default framebuffer
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    // Screen space light calculation, don't need depth
-    glDisable(GL_DEPTH_TEST);
-
-    // Enable additive blending for lighting accumulation
-    glEnable(GL_BLEND);
-    glBlendEquation(GL_FUNC_ADD);
-    glBlendFunc(GL_ONE, GL_ONE);
-
-    // Use Light Pass Shader
-    m_lightPassShader.use();
-
-    // Set the camera position in the shader
-    m_lightPassShader.setVec3("u_CameraPosition", m_camera->getPosition());
-
-    // Set the number of lights
-    auto lightView = registry.view<Light>();
-    size_t numLights = lightView.size();
-
-    m_lightPassShader.setInt("numLights", numLights);
-
-    // Pass each light's data to the shader
-    size_t i = 0;
-    for (auto entity : lightView) {
-        std::string indexStr = "[" + std::to_string(i) + "]";
-
-        const auto& lightComponent = registry.get<Light>(entity);
-        const auto& positionComponent = registry.get<Position>(entity);
-
-        m_lightPassShader.setVec3("lights" + indexStr + ".position", positionComponent.position);
-        m_lightPassShader.setVec3("lights" + indexStr + ".color", lightComponent.color);
-        m_lightPassShader.setFloat("lights" + indexStr + ".intensity", lightComponent.intensity);
-        // m_lightPassShader.setBool("lights" + indexStr + ".isDirectional", lightSystem.directionalFlags[i]);
-
-        // if (lightSystem.directionalFlags[i]) {
-            // m_lightPassShader.setVec3("lights" + indexStr + ".direction", lightSystem.directions[i]);
-        // }
-        ++i;
-    }
-
-    // Setup G-buffer textures for lighting
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_gBuffer->getColorAttachment(0)); // Position
-    m_lightPassShader.setInt("gPosition", 0);
-
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, m_gBuffer->getColorAttachment(1)); // Normal
-    m_lightPassShader.setInt("gNormal", 1);
-
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, m_gBuffer->getColorAttachment(2)); // Albedo
-    m_lightPassShader.setInt("gAlbedo", 2);
-
-    // Draw the screen-aligned quad for lighting
-    drawScreenQuad();
-
-    // Disable blending after the lighting pass
-    glDisable(GL_BLEND);
-
-    // Re-enable depth testing for subsequent passes
-    glEnable(GL_DEPTH_TEST);
-}
-
-void Renderer::forwardPass(entt::registry& registry, const glm::mat4& view) {
-    // Enable depth testing for forward pass
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-
-    auto viewMesh = registry.view<Mesh*, ModelMatrix>();
-    for (auto entity : viewMesh) {
-        const auto& mesh = registry.get<Mesh*>(entity);
-        const auto& modelMatrix = registry.get<ModelMatrix>(entity);
-
-        // Skip deferred rendering materials
-        if (mesh->material->isDeferred) {
-            continue;
-        }
-
-        Shader* shader = mesh->material->shader;
-        shader->use();
-
-        // Set transformation matrices
-        shader->setMat4("u_View", view);
-        shader->setMat4("u_Projection", m_camera->getProjectionMatrix());
-        shader->setMat4("u_Model", modelMatrix.matrix);
-
-        mesh->material->bind();
-        draw(mesh);
     }
 }
 
