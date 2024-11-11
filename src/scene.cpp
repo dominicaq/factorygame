@@ -11,18 +11,19 @@
 * Scene Management
 */
 
-// TODO: In the future, this will be a virtual func for multiple user created scenes
+// TODO: In the future, this will be user generated through UI, not code.
 void Scene::loadScene() {
     // ------------------------ Setup Camera ------------------------
     entt::entity cameraEntity = registry.create();
-    MetaData meta_cameraData;
-    meta_cameraData.position = glm::vec3(4.0f, 0.21f, 4.04f);
-    meta_cameraData.eulerAngles = glm::vec3(-2.38f, 239.0f, 0.0f);
-    GameObject* cameraObject = addGameObjectComponent(registry, cameraEntity, meta_cameraData);
+    SceneData save_cameraData;
+    save_cameraData.name = "Main Camera";
+    save_cameraData.position = glm::vec3(4.0f, 0.21f, 4.04f);
+    save_cameraData.eulerAngles = glm::vec3(-2.38f, 239.0f, 0.0f);
+    GameObject* cameraObject = addGameObjectComponent(registry, cameraEntity, save_cameraData);
     cameraObject->addScript<FreeCamera>();
 
     Camera cameraComponent(cameraEntity, registry);
-    registry.emplace<Camera>(cameraEntity, std::move(cameraComponent));
+    registry.emplace<Camera>(cameraEntity, cameraComponent);
     setPrimaryCamera(cameraEntity);
 
     // ------------------------ Shader Setup ------------------------
@@ -32,10 +33,11 @@ void Scene::loadScene() {
 
     // --------------------- Beetle Car ---------------------
     entt::entity carEntity = registry.create();
-    MetaData meta_carData;
-    meta_carData.position = glm::vec3(6.0f, -2.5f, -0.5f);
-    meta_carData.scale = glm::vec3(5.0f);
-    GameObject* carObject = addGameObjectComponent(registry, carEntity, meta_carData);
+    SceneData save_carData;
+    save_carData.name = "Buggy";
+    save_carData.position = glm::vec3(6.0f, -2.5f, -0.5f);
+    save_carData.scale = glm::vec3(5.0f);
+    GameObject* carObject = addGameObjectComponent(registry, carEntity, save_carData);
     carObject->addScript<MoveScript>();
 
     Mesh* carMesh = ResourceLoader::loadMesh(MODEL_DIR + "../obj-assets/data/beetle.obj");
@@ -47,12 +49,31 @@ void Scene::loadScene() {
         registry.emplace<Mesh*>(carEntity, carMesh);
     }
 
+    // --------------------- Ground Plane ---------------------
+    entt::entity planeEntity = registry.create();
+    SceneData save_planeData;
+    save_planeData.name = "Ground Plane";
+    save_planeData.position = glm::vec3(0.0f, -1.1f, 0.0f);
+    save_planeData.scale = glm::vec3(10.0f, 0.1f, 10.0f);
+    GameObject* planeObject = addGameObjectComponent(registry, planeEntity, save_planeData);
+
+    Mesh* planeMesh = ResourceLoader::loadMesh(MODEL_DIR + "/cube.obj");
+    if (planeMesh != nullptr) {
+        Material* planeMaterial = new Material(basicShader);
+        planeMaterial->albedoColor = glm::vec3(1.0f);
+        planeMaterial->albedoMap = new Texture(TEXTURE_DIR + "dev.jpg");
+        planeMaterial->isDeferred = true;
+        planeMesh->material = planeMaterial;
+        registry.emplace<Mesh*>(planeEntity, planeMesh);
+    }
+
     // --------------------- Stanford Bunny Model ---------------------
     entt::entity bunnyEntity = registry.create();
-    MetaData meta_bunnyData;
-    meta_bunnyData.position = glm::vec3(6.0f, -0.5f, 0.0f);
-    meta_bunnyData.scale = glm::vec3(5.0f);
-    GameObject* bunnyObject = addGameObjectComponent(registry, bunnyEntity, meta_bunnyData);
+    SceneData save_bunnyData;
+    save_bunnyData.name = "Bunny";
+    save_bunnyData.position = glm::vec3(6.0f, -0.5f, 0.0f);
+    save_bunnyData.scale = glm::vec3(5.0f);
+    GameObject* bunnyObject = addGameObjectComponent(registry, bunnyEntity, save_bunnyData);
     // Parent bunny to car
     bunnyObject->setParent(carEntity);
 
@@ -71,10 +92,11 @@ void Scene::loadScene() {
 
     // --------------------- Diablo Model ---------------------
     entt::entity diabloEntity = registry.create();
-    MetaData meta_diabloData;
-    meta_diabloData.position = glm::vec3(0.0f, 0.0f, -1.0f);
-    meta_diabloData.scale = glm::vec3(2.0f);
-    GameObject* diabloObject = addGameObjectComponent(registry, diabloEntity, meta_diabloData);
+    SceneData save_diabloData;
+    save_diabloData.name = "Diablo";
+    save_diabloData.position = glm::vec3(0.0f, 0.0f, -1.0f);
+    save_diabloData.scale = glm::vec3(1.0f);
+    GameObject* diabloObject = addGameObjectComponent(registry, diabloEntity, save_diabloData);
     diabloObject->addScript<MoveScript>();
 
     Mesh* diabloMesh = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
@@ -95,8 +117,9 @@ void Scene::loadScene() {
 
     // --------------------- Dummy Entity (global scripts) ------------------
     entt::entity dummyEntity = registry.create();
-    MetaData meta_dummyData;
-    GameObject* dummyObject = addGameObjectComponent(registry, dummyEntity, meta_dummyData);
+    SceneData save_dummyData;
+    save_dummyData.name = "GLOBAL SCRIPT HOLDER";
+    GameObject* dummyObject = addGameObjectComponent(registry, dummyEntity, save_dummyData);
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
@@ -111,10 +134,11 @@ void Scene::loadScene() {
         float z = circleRadius * std::sin(radians);
 
         entt::entity lightEntity = registry.create();
-        MetaData meta_lightData;
-        meta_lightData.scale = glm::vec3(0.1f);
-        meta_lightData.position = glm::vec3(x, yPosition, z);
-        GameObject* lightObject = addGameObjectComponent(registry, lightEntity, meta_lightData);
+        SceneData save_lightData;
+        save_lightData.name = "Light(" + std::to_string(i) + ")";
+        save_lightData.scale = glm::vec3(0.1f);
+        save_lightData.position = glm::vec3(x, yPosition, z);
+        GameObject* lightObject = addGameObjectComponent(registry, lightEntity, save_lightData);
         lightObject->addScript<CircularRotation>();
         CircularRotation* rotationScript = lightObject->getScript<CircularRotation>();
         if (rotationScript != nullptr) {
@@ -163,11 +187,15 @@ void Scene::setPrimaryCamera(entt::entity cameraEntity) {
 /*
 * Component Helpers
 */
-GameObject* Scene::addGameObjectComponent(entt::registry& registry, entt::entity entity, const MetaData& data) {
+GameObject* Scene::addGameObjectComponent(entt::registry& registry, entt::entity entity, const SceneData& data) {
     if (!registry.valid(entity)) {
         return nullptr;
     }
 
+    // Meta data
+    registry.emplace<MetaData>(entity, data.name);
+
+    // Transform
     registry.emplace<Position>(entity, data.position);
     registry.emplace<EulerAngles>(entity, data.eulerAngles);
     registry.emplace<Rotation>(entity, glm::quat(glm::radians(data.eulerAngles)));

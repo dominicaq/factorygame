@@ -15,7 +15,11 @@ static const std::string MODEL_DIR = ASSET_DIR "models/";
 static const std::string TEXTURE_DIR = ASSET_DIR "textures/";
 
 // Meta data is the data saved to disk
-struct MetaData {
+struct SceneData {
+    // Meta data
+    std::string name;
+
+    // Transform
     glm::vec3 position = glm::vec3(0.0f);
     glm::vec3 scale = glm::vec3(1.0f);
     glm::vec3 eulerAngles = glm::vec3(0.0f);
@@ -29,7 +33,7 @@ public:
     void setPrimaryCamera(entt::entity cameraEntity);
 
     // Component Helpers
-    GameObject* addGameObjectComponent(entt::registry& registry, entt::entity entity, const MetaData& data);
+    GameObject* addGameObjectComponent(entt::registry& registry, entt::entity entity, const SceneData& data);
 
     entt::registry registry;
 private:

@@ -3,6 +3,7 @@
 
 #include "script.h"
 #include "transform_components.h"
+#include "metadata.h"
 
 #include <vector>
 #include <memory>
@@ -49,6 +50,11 @@ public:
     void startScripts();
     void updateScripts(float deltaTime);
     void destroyScripts();
+
+    /*
+    * Meta data
+    */
+    std::string getName();
 
     /*
     * Transform

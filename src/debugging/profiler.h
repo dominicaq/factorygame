@@ -47,7 +47,6 @@ public:
     void display() {
         // Position the window in the top-right corner
         ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 320, 20), ImGuiCond_Always);
-        // ImGui::SetNextWindowSize(ImVec2(300, 200), ImGuiCond_Always);
         ImGui::Begin("Profiler", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
         // Display profiling data
@@ -59,9 +58,12 @@ public:
             }
         }
 
-        ImGui::Text("FPS: %.1f", m_fpsHistory.back().fps);
+        if (!m_fpsHistory.empty()) {
+            ImGui::Text("FPS: %.1f", m_fpsHistory.back().fps);
+        }
 
         ImGui::End();
+        // displayFPSgraph();
     }
 
 private:
@@ -74,11 +76,76 @@ private:
     std::unordered_map<std::string, TimeRecord> m_times;
 
     struct FPSDataPoint {
-        double time;  // Time since start in seconds
+        double time;
         float fps;
     };
 
     std::vector<FPSDataPoint> m_fpsHistory;
 
     std::chrono::time_point<std::chrono::high_resolution_clock> m_startTime;
+
+    void displayFPSgraph() {
+        // Create a new window for the FPS graph
+        ImGui::Begin("FPS Graph");
+
+        size_t totalFrames = m_fpsHistory.size();
+
+        if (ImPlot::BeginPlot("FPS Over Time", "Time (s)", "FPS")) {
+            // Get current time
+            double currentTime = m_fpsHistory.back().time;
+            // Define time window (e.g., 10 seconds)
+            const double timeWindow = 10.0; // seconds
+
+            // Find the starting index where time >= currentTime - timeWindow
+            auto it = std::lower_bound(
+                m_fpsHistory.begin(), m_fpsHistory.end(), currentTime - timeWindow,
+                [](const FPSDataPoint& dataPoint, double time) {
+                    return dataPoint.time < time;
+                }
+            );
+
+            // Get the index
+            size_t startIndex = std::distance(m_fpsHistory.begin(), it);
+
+            // Prepare data arrays
+            size_t dataSize = totalFrames - startIndex;
+            std::vector<double> times(dataSize);
+            std::vector<double> fpsValues(dataSize);
+
+            // Initialize min and max fps for y-axis limits
+            double minFPS = std::numeric_limits<double>::max();
+            double maxFPS = std::numeric_limits<double>::lowest();
+
+            for (size_t i = startIndex; i < totalFrames; ++i) {
+                times[i - startIndex] = m_fpsHistory[i].time;
+                fpsValues[i - startIndex] = m_fpsHistory[i].fps;
+
+                // Update min and max FPS for y-axis limits
+                minFPS = std::min(minFPS, fpsValues[i - startIndex]);
+                maxFPS = std::max(maxFPS, fpsValues[i - startIndex]);
+            }
+
+            // Ensure minFPS is non-negative
+            if (minFPS < 0.0f) {
+                minFPS = 0.0f;
+            }
+
+            // Ensure x-axis starts from zero
+            double xMin = std::max(currentTime - timeWindow, 0.0);
+            double xMax = currentTime;
+
+            // Set the axis limits to be non-negative ranges
+            ImPlot::SetupAxisLimits(ImAxis_X1, xMin, xMax, ImGuiCond_Always);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, minFPS, maxFPS * 1.1f, ImGuiCond_Always);
+
+            // Plot the data
+            ImPlot::PushStyleVar(ImPlotStyleVar_LineWeight, 0.01f);
+            ImPlot::PlotLine("FPS", times.data(), fpsValues.data(), static_cast<int>(dataSize));
+            ImPlot::PopStyleVar();
+
+            ImPlot::EndPlot();
+        }
+
+        ImGui::End();
+    }
 };

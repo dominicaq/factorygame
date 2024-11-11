@@ -12,6 +12,7 @@
 #include "components/mesh.h"
 #include "components/light.h"
 #include "components/gameobject.h"
+#include "components/metadata.h"
 
 #include "components/script.h"
 

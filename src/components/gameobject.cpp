@@ -43,7 +43,14 @@ void GameObject::destroyScripts() {
 }
 
 /*
-* Transform Management
+* Meta data
+*/
+std::string GameObject::getName() {
+    return m_registry.get<MetaData>(m_entity).name;
+}
+
+/*
+* Transform
 */
 void GameObject::setParent(entt::entity newParent) {
     glm::vec3 childWorldPos = m_registry.get<Position>(m_entity).position;

@@ -18,7 +18,7 @@ private:
 
 public:
     void start() override {
-        std::cout << "MoveScript started for entity: " << "\n";
+        std::cout << "MoveScript started for entity: " << gameObject->getName() << "\n";
         m_eulerRotation = gameObject->getEuler();
     }
 
