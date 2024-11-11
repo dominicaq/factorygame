@@ -4,7 +4,9 @@
 #include "renderer/rendergraph/geometrypass.h"
 #include "renderer/rendergraph/lightpass.h"
 #include "renderer/rendergraph/forwardpass.h"
+#include "renderer/rendergraph/skyboxpass.h"
 #include "renderer/rendergraph/rendergraph.h"
+#include "renderer/rendergraph/debugpass.h"
 
 #include "debugging/profiler.h"
 #include "imgui/imgui.h"
@@ -19,7 +21,7 @@
 
 // Define globals
 InputManager inputManager;
-int DEBUG_view_framebuffers = -1;
+int DEBUG_PASS_MODE = -1;
 
 int main() {
     // Initialize window
@@ -44,6 +46,8 @@ int main() {
     frameGraph.addRenderPass(std::make_unique<GeometryPass>());
     frameGraph.addRenderPass(std::make_unique<LightPass>());
     frameGraph.addRenderPass(std::make_unique<ForwardPass>());
+    frameGraph.addRenderPass(std::make_unique<SkyboxPass>());
+    frameGraph.addRenderPass(std::make_unique<DebugPass>(&camera));
 
     // Init all meshses
     auto renderQuery = scene.registry.view<Mesh*, ModelMatrix>();
@@ -52,13 +56,7 @@ int main() {
     });
 
     frameGraph.setupPasses();
-    // ------------------------ Debug Setup --------------------------
-    std::string debugVertexPath = SHADER_DIR + "deferred/debug_gbuff.vs";
-    std::string debugFragmentPath = SHADER_DIR + "deferred/debug_gbuff.fs";
-    Shader debugShader(debugVertexPath, debugFragmentPath);
-    debugShader.use();
-    debugShader.setFloat("u_Near", camera.getNearPlane());
-    debugShader.setFloat("u_Far",  camera.getFarPlane());
+
     // ---------------------------------------------------------------
 
     GameObjectSystem gameObjectSystem(scene.registry);
@@ -97,13 +95,7 @@ int main() {
         // TODO: currently each pass calculates the view matrix.
         // later update a single resource per frame (the view matrix) to each pass
         frameGraph.executePasses(renderer, scene.registry);
-        renderer.skyboxPass(camera.getViewMatrix(), camera.getProjectionMatrix());
         profiler.end("Rendering");
-
-        // DEBUG MODE
-        if (DEBUG_view_framebuffers >= 0) {
-            renderer.debugGBufferPass(debugShader, DEBUG_view_framebuffers);
-        }
 
         profiler.end("Frame");
 

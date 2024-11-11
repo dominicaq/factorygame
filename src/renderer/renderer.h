@@ -52,22 +52,20 @@ public:
     void resizeGBuffer(int width, int height);
 
     /*
-     * Skybox
-     */
-    void skyboxPass(const glm::mat4& view, const glm::mat4& projection);
-    void initSkybox(const std::vector<std::string>& faces);
-
-    /*
      * Debugging: Display G-buffer textures (e.g., Position, Normal, Albedo)
      */
     void debugGBufferPass(const Shader& debugShader, int debugMode);
 
+    int getNumAttachments();
+
 private:
     /*
-     * Screen dimensions
-     */
+    * Viewport
+    */
     int m_width;
     int m_height;
+    unsigned int m_quadVAO;
+    Camera* m_camera;
 
     /*
      * Initialize OpenGL state (depth testing, face culling, etc.)
@@ -78,12 +76,6 @@ private:
     * Init mesh buffer for screen quad
     */
     void initScreenQuad();
-
-    /*
-    * Viewport
-    */
-    unsigned int m_quadVAO;
-    Camera* m_camera;
 
     // List of framebuffers (in the future)
     std::unique_ptr<Framebuffer> m_gBuffer;
@@ -96,15 +88,7 @@ private:
         GLsizei indexCount;
         GLsizei vertexCount;
     };
-
     std::vector<MeshData> m_meshData;
-
-    /*
-     * Skybox creation / management
-     */
-    unsigned int m_skyboxVAO, m_skyboxVBO;
-    unsigned int m_skyboxTexture;
-    Shader m_skyboxShader;
 };
 
 #endif // RENDERER_H

@@ -6,6 +6,6 @@
 
 // Declare global InputManager and debug variables
 extern InputManager inputManager;
-extern int DEBUG_view_framebuffers;
+extern int DEBUG_PASS_MODE;
 
 #endif // GLOBALS_H

@@ -16,24 +16,6 @@ Renderer::Renderer(int width, int height, Camera* camera) {
 
     // Initialize G-buffer
     m_gBuffer = std::make_unique<Framebuffer>(width, height, NUM_ATTACHMENTS, true);
-
-    // Set up the skybox shader
-    std::string skyboxVertexPath = ASSET_DIR "shaders/core/skybox.vs";
-    std::string skyboxFragmentPath = ASSET_DIR "shaders/core/skybox.fs";
-    if (!m_skyboxShader.load(skyboxVertexPath, skyboxFragmentPath)) {
-        std::cerr << "[Error] Renderer::loadSkyboxShader: Failed to create skyboxShader!\n";
-    }
-
-    // Initialize skybox with cubemap faces
-    std::vector<std::string> faces = {
-        ASSET_DIR "textures/skyboxes/bspace/1.png",
-        ASSET_DIR "textures/skyboxes/bspace/3.png",
-        ASSET_DIR "textures/skyboxes/bspace/5.png",
-        ASSET_DIR "textures/skyboxes/bspace/6.png",
-        ASSET_DIR "textures/skyboxes/bspace/2.png",
-        ASSET_DIR "textures/skyboxes/bspace/4.png"
-    };
-    initSkybox(faces);
 }
 
 Renderer::~Renderer() {
@@ -286,10 +268,6 @@ void Renderer::drawScreenQuad() {
     glBindVertexArray(0);
 }
 
-/*
-* TODO: Render Passes and GBuffer code below (will be abstracted later)
-*/
-
 void Renderer::resizeGBuffer(int width, int height) {
     m_width = width;
     m_height = height;
@@ -302,104 +280,6 @@ void Renderer::resizeGBuffer(int width, int height) {
 }
 
 /*
-* Skybox
+* Misc
 */
-void Renderer::skyboxPass(const glm::mat4& view, const glm::mat4& projection) {
-    // Change depth function so the skybox renders behind everything
-    glDepthFunc(GL_LEQUAL);
-
-    // Disable depth writing so the skybox doesn't overwrite depth buffer values
-    glDepthMask(GL_FALSE);
-
-    // Use skybox shader
-    m_skyboxShader.use();
-
-    // Remove translation from the view matrix for the skybox
-    glm::mat4 viewNoTranslation = glm::mat4(glm::mat3(view));  // Remove translation
-    m_skyboxShader.setMat4("view", viewNoTranslation);
-    m_skyboxShader.setMat4("projection", projection);
-
-    // Bind the skybox VAO and texture
-    glBindVertexArray(m_skyboxVAO);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_skyboxTexture);
-    glDrawArrays(GL_TRIANGLES, 0, 36);  // Draw the skybox
-
-    // Unbind VAO
-    glBindVertexArray(0);
-
-    // Re-enable depth writing after drawing the skybox
-    glDepthMask(GL_TRUE);
-
-    // Reset depth function to default (GL_LESS)
-    glDepthFunc(GL_LESS);
-}
-
-void Renderer::initSkybox(const std::vector<std::string>& faces) {
-    // Load the cubemap textures from image files
-    m_skyboxTexture = CubeMap::createFromImages(faces);
-
-    // Get the cubemap vertices from MeshGen
-    const float* cubeMapVerts = MeshGen::createCubeMapVerts();
-
-    // Generate the VAO for the skybox
-    glGenVertexArrays(1, &m_skyboxVAO);
-    glGenBuffers(1, &m_skyboxVBO);
-
-    glBindVertexArray(m_skyboxVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, m_skyboxVBO);
-    glBufferData(GL_ARRAY_BUFFER, 108 * sizeof(float), cubeMapVerts, GL_STATIC_DRAW);
-
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-
-    // Unbind VAO
-    glBindVertexArray(0);
-}
-
-/*
- * G-Buffer Debugging
- */
-void Renderer::debugGBufferPass(const Shader& debugShader, int debugMode) {
-    // Bind default framebuffer for debugging
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // Use the debug shader
-    debugShader.use();
-
-    // Set uniform samplers for G-buffer textures
-    debugShader.setInt("gPosition", 0);
-    debugShader.setInt("gNormal", 1);
-    debugShader.setInt("gAlbedo", 2);
-    debugShader.setInt("gDepth", 3);
-
-    // Set debug mode (defines what to visualize)
-    debugShader.setInt("debugMode", debugMode);
-
-    // Bind G-buffer textures using the Framebuffer class
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_gBuffer->getColorAttachment(0)); // Position
-
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, m_gBuffer->getColorAttachment(1)); // Normal
-
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, m_gBuffer->getColorAttachment(2)); // Albedo
-
-    // Bind Depth Texture
-    glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, m_gBuffer->getDepthAttachment()); // Depth
-
-    // Bind additional G-buffer textures if any (NUM_ATTACHMENTS > 4)
-    for (int i = 4; i < NUM_ATTACHMENTS; ++i) {
-        glActiveTexture(GL_TEXTURE0 + i);
-        glBindTexture(GL_TEXTURE_2D, m_gBuffer->getColorAttachment(i));
-        debugShader.setInt("gExtraTexture" + std::to_string(i - 3), i);
-    }
-
-    // Draw the screen-aligned quad to visualize the debug information
-    drawScreenQuad();
-
-    // Unbind the framebuffer
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
+int Renderer::getNumAttachments()  { return NUM_ATTACHMENTS; }

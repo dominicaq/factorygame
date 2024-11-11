@@ -7,23 +7,23 @@ public:
     void cycleModes() {
         if (inputManager.isKeyPressed(GLFW_KEY_1)) {
             // Turn off debug mode
-            DEBUG_view_framebuffers = -1;
+            DEBUG_PASS_MODE = -1;
         }
         if (inputManager.isKeyPressed(GLFW_KEY_2)) {
             // Position
-            DEBUG_view_framebuffers = 0;
+            DEBUG_PASS_MODE = 0;
         }
         if (inputManager.isKeyPressed(GLFW_KEY_3)) {
             // Normal
-            DEBUG_view_framebuffers = 1;
+            DEBUG_PASS_MODE = 1;
         }
         if (inputManager.isKeyPressed(GLFW_KEY_4)) {
             // Albedo
-            DEBUG_view_framebuffers = 2;
+            DEBUG_PASS_MODE = 2;
         }
         if (inputManager.isKeyPressed(GLFW_KEY_5)) {
             // Depth
-            DEBUG_view_framebuffers = 3;
+            DEBUG_PASS_MODE = 3;
         }
     }
 
