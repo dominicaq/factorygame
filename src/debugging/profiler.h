@@ -54,7 +54,7 @@ public:
             if (record.active) {
                 ImGui::Text("%s: running...", label.c_str());
             } else {
-                ImGui::Text("%s: %lld µs", label.c_str(), record.duration);
+                ImGui::Text("%s: %.3f ms", label.c_str(), record.duration / 1000.0);
             }
         }
 

@@ -15,9 +15,20 @@ uniform int debugMode;
 uniform float u_Near;
 uniform float u_Far;
 
+// Depth slicing
+uniform int numSlices;
+
 float LinearizeDepth(float depth) {
     float z = depth * 2.0 - 1.0; // Back to NDC
     return (2.0 * u_Near * u_Far) / (u_Far + u_Near - z * (u_Far - u_Near));
+}
+
+// Hash function to generate a random color based on the slice index
+vec3 GetSliceColor(int slice) {
+    float r = fract(sin(float(slice) * 12.9898) * 43758.5453);
+    float g = fract(sin(float(slice) * 78.233) * 43758.5453);
+    float b = fract(sin(float(slice) * 93.989) * 43758.5453);
+    return vec3(r, g, b);
 }
 
 void main()
@@ -34,8 +45,6 @@ void main()
     } else if (debugMode == 3) {
         // Visualize the depth buffer directly
         float depth = texture(gDepth, TexCoord).r;
-
-        // Linearize depth for better visualization
         float linearDepth = LinearizeDepth(depth);
 
         // Normalize the depth value between near and far planes
@@ -44,5 +53,21 @@ void main()
 
         // Output as grayscale
         FragColor = vec4(vec3(normalizedDepth), 1.0);
+    } else if (debugMode == 4) {
+        // Depth slice visualization
+        float depth = texture(gDepth, TexCoord).r;
+        float linearDepth = LinearizeDepth(depth);
+
+        // Calculate the slice index based on the provided formula
+        float logFarNear = log(u_Far / u_Near);
+        float sliceIndex = (log(linearDepth) / logFarNear) * numSlices - (numSlices * log(u_Near) / logFarNear);
+
+        // Get the integer slice index and clamp it within the range
+        int slice = int(floor(sliceIndex));
+        slice = clamp(slice, 0, numSlices - 1);
+
+        // Get a consistent random color for this slice
+        vec3 sliceColor = GetSliceColor(slice);
+        FragColor = vec4(sliceColor, 1.0);
     }
 }

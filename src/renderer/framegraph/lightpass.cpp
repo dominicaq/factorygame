@@ -2,6 +2,8 @@
 #include <iostream>
 #include <string>
 
+// TODO: clustered deferred lighting
+// https://www.aortiz.me/2018/12/21/CG.html
 void LightPass::setup() {
     std::string lightVertexPath = ASSET_DIR "shaders/core/deferred/lightpass.vs";
     std::string lightFragmentPath = ASSET_DIR "shaders/core/deferred/lightpass.fs";

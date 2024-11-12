@@ -20,14 +20,8 @@ public:
     };
 
     void execute(Renderer& renderer, entt::registry& registry) override {
-        if (DEBUG_PASS_MODE < 0) {
+        if (DEBUG_CTX.mode < 0) {
             return;
-        }
-
-        // Get resources
-        Camera* camera = renderer.getCamera();
-        if (m_camera != camera) {
-            m_camera = camera;
         }
 
         // Bind default framebuffer for debugging
@@ -37,6 +31,13 @@ public:
         // Use the debug shader
         m_debugShader.use();
 
+        Camera* camera = renderer.getCamera();
+        if (m_camera != camera) {
+            m_camera = camera;
+            m_debugShader.setFloat("u_Near", m_camera->getNearPlane());
+            m_debugShader.setFloat("u_Far",  m_camera->getFarPlane());
+        }
+
         // Set uniform samplers for G-buffer textures
         m_debugShader.setInt("gPosition", 0);
         m_debugShader.setInt("gNormal", 1);
@@ -44,7 +45,8 @@ public:
         m_debugShader.setInt("gDepth", 3);
 
         // Set debug mode (defines what to visualize)
-        m_debugShader.setInt("debugMode", DEBUG_PASS_MODE);
+        m_debugShader.setInt("debugMode", DEBUG_CTX.mode);
+        m_debugShader.setInt("numSlices", DEBUG_CTX.numDepthSlices);
 
         // Bind G-buffer textures using the Framebuffer class
         Framebuffer* gBuffer = renderer.getFramebuffer();

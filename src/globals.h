@@ -6,6 +6,11 @@
 
 // Declare global InputManager and debug variables
 extern InputManager inputManager;
-extern int DEBUG_PASS_MODE;
+
+struct DebugContext {
+    int mode;
+    int numDepthSlices;
+};
+extern DebugContext DEBUG_CTX;
 
 #endif // GLOBALS_H

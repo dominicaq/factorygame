@@ -21,9 +21,12 @@
 
 // Define globals
 InputManager inputManager;
-int DEBUG_PASS_MODE = -1;
+DebugContext DEBUG_CTX;
 
 int main() {
+    DEBUG_CTX.mode = -1;
+    DEBUG_CTX.numDepthSlices = 20;
+
     // Initialize window
     Window window("Factory Game", SCREEN_WIDTH, SCREEN_HEIGHT);
     if (!window.init()) {
