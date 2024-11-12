@@ -10,12 +10,6 @@
 #include <memory>
 #include <vector>
 
-// Forward declarations to prevent circular dependency from engine.h
-class Mesh;
-class ECSWorld;
-class Entity;
-class Camera;
-
 /*
  * The Renderer class is responsible for handling OpenGL rendering,
  * including G-buffer management for deferred rendering and mesh rendering.
