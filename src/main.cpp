@@ -1,12 +1,12 @@
 #include "engine.h"
 
 // Render passes
-#include "renderer/rendergraph/geometrypass.h"
-#include "renderer/rendergraph/lightpass.h"
-#include "renderer/rendergraph/forwardpass.h"
-#include "renderer/rendergraph/skyboxpass.h"
-#include "renderer/rendergraph/rendergraph.h"
-#include "renderer/rendergraph/debugpass.h"
+#include "renderer/framegraph/geometrypass.h"
+#include "renderer/framegraph/lightpass.h"
+#include "renderer/framegraph/forwardpass.h"
+#include "renderer/framegraph/skyboxpass.h"
+#include "renderer/framegraph/framegraph.h"
+#include "renderer/framegraph/debugpass.h"
 
 #include "debugging/profiler.h"
 #include "imgui/imgui.h"
@@ -57,8 +57,7 @@ int main() {
 
     frameGraph.setupPasses();
 
-    // ---------------------------------------------------------------
-
+    // -------------------- Start Game -------------------
     GameObjectSystem gameObjectSystem(scene.registry);
     TransformSystem transformSystem(scene.registry);
 
@@ -69,7 +68,7 @@ int main() {
 
     Profiler profiler;
 
-    // Game loop
+    // -------------------- Game Loop -------------------
     while (!window.shouldClose()) {
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
@@ -84,7 +83,6 @@ int main() {
         }
 
         // -------------- System updates ------------
-
         profiler.start("Systems");
         gameObjectSystem.updateAll(deltaTime);
         transformSystem.updateTransformComponents();

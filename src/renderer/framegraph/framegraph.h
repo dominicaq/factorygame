@@ -1,5 +1,5 @@
-#ifndef RENDERGRAPH_H
-#define RENDERGRAPH_H
+#ifndef FRAMEGRAPH_H
+#define FRAMEGRAPH_H
 
 #include <memory>
 #include <vector>
@@ -31,4 +31,4 @@ private:
     std::vector<std::unique_ptr<RenderPass>> m_renderPasses;
 };
 
-#endif // RENDERGRAPH_H
+#endif // FRAMEGRAPH_H
