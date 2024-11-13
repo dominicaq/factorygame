@@ -1,7 +1,6 @@
 #include "scene.h"
 
-#include <stdexcept>
-
+// User scripts
 #include "CircularRotation.h"
 #include "FreeCamera.h"
 #include "MoveScript.h"
@@ -161,7 +160,7 @@ void Scene::loadScene() {
         lightData.type = LightType::Point;
         lightData.castsShadows = false;
         lightData.isActive = true;
-        registry.emplace<Light>(lightEntity, lightData);
+        addPointLightComponents(registry, lightEntity, lightData);
 
         Mesh* lightCube = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
         if (lightCube != nullptr) {
@@ -187,6 +186,16 @@ void Scene::setPrimaryCamera(entt::entity cameraEntity) {
 /*
 * Component Helpers
 */
+void Scene::addLightComponents(entt::registry& registry, entt::entity entity, Light lightData) {
+    registry.emplace<Light>(entity, lightData);
+    registry.emplace<LightSpaceMatrix>(entity);
+}
+
+void Scene::addPointLightComponents(entt::registry& registry, entt::entity entity, Light lightData) {
+    registry.emplace<Light>(entity, lightData);
+    registry.emplace<LightSpaceMatrixCube>(entity);
+}
+
 GameObject* Scene::addGameObjectComponent(entt::registry& registry, entt::entity entity, const SceneData& data) {
     if (!registry.valid(entity)) {
         return nullptr;

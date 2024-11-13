@@ -17,6 +17,7 @@
 
 #include "components/systems/gameobject_system.h"
 #include "components/systems/transform_system.h"
+#include "components/systems/light_system.h"
 
 #include "components/resources.h"
 
@@ -28,7 +29,5 @@
 #include "renderer/shader.h"
 #include "renderer/texture.h"
 #include "renderer/renderer.h"
-
-#include "scene.h"
 
 #endif // ENGINE_H

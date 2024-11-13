@@ -5,8 +5,6 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <vector>
-#include <limits>
 
 #define MAX_LIGHTS 100
 
@@ -25,10 +23,19 @@ struct Light {
     bool isActive = true;
 };
 
-struct Shadow {
-    glm::mat4 lightSpaceMatrix = glm::mat4(1.0f);
-    unsigned int shadowMapTexture = 0;
-    bool dirty = false;
+struct LightSpaceMatrix {
+    glm::mat4 matrix = glm::mat4(1.0f);
+};
+
+struct LightSpaceMatrixCube {
+    glm::mat4 matrices[6] = {
+        glm::mat4(1.0f), // Right face (+X)
+        glm::mat4(1.0f), // Left face (-X)
+        glm::mat4(1.0f), // Up face (+Y)
+        glm::mat4(1.0f), // Down face (-Y)
+        glm::mat4(1.0f), // Front face (+Z)
+        glm::mat4(1.0f)  // Back face (-Z)
+    };
 };
 
 #endif // LIGHT_H

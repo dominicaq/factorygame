@@ -1,4 +1,5 @@
 #include "engine.h"
+#include "scene.h"
 
 // Render passes
 #include "renderer/framegraph/geometrypass.h"
@@ -25,7 +26,7 @@ DebugContext DEBUG_CTX;
 
 int main() {
     DEBUG_CTX.mode = -1;
-    DEBUG_CTX.numDepthSlices = 20;
+    DEBUG_CTX.numDepthSlices = 50;
 
     // Initialize window
     Window window("Factory Game", SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -63,6 +64,7 @@ int main() {
     // -------------------- Start Game -------------------
     GameObjectSystem gameObjectSystem(scene.registry);
     TransformSystem transformSystem(scene.registry);
+    LightSystem lightSystem(scene.registry);
 
     gameObjectSystem.startAll();
 
@@ -89,6 +91,7 @@ int main() {
         profiler.start("Systems");
         gameObjectSystem.updateAll(deltaTime);
         transformSystem.updateTransformComponents();
+        lightSystem.updateShadowMatrices();
         profiler.end("Systems");
 
         // ------------------------ Rendering ------------------------

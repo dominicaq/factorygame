@@ -27,16 +27,18 @@ struct SceneData {
 
 class Scene {
 public:
+    entt::registry registry;
+
     // Scene management
     void loadScene();
     Camera& getPrimaryCamera();
     void setPrimaryCamera(entt::entity cameraEntity);
-
+private:
     // Component Helpers
     GameObject* addGameObjectComponent(entt::registry& registry, entt::entity entity, const SceneData& data);
+    void addLightComponents(entt::registry& registry, entt::entity entity, Light lightData);
+    void addPointLightComponents(entt::registry& registry, entt::entity entity, Light lightData);
 
-    entt::registry registry;
-private:
     entt::entity m_primaryCameraEntity = entt::null;
 };
 
