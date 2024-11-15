@@ -26,8 +26,14 @@ public:
         return {m_width, m_height};
     }
     Framebuffer* getFramebuffer() const { return m_gBuffer.get(); }
-    Framebuffer* getShadowAtlas() const { return m_shadowAtlas.get(); }
     Camera* getCamera() const { return m_camera; }
+
+    /*
+    * Shadow Atlas
+    */
+    Framebuffer* getShadowAtlas() const { return m_shadowAtlas.get(); }
+    std::pair<int, int> getShadowAtlasDimensions() const { return {m_atlasSize, m_atlasTileSize}; }
+    void resizeShadowAtlas();
 
     /*
      * Initialize and manage mesh buffers

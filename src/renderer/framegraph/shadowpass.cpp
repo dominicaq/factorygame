@@ -1,10 +1,6 @@
 #include "shadowpass.h"
 #include <glad/glad.h>
 
-ShadowPass::ShadowPass(Renderer& renderer, unsigned int atlasSize, unsigned int tileSize)
-    : m_atlasSize(atlasSize),
-      m_tileSize(tileSize) {}
-
 void ShadowPass::setup() {
     std::string shadowVertPath = ASSET_DIR "shaders/core/shadow.vs";
     std::string shadowFragPath = ASSET_DIR "shaders/core/shadow.fs";
@@ -19,16 +15,25 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
     shadowAtlas->bind();
     m_shadowShader.use();
 
-    int tileIndex = 0;
+    // Get atlas data
+    std::pair<int, int> atlasDimensions = renderer.getShadowAtlasDimensions();
+    int atlasSize = atlasDimensions.first;
+    int tileSize = atlasDimensions.second;
+    int maxShadowMaps = (atlasSize / tileSize) * (atlasSize / tileSize);
 
+    int tileIndex = 0;
     // Render 2D shadow maps
     registry.view<LightSpaceMatrix>().each([&](auto& lightSpaceMatrix) {
+        if (tileIndex >= maxShadowMaps) {
+            std::cerr << "[Warning] Exceeded maximum number of shadow maps in the atlas!" << std::endl;
+            return;
+        }
+
+        int tileX = (tileIndex % (atlasSize / tileSize)) * tileSize;
+        int tileY = (tileIndex / (atlasSize / tileSize)) * tileSize;
+
         m_shadowShader.setMat4("u_LightSpaceMatrix", lightSpaceMatrix.matrix);
-
-        int tileX = (tileIndex % (m_atlasSize / m_tileSize)) * m_tileSize;
-        int tileY = (tileIndex / (m_atlasSize / m_tileSize)) * m_tileSize;
-
-        glViewport(tileX, tileY, m_tileSize, m_tileSize);
+        glViewport(tileX, tileY, tileSize, tileSize);
         glClear(GL_DEPTH_BUFFER_BIT);
 
         renderSceneDepth(renderer, registry);
@@ -38,12 +43,16 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
     // Render cubemap shadow maps
     registry.view<LightSpaceMatrixCube>().each([&](auto& lightSpaceCube) {
         for (int face = 0; face < 6; ++face) {
+            if (tileIndex >= maxShadowMaps) {
+                std::cerr << "[Warning] Exceeded maximum number of shadow maps in the atlas!" << std::endl;
+                return;
+            }
+
+            int tileX = (tileIndex % (atlasSize / tileSize)) * tileSize;
+            int tileY = (tileIndex / (atlasSize / tileSize)) * tileSize;
+
             m_shadowShader.setMat4("u_LightSpaceMatrix", lightSpaceCube.matrices[face]);
-
-            int tileX = (tileIndex % (m_atlasSize / m_tileSize)) * m_tileSize;
-            int tileY = (tileIndex / (m_atlasSize / m_tileSize)) * m_tileSize;
-
-            glViewport(tileX, tileY, m_tileSize, m_tileSize);
+            glViewport(tileX, tileY, tileSize, tileSize);
             glClear(GL_DEPTH_BUFFER_BIT);
 
             renderSceneDepth(renderer, registry);
@@ -52,8 +61,8 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
     });
 
     shadowAtlas->unbind();
-    auto dimensions = renderer.getScreenDimensions();
-    glViewport(0, 0, dimensions.first, dimensions.second);
+    auto screenDimensions = renderer.getScreenDimensions();
+    glViewport(0, 0, screenDimensions.first, screenDimensions.second);
 }
 
 void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) {

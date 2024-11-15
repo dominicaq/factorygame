@@ -20,6 +20,8 @@
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
+#define SHADOW_ATLAS_SIZE 4096
+#define SHADOW_ATLAS_TILE_SIZE 256
 
 // Define globals
 InputManager inputManager;
@@ -44,11 +46,11 @@ int main() {
 
     // Create renderer and send mesh data to GPU
     Camera& camera = scene.getPrimaryCamera();
-    Renderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT, 1, 1, &camera);
+    Renderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT, SHADOW_ATLAS_SIZE, SHADOW_ATLAS_TILE_SIZE, &camera);
     window.setRenderer(&renderer);
 
     FrameGraph frameGraph;
-    frameGraph.addRenderPass(std::make_unique<ShadowPass>(renderer));
+    frameGraph.addRenderPass(std::make_unique<ShadowPass>());
     frameGraph.addRenderPass(std::make_unique<GeometryPass>());
     frameGraph.addRenderPass(std::make_unique<LightPass>());
     frameGraph.addRenderPass(std::make_unique<ForwardPass>());
