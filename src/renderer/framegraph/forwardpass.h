@@ -20,14 +20,10 @@ public:
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);
 
-        auto viewMesh = registry.view<Mesh*, ModelMatrix>();
-        for (auto entity : viewMesh) {
-            const auto& mesh = registry.get<Mesh*>(entity);
-            const auto& modelMatrix = registry.get<ModelMatrix>(entity);
-
+        registry.view<Mesh*, ModelMatrix>().each([&](Mesh* mesh, const ModelMatrix& modelMatrix) {
             // Skip deferred rendering materials
             if (mesh->material->isDeferred) {
-                continue;
+                return;
             }
 
             Shader* shader = mesh->material->shader;
@@ -40,8 +36,8 @@ public:
 
             mesh->material->bind();
             renderer.draw(mesh);
-        }
-    };
+        });
+    }
 };
 
 #endif // FORWARDPASS_H

@@ -13,6 +13,8 @@ public:
     Framebuffer(unsigned int width, unsigned int height, unsigned int numColorAttachments, bool useDepthBuffer);
     ~Framebuffer();
 
+    void initFrameBuffer(unsigned int width, unsigned int height, unsigned int numColorAttachments, bool useDepthBuffer);
+
     void bind() const;
     void unbind() const;
 
@@ -54,8 +56,6 @@ private:
     };
 
     FramebufferData m_data;  // Holds packed data
-
-    void initFrameBuffer(unsigned int width, unsigned int height, unsigned int numColorAttachments, bool useDepthBuffer);
 };
 
 #endif // FRAMEBUFFER_H

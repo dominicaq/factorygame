@@ -6,16 +6,37 @@
 // Define the number of G-buffer attachments
 #define NUM_ATTACHMENTS 4
 
-Renderer::Renderer(int width, int height, Camera* camera) {
+Renderer::Renderer(int width, int height, int atlasSize, int atlasTileSize, Camera* camera) {
+    // Viewport
     m_camera = camera;
     m_width = width;
     m_height = height;
 
+    // Shadow Atlas
+    m_atlasSize = atlasSize;
+    m_atlasTileSize = atlasTileSize;
+
     initOpenGLState();
     initScreenQuad();
 
-    // Initialize G-buffer
+    // Initialize G-Buffer
     m_gBuffer = std::make_unique<Framebuffer>(width, height, NUM_ATTACHMENTS, true);
+
+    // Initialize Shadow Atlas
+    m_shadowAtlas = std::make_unique<Framebuffer>(atlasSize, atlasSize, 0, true);
+    m_shadowAtlas->bind();
+
+    // Set up the depth texture parameters for the shadow map
+    glBindTexture(GL_TEXTURE_2D, m_shadowAtlas->getDepthAttachment());
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+    float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+    m_shadowAtlas->unbind();
 }
 
 Renderer::~Renderer() {

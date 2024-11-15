@@ -32,26 +32,17 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     Camera* camera = renderer.getCamera();
     m_lightPassShader.setVec3("u_CameraPosition", camera->getPosition());
 
-    // Set the number of lights
-    auto lightView = registry.view<Light>();
-    size_t numLights = lightView.size();
-
-    m_lightPassShader.setInt("numLights", numLights);
-
     // Pass each light's data to the shader
-    size_t i = 0;
-    for (auto entity : lightView) {
+    int i = 0;
+    registry.view<Light, Position>().each([&](const Light& lightComponent, const Position& positionComponent) {
         std::string indexStr = "[" + std::to_string(i) + "]";
-
-        const auto& lightComponent = registry.get<Light>(entity);
-        const auto& positionComponent = registry.get<Position>(entity);
-
         m_lightPassShader.setVec3("lights" + indexStr + ".position", positionComponent.position);
         m_lightPassShader.setVec3("lights" + indexStr + ".color", lightComponent.color);
         m_lightPassShader.setFloat("lights" + indexStr + ".intensity", lightComponent.intensity);
 
         ++i;
-    }
+    });
+    m_lightPassShader.setInt("numLights", i + 1);
 
     // Setup G-buffer textures for lighting
     Framebuffer* gbuffer = renderer.getFramebuffer();

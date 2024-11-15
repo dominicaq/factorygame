@@ -64,17 +64,30 @@ void Framebuffer::initFrameBuffer(unsigned int width, unsigned int height, unsig
     glGenFramebuffers(1, &m_fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
 
-    // Create color attachments
-    glGenTextures(numColorAttachments, m_colorAttachments);
+    if (numColorAttachments > 0) {
+        // Create color attachments
+        glGenTextures(numColorAttachments, m_colorAttachments);
 
-    for (unsigned int i = 0; i < numColorAttachments; ++i) {
-        glBindTexture(GL_TEXTURE_2D, m_colorAttachments[i]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, m_colorAttachments[i], 0);
+        for (unsigned int i = 0; i < numColorAttachments; ++i) {
+            glBindTexture(GL_TEXTURE_2D, m_colorAttachments[i]);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, m_colorAttachments[i], 0);
+        }
+
+        // Specify the list of draw buffers
+        GLenum drawBuffers[MAX_ATTACHMENTS];
+        for (unsigned int i = 0; i < numColorAttachments; ++i) {
+            drawBuffers[i] = GL_COLOR_ATTACHMENT0 + i;
+        }
+        glDrawBuffers(numColorAttachments, drawBuffers);
+    } else {
+        // No color attachments, disable drawing to color buffers
+        glDrawBuffer(GL_NONE);
+        glReadBuffer(GL_NONE);
     }
 
     // Create depth buffer if needed
@@ -86,13 +99,6 @@ void Framebuffer::initFrameBuffer(unsigned int width, unsigned int height, unsig
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_depthBuffer, 0);
     }
-
-    // Specify the list of draw buffers
-    GLenum drawBuffers[MAX_ATTACHMENTS];
-    for (unsigned int i = 0; i < numColorAttachments; ++i) {
-        drawBuffers[i] = GL_COLOR_ATTACHMENT0 + i;
-    }
-    glDrawBuffers(numColorAttachments, drawBuffers);
 
     // Check if the framebuffer is complete
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {

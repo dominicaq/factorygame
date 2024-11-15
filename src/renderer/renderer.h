@@ -16,7 +16,7 @@
  */
 class Renderer {
 public:
-    Renderer(int width, int height, Camera* camera);
+    Renderer(int width, int height, int atlasSize, int atlasTileSize, Camera* camera);
     ~Renderer();
 
     /*
@@ -26,6 +26,7 @@ public:
         return {m_width, m_height};
     }
     Framebuffer* getFramebuffer() const { return m_gBuffer.get(); }
+    Framebuffer* getShadowAtlas() const { return m_shadowAtlas.get(); }
     Camera* getCamera() const { return m_camera; }
 
     /*
@@ -45,11 +46,6 @@ public:
      */
     void resizeGBuffer(int width, int height);
 
-    /*
-     * Debugging: Display G-buffer textures (e.g., Position, Normal, Albedo)
-     */
-    void debugGBufferPass(const Shader& debugShader, int debugMode);
-
     int getNumAttachments();
 
 private:
@@ -60,6 +56,12 @@ private:
     int m_height;
     unsigned int m_quadVAO;
     Camera* m_camera;
+
+    /*
+    * Shadow Atlas
+    */
+    int m_atlasSize;
+    int m_atlasTileSize;
 
     /*
      * Initialize OpenGL state (depth testing, face culling, etc.)
@@ -73,6 +75,7 @@ private:
 
     // List of framebuffers (in the future)
     std::unique_ptr<Framebuffer> m_gBuffer;
+    std::unique_ptr<Framebuffer> m_shadowAtlas;
 
     /*
      * Mesh buffer storage

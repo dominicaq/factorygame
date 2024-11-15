@@ -34,25 +34,20 @@ public:
         m_gBufferShader.setMat4("u_View", viewMatrix);
         m_gBufferShader.setMat4("u_Projection", camera->getProjectionMatrix());
 
-        // Loop through all entities with Mesh and ModelMatrix components
-        // This is bad, but for now query for meshes in the individual passes
-        auto viewMesh = registry.view<Mesh*, ModelMatrix>();
-        for (auto entity : viewMesh) {
-            const auto& mesh = registry.get<Mesh*>(entity);
-            // Skip forward rendering materials
+        registry.view<Mesh*, ModelMatrix>().each([&](Mesh* mesh, const ModelMatrix& modelMatrix) {
+            // Skip forward render materials
             if (!mesh->material->isDeferred) {
-                continue;
+                return;
             }
 
-            const auto& modelMatrix = registry.get<ModelMatrix>(entity);
             m_gBufferShader.setMat4("u_Model", modelMatrix.matrix);
 
             mesh->material->bind(&m_gBufferShader);
             renderer.draw(mesh);
-        }
+        });
+
 
         std::pair<int, int> dimensions = renderer.getScreenDimensions();
-
         int width = dimensions.first;
         int height = dimensions.second;
 

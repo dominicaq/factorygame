@@ -161,6 +161,7 @@ void Scene::loadScene() {
         lightData.castsShadows = false;
         lightData.isActive = true;
         addPointLightComponents(registry, lightEntity, lightData);
+        // addPointLightComponents(registry, lightEntity, lightData);
 
         Mesh* lightCube = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
         if (lightCube != nullptr) {
