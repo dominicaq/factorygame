@@ -9,6 +9,11 @@ uniform sampler2D gPosition;
 uniform sampler2D gNormal;
 uniform sampler2D gAlbedo;
 
+// Shadow atlas data
+uniform sampler2D u_ShadowAtlas;
+uniform int u_AtlasSize;
+uniform int u_TileSize;
+
 // Scene Data
 uniform vec3 u_CameraPosition;
 
@@ -17,8 +22,7 @@ struct Light {
     vec3 position;
     vec3 color;
     float intensity;
-    bool isDirectional;
-    vec3 direction;
+    int atlasIndices[6];
 };
 
 #define MAX_LIGHTS 10
@@ -26,6 +30,8 @@ uniform int numLights;
 uniform Light lights[MAX_LIGHTS];
 
 void main() {
+    float dummy = texture(u_ShadowAtlas, vec2(u_AtlasSize, u_TileSize)).r;
+
     // Retrieve data from G-buffer
     vec3 FragPos = texture(gPosition, TexCoords).rgb;
     vec3 Normal = normalize(texture(gNormal, TexCoords).rgb);
@@ -39,12 +45,7 @@ void main() {
     for (int i = 0; i < numLights; ++i) {
         Light light = lights[i];
 
-        vec3 lightDir;
-        if (light.isDirectional) {
-            lightDir = normalize(-light.direction);
-        } else {
-            lightDir = normalize(light.position - FragPos);
-        }
+        vec3 lightDir = normalize(light.position - FragPos);
 
         // Diffuse component
         float diff = max(dot(Normal, lightDir), 0.0);

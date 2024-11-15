@@ -36,12 +36,20 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     int i = 0;
     registry.view<Light, Position>().each([&](const Light& lightComponent, const Position& positionComponent) {
         std::string indexStr = "[" + std::to_string(i) + "]";
+
         m_lightPassShader.setVec3("lights" + indexStr + ".position", positionComponent.position);
         m_lightPassShader.setVec3("lights" + indexStr + ".color", lightComponent.color);
         m_lightPassShader.setFloat("lights" + indexStr + ".intensity", lightComponent.intensity);
 
+        for (size_t j = 0; j < 6; ++j) {
+            std::string atlasIndexStr = "lights" + indexStr + ".atlasIndices[" + std::to_string(j) + "]";
+            m_lightPassShader.setInt(atlasIndexStr, lightComponent.atlasIndices[j]);
+        }
+
         ++i;
     });
+
+    // TODO: Send light space matrix data as well. can be done here with view<LightSpaceMatrix>, and view<LightSpaceMatrixCube>
     m_lightPassShader.setInt("numLights", i + 1);
 
     // Setup G-buffer textures for lighting
@@ -57,6 +65,17 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, gbuffer->getColorAttachment(2));
     m_lightPassShader.setInt("gAlbedo", 2);
+
+    // Set shadow atlas for sampling
+    Framebuffer* shadowAtlas = renderer.getShadowAtlas();
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, shadowAtlas->getDepthAttachment());
+    m_lightPassShader.setInt("u_ShadowAtlas", 3);
+
+    // Shadow Atlas properties
+    std::pair<int, int> atlasDimensions = renderer.getShadowAtlasDimensions();
+    m_lightPassShader.setInt("u_AtlasSize", atlasDimensions.first);
+    m_lightPassShader.setInt("u_TileSize", atlasDimensions.second);
 
     // Draw the screen-aligned quad for lighting
     renderer.drawScreenQuad();
