@@ -74,9 +74,7 @@ void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) 
         const auto& mesh = registry.get<Mesh*>(entity);
         const auto& modelMatrix = registry.get<ModelMatrix>(entity);
 
-        m_shadowShader.use();
         m_shadowShader.setMat4("u_Model", modelMatrix.matrix);
-
         renderer.draw(mesh);
     }
 }

@@ -124,7 +124,7 @@ void Scene::loadScene() {
     // --------------------- Light Circle ---------------------
     int n = 3;
     float circleRadius = 5.0f;
-    float yPosition = 2.0f;
+    float yPosition = 1.0f;
 
     for (int i = 0; i < n; ++i) {
         float angle = i * (360.0f / n);
@@ -156,12 +156,11 @@ void Scene::loadScene() {
         }
         lightData.color = color;
         lightData.intensity = 1.0f;
-        lightData.radius = 1.0f;
+        lightData.radius = 1000.0f;
         lightData.type = LightType::Point;
-        lightData.castsShadows = false;
+        lightData.castsShadows = true;
         lightData.isActive = true;
         addPointLightComponents(registry, lightEntity, lightData);
-        // addPointLightComponents(registry, lightEntity, lightData);
 
         Mesh* lightCube = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
         if (lightCube != nullptr) {
