@@ -13,6 +13,8 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
     // Access and bind Renderer’s shadow atlas directly
     Framebuffer* shadowAtlas = renderer.getShadowAtlas();
     shadowAtlas->bind();
+    glClear(GL_DEPTH_BUFFER_BIT);
+
     m_shadowShader.use();
 
     // Get atlas data
@@ -31,10 +33,9 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 
         int tileX = (tileIndex % (atlasSize / tileSize)) * tileSize;
         int tileY = (tileIndex / (atlasSize / tileSize)) * tileSize;
+        glViewport(tileX, tileY, tileSize, tileSize);
 
         m_shadowShader.setMat4("u_LightSpaceMatrix", lightSpaceMatrix.matrix);
-        glViewport(tileX, tileY, tileSize, tileSize);
-        glClear(GL_DEPTH_BUFFER_BIT);
 
         renderSceneDepth(renderer, registry);
         ++tileIndex;
@@ -53,7 +54,6 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 
             m_shadowShader.setMat4("u_LightSpaceMatrix", lightSpaceCube.matrices[face]);
             glViewport(tileX, tileY, tileSize, tileSize);
-            glClear(GL_DEPTH_BUFFER_BIT);
 
             renderSceneDepth(renderer, registry);
             ++tileIndex;

@@ -83,5 +83,10 @@ else()
     target_link_libraries(${PROJECT_NAME} "${GLFW_LIB_DIR}/libglfw.3.dylib")
 endif()
 
-# Silence deprecated warnings from entt
-target_compile_options(${PROJECT_NAME} PRIVATE -Wno-deprecated-declarations)
+if (APPLE)
+    # Silence deprecated warnings on macOS
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wno-deprecated-declarations)
+elseif (WIN32)
+    # Silence deprecated warnings on Windows (MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE /wd4996)
+endif()

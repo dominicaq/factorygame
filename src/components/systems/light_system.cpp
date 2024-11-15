@@ -3,37 +3,37 @@
 LightSystem::LightSystem(entt::registry& registry) : m_registry(registry) {}
 
 void LightSystem::updateShadowMatrices() {
-    auto lightView = m_registry.view<Light, Position>();
-
-    for (auto entity : lightView) {
-        auto& light = lightView.get<Light>(entity);
-
+    m_registry.view<Light, Position>().each([&](auto entity, Light& light, Position& position) {
         if (!light.castsShadows) {
-            continue;
+            return; // Skip lights that don't cast shadows
         }
 
-        const auto& position = lightView.get<Position>(entity).position;
-
         if (light.type == LightType::Point) {
-            auto& lightSpaceCube = m_registry.get<LightSpaceMatrixCube>(entity);
-            updatePointLightMatrices(lightSpaceCube, position, light.radius);
+            // Get the LightSpaceMatrixCube component
+            auto* lightSpaceCube = m_registry.try_get<LightSpaceMatrixCube>(entity);
+            updatePointLightMatrices(*lightSpaceCube, position.position, light.radius);
         } else {
-            auto& lightMatrix = m_registry.get<LightSpaceMatrix>(entity).matrix;
-            const auto& eulerAngles = m_registry.get<EulerAngles>(entity).euler;
+            // Get the LightSpaceMatrix and EulerAngles components
+            auto* lightSpaceMatrixComponent = m_registry.try_get<LightSpaceMatrix>(entity);
+            auto* eulerAnglesComponent = m_registry.try_get<EulerAngles>(entity);
 
             glm::vec3 lightDirection;
-            float pitch = glm::radians(eulerAngles.x);
-            float yaw = glm::radians(eulerAngles.y);
+            float pitch = glm::radians(eulerAnglesComponent->euler.x);
+            float yaw = glm::radians(eulerAnglesComponent->euler.y);
 
-            // Get forward direction
+            // Calculate the forward direction
             lightDirection.x = cos(pitch) * sin(yaw);
             lightDirection.y = sin(pitch);
             lightDirection.z = cos(pitch) * cos(yaw);
             lightDirection = glm::normalize(lightDirection);
 
-            lightMatrix = calculateLightSpaceMatrix(position, lightDirection, light.type, light.radius);
+            // Update the light space matrix
+            lightSpaceMatrixComponent->matrix = calculateLightSpaceMatrix(
+                position.position,
+                lightDirection,
+                light.type, light.radius);
         }
-    }
+    });
 }
 
 void LightSystem::updatePointLightMatrices(LightSpaceMatrixCube& lightSpaceCube, const glm::vec3& position, float radius) {
