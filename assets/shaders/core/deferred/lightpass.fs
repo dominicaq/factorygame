@@ -23,15 +23,41 @@ struct Light {
     vec3 color;
     float intensity;
     int atlasIndices[6];
+    mat4 lightSpaceMatrices[6];
 };
 
 #define MAX_LIGHTS 10
 uniform int numLights;
 uniform Light lights[MAX_LIGHTS];
 
-void main() {
-    float dummy = texture(u_ShadowAtlas, vec2(u_AtlasSize, u_TileSize)).r;
+// Function to compute shadow contribution for a single face
+float SampleShadow(vec4 lightSpaceFragPos, int tileIndex) {
+    // Perform perspective divide
+    vec3 projCoords = lightSpaceFragPos.xyz / lightSpaceFragPos.w;
 
+    // Map to [0, 1] UV space
+    projCoords = projCoords * 0.5 + 0.5;
+
+    // Check if out of bounds
+    if (projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0 || projCoords.z > 1.0) {
+        return 1.0; // Not in shadow
+    }
+
+    // Compute shadow atlas UV
+    int tilesPerRow = u_AtlasSize / u_TileSize;
+    vec2 tileOffset = vec2(tileIndex % tilesPerRow, tileIndex / tilesPerRow) * float(u_TileSize) / float(u_AtlasSize);
+    vec2 atlasUV = projCoords.xy * float(u_TileSize) / float(u_AtlasSize) + tileOffset;
+
+    // Sample shadow map and perform depth comparison
+    float shadowDepth = texture(u_ShadowAtlas, atlasUV).r;
+    float currentDepth = projCoords.z;
+
+    // Add a bias to avoid shadow acne
+    float bias = 0.005;
+    return currentDepth - bias > shadowDepth ? 0.0 : 1.0;
+}
+
+void main() {
     // Retrieve data from G-buffer
     vec3 FragPos = texture(gPosition, TexCoords).rgb;
     vec3 Normal = normalize(texture(gNormal, TexCoords).rgb);
@@ -41,7 +67,7 @@ void main() {
     vec3 ambient = 0.2 * Albedo;
     vec3 lighting = ambient;
 
-    // Accumulate lighting for each light (naive approach)
+    // Accumulate lighting for each light
     for (int i = 0; i < numLights; ++i) {
         Light light = lights[i];
 
@@ -54,11 +80,19 @@ void main() {
         // Specular component
         vec3 viewDir = normalize(u_CameraPosition - FragPos);
         vec3 reflectDir = reflect(-lightDir, Normal);
-        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 512.0);
+        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
         vec3 specular = light.color * spec * light.intensity * 0.5;
 
-        // Accumulate light contribution
-        lighting += diffuse + specular;
+        // Shadow calculation (extremely performance heavy, needs another look)
+        float shadow = 0.0;
+        for (int j = 0; j < 6; ++j) {
+            vec4 lightSpaceFragPos = light.lightSpaceMatrices[j] * vec4(FragPos, 1.0);
+            shadow += SampleShadow(lightSpaceFragPos, light.atlasIndices[j]);
+        }
+        shadow /= 6.0;
+
+        // Combine lighting with shadow
+        lighting += shadow * (diffuse + specular);
     }
 
     // Blend albedo and lighting

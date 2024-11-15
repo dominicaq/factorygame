@@ -34,22 +34,34 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
 
     // Pass each light's data to the shader
     int i = 0;
-    registry.view<Light, Position>().each([&](const Light& lightComponent, const Position& positionComponent) {
+    registry.view<Light, Position>().each([&](entt::entity entity, const Light& lightComponent, const Position& positionComponent) {
         std::string indexStr = "[" + std::to_string(i) + "]";
 
+        // Light properties
         m_lightPassShader.setVec3("lights" + indexStr + ".position", positionComponent.position);
         m_lightPassShader.setVec3("lights" + indexStr + ".color", lightComponent.color);
         m_lightPassShader.setFloat("lights" + indexStr + ".intensity", lightComponent.intensity);
 
+        // Atlas indices
         for (size_t j = 0; j < 6; ++j) {
             std::string atlasIndexStr = "lights" + indexStr + ".atlasIndices[" + std::to_string(j) + "]";
             m_lightPassShader.setInt(atlasIndexStr, lightComponent.atlasIndices[j]);
         }
 
+        // Light-space matrix
+        if (auto* lightSpaceMatrix = registry.try_get<LightSpaceMatrix>(entity)) {
+            m_lightPassShader.setMat4("lights" + indexStr + ".lightSpaceMatrices[0]", lightSpaceMatrix->matrix);
+        } else if (auto* lightSpaceMatrices = registry.try_get<LightSpaceMatrixCube>(entity)) {
+            // Cubemap light-space matrices (6 faces)
+            for (size_t j = 0; j < 6; ++j) {
+                std::string matrixStr = "lights" + indexStr + ".lightSpaceMatrices[" + std::to_string(j) + "]";
+                m_lightPassShader.setMat4(matrixStr, lightSpaceMatrices->matrices[j]);
+            }
+        }
+
         ++i;
     });
 
-    // TODO: Send light space matrix data as well. can be done here with view<LightSpaceMatrix>, and view<LightSpaceMatrixCube>
     m_lightPassShader.setInt("numLights", i + 1);
 
     // Setup G-buffer textures for lighting

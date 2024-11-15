@@ -93,7 +93,7 @@ void Scene::loadScene() {
     entt::entity diabloEntity = registry.create();
     SceneData save_diabloData;
     save_diabloData.name = "Diablo";
-    save_diabloData.position = glm::vec3(0.0f, 0.0f, -1.0f);
+    save_diabloData.position = glm::vec3(0.0f, -0.1f, -1.0f);
     save_diabloData.scale = glm::vec3(1.0f);
     GameObject* diabloObject = addGameObjectComponent(registry, diabloEntity, save_diabloData);
     diabloObject->addScript<MoveScript>();
@@ -122,8 +122,8 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 3;
-    float circleRadius = 5.0f;
+    int n = 1;
+    float circleRadius = 3.0f;
     float yPosition = 1.0f;
 
     for (int i = 0; i < n; ++i) {
@@ -149,14 +149,14 @@ void Scene::loadScene() {
         Light lightData;
         glm::vec3 color;
         switch (i % n) {
-            case 0: color = glm::vec3(1.0f, 0.0f, 0.0f); break; // Red
-            case 1: color = glm::vec3(0.0f, 1.0f, 0.0f); break; // Green
-            case 2: color = glm::vec3(0.0f, 0.0f, 1.0f); break; // Blue
-            default: color = glm::vec3(1.0f); break;            // White
+            case 0: color = glm::vec3(1.0f, 1.0f, 1.0f); break; // White
+            case 1: color = glm::vec3(1.0f, 0.0f, 0.0f); break; // Red
+            case 2: color = glm::vec3(0.0f, 1.0f, 0.0f); break; // Green
+            default: color = glm::vec3(0.0f, 0.0f, 1.0f); break; // Blue
         }
         lightData.color = color;
         lightData.intensity = 1.0f;
-        lightData.radius = 1000.0f;
+        lightData.radius = 20.0f;
         lightData.type = LightType::Point;
         lightData.castsShadows = true;
         lightData.isActive = true;

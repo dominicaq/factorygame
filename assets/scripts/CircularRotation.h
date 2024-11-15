@@ -6,7 +6,7 @@
 
 class CircularRotation : public Script {
 public:
-    float rotationSpeed = 1.0f;
+    float rotationSpeed = 0.25f;
     float radius = 5.0f;
     glm::vec3 center = glm::vec3(0.0f);
 
