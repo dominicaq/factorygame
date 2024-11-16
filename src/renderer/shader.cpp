@@ -6,7 +6,7 @@
 
 Shader::Shader() : m_ID(0) {}
 
-Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath) {
+Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath) {
     load(vertexPath, fragmentPath);
 }
 
@@ -78,11 +78,10 @@ void Shader::setVec3(const std::string& name, const glm::vec3& value) const {
 /*
 * Shader creation
 */
-bool Shader::load(const std::string& vertexPath, const std::string& fragmentPath) {
+bool Shader::load(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath) {
     m_ID = 0;
-    // Load shaders from files and create shader program
 
-    // Read files
+    // Load shaders from files
     std::string vertexCode = ResourceLoader::readFile(vertexPath);
     if (vertexCode.empty()) {
         std::cerr << "[Error] Shader::load: Failed to read vertex shader file: " << vertexPath << "\n";
@@ -93,6 +92,15 @@ bool Shader::load(const std::string& vertexPath, const std::string& fragmentPath
     if (fragmentCode.empty()) {
         std::cerr << "[Error] Shader::load: Failed to read fragment shader file: " << fragmentPath << "\n";
         return false;
+    }
+
+    std::string geometryCode;
+    if (!geometryPath.empty()) {
+        geometryCode = ResourceLoader::readFile(geometryPath);
+        if (geometryCode.empty()) {
+            std::cerr << "[Error] Shader::load: Failed to read geometry shader file: " << geometryPath << "\n";
+            return false;
+        }
     }
 
     // Compile shaders
@@ -110,19 +118,36 @@ bool Shader::load(const std::string& vertexPath, const std::string& fragmentPath
         return false;
     }
 
+    unsigned int geometryShader = 0;
+    if (!geometryCode.empty()) {
+        geometryShader = compileShader(GL_GEOMETRY_SHADER, geometryCode.c_str(), &compileStatus);
+        if (compileStatus != 0) {
+            std::cerr << "[Error] Shader::load: Geometry shader compilation failed\n";
+            glDeleteShader(vertexShader);
+            glDeleteShader(fragmentShader);
+            return false;
+        }
+    }
+
     // Link shaders into a program
     int linkStatus = 0;
-    linkProgram(vertexShader, fragmentShader, &linkStatus);
+    linkProgram(vertexShader, fragmentShader, geometryShader, &linkStatus);
     if (linkStatus != 0) {
         std::cerr << "[Error] Shader::load: Program linking failed\n";
         glDeleteShader(vertexShader);
         glDeleteShader(fragmentShader);
+        if (geometryShader) {
+            glDeleteShader(geometryShader);
+        }
         return false;
     }
 
     // Clean up shaders after linking
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
+    if (geometryShader) {
+        glDeleteShader(geometryShader);
+    }
 
     return true;
 }
@@ -146,10 +171,13 @@ unsigned int Shader::compileShader(unsigned int type, const char* source, int* s
     return shader;
 }
 
-void Shader::linkProgram(unsigned int vertexShader, unsigned int fragmentShader, int* status) {
-    m_ID = glCreateProgram(); // This sets m_ID to a valid OpenGL program ID
+void Shader::linkProgram(unsigned int vertexShader, unsigned int fragmentShader, unsigned int geometryShader, int* status) {
+    m_ID = glCreateProgram();
     glAttachShader(m_ID, vertexShader);
     glAttachShader(m_ID, fragmentShader);
+    if (geometryShader != 0) {
+        glAttachShader(m_ID, geometryShader);
+    }
     glLinkProgram(m_ID);
 
     int linkStatus;

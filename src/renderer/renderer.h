@@ -39,6 +39,7 @@ public:
      * Initialize and manage mesh buffers
      */
     void draw(const Mesh* mesh);
+    void drawInstanced(const Mesh* mesh, size_t instanceCount);
     void initMeshBuffers(Mesh* mesh, bool isStatic = true);
     void deleteMeshBuffer(const Mesh* mesh);
 

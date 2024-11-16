@@ -10,6 +10,9 @@ void ShadowPass::setup() {
 }
 
 void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
     // Access and bind Renderer’s shadow atlas directly
     Framebuffer* shadowAtlas = renderer.getShadowAtlas();
     shadowAtlas->bind();
@@ -68,15 +71,8 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 }
 
 void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) {
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-
-    auto viewMesh = registry.view<Mesh*, ModelMatrix>();
-    for (auto entity : viewMesh) {
-        const auto& mesh = registry.get<Mesh*>(entity);
-        const auto& modelMatrix = registry.get<ModelMatrix>(entity);
-
+    registry.view<Mesh*, ModelMatrix>().each([&](Mesh* mesh, const ModelMatrix& modelMatrix) {
         m_shadowShader.setMat4("u_Model", modelMatrix.matrix);
         renderer.draw(mesh);
-    }
+    });
 }

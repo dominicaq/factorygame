@@ -37,7 +37,7 @@ void LightSystem::updateShadowMatrices() {
 }
 
 void LightSystem::updatePointLightMatrices(LightSpaceMatrixCube& lightSpaceCube, const glm::vec3& position, float radius) {
-    glm::mat4 projection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, radius);
+    glm::mat4 projection = glm::perspective(glm::radians(90.0f), 1.0f, 1.0f, radius);
 
     // Define the view-projection matrices for each face of the cubemap
     lightSpaceCube.matrices[0] = projection * glm::lookAt(position, position + glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)); // Right face (+X)

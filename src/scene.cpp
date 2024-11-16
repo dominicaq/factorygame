@@ -96,7 +96,7 @@ void Scene::loadScene() {
     save_diabloData.position = glm::vec3(0.0f, -0.1f, -1.0f);
     save_diabloData.scale = glm::vec3(1.0f);
     GameObject* diabloObject = addGameObjectComponent(registry, diabloEntity, save_diabloData);
-    diabloObject->addScript<MoveScript>();
+    // diabloObject->addScript<MoveScript>();
 
     Mesh* diabloMesh = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
     if (diabloMesh != nullptr) {
@@ -123,8 +123,8 @@ void Scene::loadScene() {
 
     // --------------------- Light Circle ---------------------
     int n = 1;
-    float circleRadius = 3.0f;
-    float yPosition = 1.0f;
+    float circleRadius = 4.0f;
+    float yPosition = 0.0f;
 
     for (int i = 0; i < n; ++i) {
         float angle = i * (360.0f / n);
@@ -143,7 +143,7 @@ void Scene::loadScene() {
         if (rotationScript != nullptr) {
             rotationScript->radius = circleRadius;
             rotationScript->center = glm::vec3(0.0f, yPosition, 0.0f);
-            rotationScript->rotationSpeed = 1.5f;
+            rotationScript->rotationSpeed = 0.5f;
         }
 
         Light lightData;

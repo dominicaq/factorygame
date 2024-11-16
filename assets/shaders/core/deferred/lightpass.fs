@@ -17,6 +17,9 @@ uniform int u_TileSize;
 // Scene Data
 uniform vec3 u_CameraPosition;
 
+// Debug toggle for shadows
+bool u_DebugPitchBlackShadows = true;
+
 // Light structure
 struct Light {
     vec3 position;
@@ -83,13 +86,23 @@ void main() {
         float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
         vec3 specular = light.color * spec * light.intensity * 0.5;
 
-        // Shadow calculation (extremely performance heavy, needs another look)
+        // Shadow calculation
         float shadow = 0.0;
         for (int j = 0; j < 6; ++j) {
+            if (light.atlasIndices[j] == -1) {
+                break;
+            }
             vec4 lightSpaceFragPos = light.lightSpaceMatrices[j] * vec4(FragPos, 1.0);
             shadow += SampleShadow(lightSpaceFragPos, light.atlasIndices[j]);
         }
         shadow /= 6.0;
+
+        // Darken the shadow based on debug mode
+        if (u_DebugPitchBlackShadows) {
+            shadow = shadow < 1.0 ? 0.0 : 1.0; // Make shadowed regions pitch black
+        } else {
+            shadow = mix(0.2, 1.0, shadow); // Normal shadow rendering
+        }
 
         // Combine lighting with shadow
         lighting += shadow * (diffuse + specular);

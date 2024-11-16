@@ -101,6 +101,29 @@ void Renderer::draw(const Mesh* mesh) {
     glBindVertexArray(0);
 }
 
+void Renderer::drawInstanced(const Mesh* mesh, size_t instanceCount) {
+    size_t index = mesh->id;
+    if (index >= m_meshData.size() || m_meshData[index].VAO == 0) {
+        std::cerr << "[Error] Renderer::drawInstanced: Mesh buffer id not found!\n";
+        return;
+    }
+
+    const MeshData& data = m_meshData[index];
+
+    // Bind VAO
+    glBindVertexArray(data.VAO);
+
+    // Draw the instanced mesh
+    if (data.EBO != 0) {
+        glDrawElementsInstanced(GL_TRIANGLES, data.indexCount, GL_UNSIGNED_INT, 0, instanceCount);
+    } else {
+        glDrawArraysInstanced(GL_TRIANGLES, 0, data.vertexCount, instanceCount);
+    }
+
+    // Unbind VAO
+    glBindVertexArray(0);
+}
+
 void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic) {
     if (mesh->uvs.empty() ||
         mesh->normals.empty() ||

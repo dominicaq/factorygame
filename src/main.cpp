@@ -20,8 +20,8 @@
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
-#define SHADOW_ATLAS_SIZE 4096
-#define SHADOW_ATLAS_TILE_SIZE 256
+#define SHADOW_ATLAS_SIZE 8192
+#define SHADOW_ATLAS_TILE_SIZE 512
 
 // Define globals
 InputManager inputManager;
