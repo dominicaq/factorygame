@@ -13,7 +13,7 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    // Access and bind Renderer’s shadow atlas directly
+    // Access and bind the Renderer’s shadow atlas directly
     Framebuffer* shadowAtlas = renderer.getShadowAtlas();
     shadowAtlas->bind();
     glClear(GL_DEPTH_BUFFER_BIT);
@@ -21,19 +21,21 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
     m_shadowShader.use();
 
     // Get atlas data
-    std::pair<int, int> atlasDimensions = renderer.getShadowAtlasDimensions();
+    auto atlasDimensions = renderer.getShadowAtlasDimensions();
     int atlasSize = atlasDimensions.first;
     int tileSize = atlasDimensions.second;
     int maxShadowMaps = (atlasSize / tileSize) * (atlasSize / tileSize);
 
     int tileIndex = 0;
-    // Render 2D shadow maps
+
+    // Render 2D shadow maps (directional/spotlights) to the atlas
     registry.view<LightSpaceMatrix, Light>().each([&](auto& lightSpaceMatrix, auto& light) {
         if (tileIndex >= maxShadowMaps) {
             std::cerr << "[Warning] Exceeded maximum number of shadow maps in the atlas!" << std::endl;
             return;
         }
 
+        // Compute the viewport for this shadow map
         int tileX = (tileIndex % (atlasSize / tileSize)) * tileSize;
         int tileY = (tileIndex / (atlasSize / tileSize)) * tileSize;
         glViewport(tileX, tileY, tileSize, tileSize);
@@ -41,28 +43,45 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
         light.atlasIndices[0] = tileIndex;
         m_shadowShader.setMat4("u_LightSpaceMatrix", lightSpaceMatrix.matrix);
 
-        renderSceneDepth(renderer, registry);
+        // Draw scene from light's point of view
+        registry.view<Mesh*, ModelMatrix>().each([&](Mesh* mesh, const ModelMatrix& modelMatrix) {
+            m_shadowShader.setMat4("u_Model", modelMatrix.matrix);
+            renderer.draw(mesh);
+        });
+
         ++tileIndex;
     });
 
-    // Render cubemap shadow maps
+    // TODO: render cube maps to their own texture, use geometry shader for instancing
+    // Render point light shadow maps
     registry.view<LightSpaceMatrixCube, Light>().each([&](auto entity, auto& lightSpaceCube, auto& light) {
-        for (int face = 0; face < 6; ++face) {
-            if (tileIndex >= maxShadowMaps) {
-                std::cerr << "[Warning] Exceeded maximum number of shadow maps in the atlas!" << std::endl;
-                return;
-            }
+        if (tileIndex + 6 > maxShadowMaps) {
+            std::cerr << "[Warning] Exceeded maximum number of shadow maps in the atlas!" << std::endl;
+            return;
+        }
 
-            int tileX = (tileIndex % (atlasSize / tileSize)) * tileSize;
-            int tileY = (tileIndex / (atlasSize / tileSize)) * tileSize;
+        // Render each face separately
+        for (int face = 0; face < 6; ++face) {
+            int currentTileIndex = tileIndex + face;
+
+            // Compute the viewport for this face
+            int tileX = (currentTileIndex % (atlasSize / tileSize)) * tileSize;
+            int tileY = (currentTileIndex / (atlasSize / tileSize)) * tileSize;
             glViewport(tileX, tileY, tileSize, tileSize);
 
+            // Set atlas index for this face
+            light.atlasIndices[face] = currentTileIndex;
             m_shadowShader.setMat4("u_LightSpaceMatrix", lightSpaceCube.matrices[face]);
-            light.atlasIndices[face] = tileIndex;
 
-            renderSceneDepth(renderer, registry);
-            ++tileIndex;
+            // Draw the scene from this face's point of view
+            registry.view<Mesh*, ModelMatrix>().each([&](Mesh* mesh, const ModelMatrix& modelMatrix) {
+                m_shadowShader.setMat4("u_Model", modelMatrix.matrix);
+                renderer.draw(mesh);
+            });
         }
+
+        // Increment for next group of faces
+        tileIndex += 6;
     });
 
     shadowAtlas->unbind();
