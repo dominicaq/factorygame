@@ -1,4 +1,4 @@
-# OpenGL Deferred Renderer (WIP)
+# Factory Game
 
 This project is an OpenGL deferred renderer with plans to become a game engine, currently in development.
 
@@ -8,13 +8,16 @@ This project is an OpenGL deferred renderer with plans to become a game engine, 
 
 
 ## Features
-
+- **Cube Maps**
+    - Used for SkyboxPass and ShadowPass (point lights)
+    - **Note**: Not using compute shaders, cube maps are x6 draw calls for the scene
 - **Deferred Rendering**:
     - G-buffers: Position, Normal, and Color.
-- **Skybox**:
-    - Rendering of environment skybox.
-- **Entity-Component System (WIP)**:
-    - Custom ECS for managing scene entities.
+- **Shadow Atlas (WIP)**:
+    - Spot lights will draw to a shadow atlas for sampling within the light pass. Shadow atlas can be any size.
+    - **Note** By default, shadow atlas is 8k resolution
+- **Render Graph (WIP)**
+    - Every render pass inherits RenderPass for compilation, resource gathering, and running.
 
 ## Installation
 ```sh
