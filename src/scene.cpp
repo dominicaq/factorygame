@@ -122,10 +122,10 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 5;
+    int n = 5000;
     float circleRadius = 4.0f;
     float yPosition = 0.0f;
-    // createLights(n, circleRadius, yPosition, basicShader);
+    createLights(n / 1000, circleRadius, yPosition, basicShader);
     createAsteroids(n, circleRadius, yPosition, basicShader);
 }
 

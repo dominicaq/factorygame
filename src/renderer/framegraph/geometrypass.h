@@ -54,31 +54,36 @@ public:
             renderer.draw(mesh);
         });
 
-        // Render instanced meshes
+
+        // First, collect all instances by mesh ID
+        std::unordered_map<size_t, std::vector<glm::mat4>> instancesByMeshId;
         registry.view<MeshInstance, ModelMatrix>().each([&](MeshInstance& instance, const ModelMatrix& modelMatrix) {
             size_t id = instance.id;
-            if (id >= m_meshInstances.size()) {
+            if (id >= m_meshInstances.size() || !m_meshInstances[id]->material->isDeferred) {
                 return;
             }
-
-            if (!m_meshInstances[id]->material->isDeferred) {
-                return;
-            }
-
-            // Check if this instance has already been drawn in this frame
-            if (m_instanceDrawnFlags[id]) {
-                return;
-            }
-
-            // TODO: this is where the logic doesnt add up
-            const glm::mat4& instanceModelMatrix = modelMatrix.matrix;
-            m_gBufferShader.setMat4("u_Model", instanceModelMatrix);
-            m_meshInstances[id]->material->bind(&m_gBufferShader);
-
-            // Draw and mark this instance as drawn
-            renderer.drawInstanced(id);
-            m_instanceDrawnFlags[id] = true;
+            instancesByMeshId[id].push_back(modelMatrix.matrix);
         });
+
+        // Now draw each unique mesh just once, with all its instances
+        for (const auto& [meshId, matrices] : instancesByMeshId) {
+            if (matrices.empty()) {
+                continue;
+            }
+
+            // Update buffer with instance matrices for this mesh
+            renderer.updateInstanceBuffer(meshId, matrices);
+
+            // Bind material once for all instances of this mesh
+            m_meshInstances[meshId]->material->bind(&m_gBufferShader);
+
+            // Set the first matrix as the model uniform (for gl_InstanceID == 0)
+            // This ensures the first instance is drawn correctly
+            m_gBufferShader.setMat4("u_Model", matrices[0]);
+
+            // Draw all instances of this mesh in one call
+            renderer.drawInstanced(meshId);
+        }
 
         std::pair<int, int> dimensions = renderer.getScreenDimensions();
         int width = dimensions.first;

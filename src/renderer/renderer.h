@@ -39,6 +39,7 @@ public:
     * Instancing
     */
     void drawInstanced(size_t instanceID);
+    void updateInstanceBuffer(size_t instanceID, const std::vector<glm::mat4>& modelMatrices);
     void setupInstanceAttributes(size_t instanceID, const std::vector<glm::mat4>& modelMatrices);
     void deleteInstanceBuffer(size_t instanceID);
 

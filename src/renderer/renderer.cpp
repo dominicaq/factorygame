@@ -337,6 +337,28 @@ void Renderer::initScreenQuad() {
     glBindVertexArray(0);
 }
 
+void Renderer::updateInstanceBuffer(size_t instanceID, const std::vector<glm::mat4>& modelMatrices) {
+    if (instanceID >= m_instanceMeshData.size() || m_instanceMeshData[instanceID].VAO == 0) {
+        std::cerr << "[Error] Renderer::updateInstanceBuffer: Instance mesh not found!\n";
+        return;
+    }
+
+    MeshData& data = m_instanceMeshData[instanceID];
+
+    // Check if instance buffer exists
+    if (data.instanceVBO == 0) {
+        std::cerr << "[Error] Renderer::updateInstanceBuffer: Instance buffer doesn't exist! Call setupInstanceAttributes first.\n";
+        return;
+    }
+
+    // Update the existing buffer
+    glBindBuffer(GL_ARRAY_BUFFER, data.instanceVBO);
+    glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_DYNAMIC_DRAW);
+
+    // Update the instance count
+    data.instanceCount = modelMatrices.size();
+}
+
 void Renderer::setupInstanceAttributes(size_t instanceID, const std::vector<glm::mat4>& modelMatrices) {
     if (instanceID >= m_instanceMeshData.size() || m_instanceMeshData[instanceID].VAO == 0) {
         std::cerr << "[Error] Renderer::setupInstanceAttributes: Instance mesh not found!\n";
@@ -354,27 +376,13 @@ void Renderer::setupInstanceAttributes(size_t instanceID, const std::vector<glm:
 
     // Set up vertex attribute pointers for the model matrix (takes up 4 attribute slots)
     // Each mat4 needs to be broken into 4 vec4s due to GLSL attribute limitations
-    GLsizei vec4Size = sizeof(glm::vec4);
 
-    // mat4 column 0
-    glEnableVertexAttribArray(5);
-    glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)0);
-    glVertexAttribDivisor(5, 1); // Tell OpenGL this is an instanced attribute
-
-    // mat4 column 1
-    glEnableVertexAttribArray(6);
-    glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(vec4Size));
-    glVertexAttribDivisor(6, 1);
-
-    // mat4 column 2
-    glEnableVertexAttribArray(7);
-    glVertexAttribPointer(7, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(2 * vec4Size));
-    glVertexAttribDivisor(7, 1);
-
-    // mat4 column 3
-    glEnableVertexAttribArray(8);
-    glVertexAttribPointer(8, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(3 * vec4Size));
-    glVertexAttribDivisor(8, 1);
+    // For the instance matrix columns (4 vec4s)
+    for (int i = 0; i < 4; i++) {
+        glEnableVertexAttribArray(5 + i);
+        glVertexAttribPointer(5 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(sizeof(float) * 4 * i));
+        glVertexAttribDivisor(5 + i, 1); // This makes it per-instance
+    }
 
     glBindVertexArray(0);
 
