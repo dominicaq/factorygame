@@ -15,7 +15,6 @@ struct Mesh {
     std::vector<glm::vec3> tangents;
     std::vector<glm::vec3> bitangents;
     std::vector<unsigned int> indices;
-
     Material* material = nullptr;
 
     // Method to clear CPU-side mesh data
@@ -31,6 +30,11 @@ struct Mesh {
         normals.shrink_to_fit();
         indices.shrink_to_fit();
     }
+};
+
+struct MeshInstance {
+    size_t id = SIZE_MAX;
+    Material* material = nullptr;
 };
 
 #endif // MESH_H

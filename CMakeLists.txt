@@ -11,15 +11,11 @@ if(WIN32 AND MSVC)
     set(CMAKE_CXX_RUNTIME_LIBRARY "MultiThreaded")
 endif()
 
-# User defined script directory
-include_directories(
-    ${CMAKE_SOURCE_DIR}/assets/scripts
-)
+# User-defined script directory
+include_directories(${CMAKE_SOURCE_DIR}/assets/scripts)
 
 # Include src directory for engine
-include_directories(
-    ${CMAKE_SOURCE_DIR}/src
-)
+include_directories(${CMAKE_SOURCE_DIR}/src)
 
 # Include external directories
 include_directories(
@@ -50,15 +46,25 @@ if(APPLE)
     set(OpenGL_GL_PREFERENCE LEGACY)
 endif()
 
-# Set up GLFW
-set(GLFW_ROOT "${CMAKE_SOURCE_DIR}/external/glfw-3.4")
-include_directories("${GLFW_ROOT}/include")
-
+# GLFW Configuration
 if(WIN32)
+    set(GLFW_ROOT "${CMAKE_SOURCE_DIR}/external/glfw-3.4")
+    include_directories("${GLFW_ROOT}/include")
     set(GLFW_LIB_DIR "${GLFW_ROOT}/lib-vc2022")
+
 elseif(APPLE)
     set(GLFW_LIB_DIR "${GLFW_ROOT}/lib-arm64")
+    set(GLFW_LIB "${GLFW_LIB_DIR}/libglfw.3.dylib")
+
+elseif(UNIX AND NOT APPLE)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GLFW REQUIRED glfw3)
+    include_directories(${GLFW_INCLUDE_DIRS})
+    link_directories(${GLFW_LIBRARY_DIRS})
+    set(GLFW_LIB ${GLFW_LIBRARIES})
+
 endif()
+
 link_directories("${GLFW_LIB_DIR}")
 
 # Find all .cpp files in src/ and its subdirectories
@@ -76,17 +82,11 @@ add_library(glad STATIC ${CMAKE_SOURCE_DIR}/external/glad/src/glad.c)
 add_executable(${PROJECT_NAME} ${SOURCES} ${SCRIPT_SOURCES} ${IMGUI_SRC})
 
 # Link against libraries
-target_link_libraries(${PROJECT_NAME} glad OpenGL::GL)
-if(WIN32 AND MSVC)
-    target_link_libraries(${PROJECT_NAME} "${GLFW_LIB_DIR}/glfw3_mt.lib")
-else()
-    target_link_libraries(${PROJECT_NAME} "${GLFW_LIB_DIR}/libglfw.3.dylib")
-endif()
+target_link_libraries(${PROJECT_NAME} glad OpenGL::GL ${GLFW_LIB})
 
-if (APPLE)
-    # Silence deprecated warnings on macOS
+# Platform-specific compiler options
+if (APPLE OR UNUX)
     target_compile_options(${PROJECT_NAME} PRIVATE -Wno-deprecated-declarations)
 elseif (WIN32)
-    # Silence deprecated warnings on Windows (MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE /wd4996)
 endif()

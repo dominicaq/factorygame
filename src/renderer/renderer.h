@@ -39,8 +39,8 @@ public:
      * Initialize and manage mesh buffers
      */
     void draw(const Mesh* mesh);
-    void drawInstanced(const Mesh* mesh, size_t instanceCount);
-    void initMeshBuffers(Mesh* mesh, bool isStatic = true);
+    void drawInstanced(size_t index, size_t instanceCount);
+    void initMeshBuffers(Mesh* mesh, bool isStatic = true, size_t instanceID = SIZE_MAX);
     void deleteMeshBuffer(const Mesh* mesh);
 
     /*
@@ -92,7 +92,9 @@ private:
         GLsizei indexCount;
         GLsizei vertexCount;
     };
+
     std::vector<MeshData> m_meshData;
+    std::vector<MeshData> m_instanceMeshData;
 };
 
 #endif // RENDERER_H

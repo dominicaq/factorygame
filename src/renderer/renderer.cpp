@@ -37,6 +37,9 @@ Renderer::Renderer(int width, int height, int atlasSize, int atlasTileSize, Came
     glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
     m_shadowAtlas->unbind();
+
+    // Make the first mesh instance blank
+    m_instanceMeshData.push_back(MeshData{0});
 }
 
 Renderer::~Renderer() {
@@ -101,14 +104,13 @@ void Renderer::draw(const Mesh* mesh) {
     glBindVertexArray(0);
 }
 
-void Renderer::drawInstanced(const Mesh* mesh, size_t instanceCount) {
-    size_t index = mesh->id;
-    if (index >= m_meshData.size() || m_meshData[index].VAO == 0) {
+void Renderer::drawInstanced(size_t index, size_t instanceCount) {
+    if (index >= m_instanceMeshData.size() || m_instanceMeshData[index].VAO == 0) {
         std::cerr << "[Error] Renderer::drawInstanced: Mesh buffer id not found!\n";
         return;
     }
 
-    const MeshData& data = m_meshData[index];
+    const MeshData& data = m_instanceMeshData[index];
 
     // Bind VAO
     glBindVertexArray(data.VAO);
@@ -124,7 +126,7 @@ void Renderer::drawInstanced(const Mesh* mesh, size_t instanceCount) {
     glBindVertexArray(0);
 }
 
-void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic) {
+void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic, size_t instanceID) {
     if (mesh->uvs.empty() ||
         mesh->normals.empty() ||
         mesh->tangents.empty() ||
@@ -133,9 +135,16 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic) {
         return;
     }
 
+    bool isInstance = (instanceID != SIZE_MAX);
+
+    // Check if the instance already exists in m_instanceMeshData
+    if (isInstance && m_instanceMeshData[instanceID].VAO != 0) {
+        return;
+    }
+
     // Assign an ID if not already assigned
     if (mesh->id == SIZE_MAX) {
-        mesh->id = m_meshData.size();
+        mesh->id = isInstance ? instanceID : m_meshData.size();
     }
 
     MeshData data = {};
@@ -187,45 +196,46 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic) {
     }
 
     // Vertex attribute pointers
-
-    // Positions (location = 0)
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)0);
 
-    // Normals (location = 1)
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(5 * sizeof(float)));
 
-    // UVs (location = 2)
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(3 * sizeof(float)));
 
-    // Tangents (location = 3)
     glEnableVertexAttribArray(3);
     glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
 
-    // Bitangents (location = 4)
     glEnableVertexAttribArray(4);
     glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
 
-    // Unbind VAO
-    glBindVertexArray(0);
+    glBindVertexArray(0); // Unbind VAO
 
-    // Find the first available spot in the mesh data vector
-    bool inserted = false;
-    for (size_t i = 0; i < m_meshData.size(); ++i) {
-        if (m_meshData[i].VAO == 0) {
-            m_meshData[i] = data;
-            mesh->id = i;
-            inserted = true;
-            break;
+    // Store mesh data in the appropriate vector
+    if (isInstance) {
+        // Ensure m_instanceMeshData is large enough
+        if (instanceID >= m_instanceMeshData.size()) {
+            m_instanceMeshData.resize(instanceID + 1);
         }
-    }
+        m_instanceMeshData[instanceID] = data;
 
-    // If all slots were full, append to end
-    if (!inserted) {
-        m_meshData.push_back(data);
-        mesh->id = m_meshData.size() - 1;
+    } else {
+        // Find the first available slot in m_meshData
+        bool inserted = false;
+        for (size_t i = 0; i < m_meshData.size(); ++i) {
+            if (m_meshData[i].VAO == 0) {
+                m_meshData[i] = data;
+                mesh->id = i;
+                inserted = true;
+                break;
+            }
+        }
+        if (!inserted) {
+            m_meshData.push_back(data);
+            mesh->id = m_meshData.size() - 1;
+        }
     }
 
     // Clear CPU-side mesh data if possible

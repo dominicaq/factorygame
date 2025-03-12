@@ -11,6 +11,7 @@
 #include "renderer/framegraph/debugpass.h"
 
 #include "debugging/profiler.h"
+#include "debugging/pcinfo.h"
 #include "imgui/imgui.h"
 
 #include <string>
@@ -37,6 +38,7 @@ int main() {
         return -1;
     }
     inputManager.init(window.getGLFWwindow());
+    printPCInfo();
 
     // ------------------------ Scene Setup --------------------------
     Scene scene;
@@ -51,7 +53,7 @@ int main() {
 
     FrameGraph frameGraph;
     frameGraph.addRenderPass(std::make_unique<ShadowPass>());
-    frameGraph.addRenderPass(std::make_unique<GeometryPass>());
+    frameGraph.addRenderPass(std::make_unique<GeometryPass>(scene.instanceMeshes, scene.instanceCounts));
     frameGraph.addRenderPass(std::make_unique<LightPass>());
     frameGraph.addRenderPass(std::make_unique<ForwardPass>());
     frameGraph.addRenderPass(std::make_unique<SkyboxPass>());
@@ -61,6 +63,11 @@ int main() {
     auto renderQuery = scene.registry.view<Mesh*, ModelMatrix>();
     renderQuery.each([&](auto entity, Mesh* mesh, ModelMatrix&) {
         renderer.initMeshBuffers(mesh);
+    });
+    auto instanceQuery = scene.registry.view<MeshInstance, ModelMatrix>();
+    instanceQuery.each([&](auto entity, MeshInstance meshInstance, ModelMatrix&) {
+        size_t id = meshInstance.id;
+        renderer.initMeshBuffers(scene.instanceMeshes[id], false, id);
     });
 
     frameGraph.setupPasses();

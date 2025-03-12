@@ -5,7 +5,12 @@
 
 class GeometryPass : public RenderPass {
 public:
-    explicit GeometryPass() = default;
+    // Updated constructor to accept instance counts
+    explicit GeometryPass(const std::vector<Mesh*>& meshInstances, const std::vector<int>& instanceCounts)
+        : m_meshInstances(meshInstances), m_instanceCounts(instanceCounts) {
+        // Initialize the drawn flags vector to false for all instances
+        m_instanceDrawnFlags.resize(meshInstances.size(), false);
+    }
 
     void setup() override {
         std::string gBufferVertexPath = ASSET_DIR "shaders/core/deferred/gbuff.vs";
@@ -13,17 +18,21 @@ public:
         if (!m_gBufferShader.load(gBufferVertexPath, gBufferFragmentPath)) {
             std::cerr << "[Error] Renderer::Renderer: Failed to create gBufferShader!\n";
         }
-    };
+    }
+
+    void resetInstanceDrawFlags() {
+        // Reset the drawn flags at the start of every frame
+        std::fill(m_instanceDrawnFlags.begin(), m_instanceDrawnFlags.end(), false);
+    }
 
     void execute(Renderer& renderer, entt::registry& registry) override {
+        // Reset flags before starting a new frame
+        resetInstanceDrawFlags();
+
         // Get resources
         Framebuffer* gbuffer = renderer.getFramebuffer();
         Camera* camera = renderer.getCamera();
         const glm::mat4& viewMatrix = camera->getViewMatrix();
-
-        // broken code
-        // auto& viewMatrixResource = registry.ctx().get<ViewMatrixResource>();
-        // end of broken code
 
         // Bind G-buffer framebuffer
         gbuffer->bind();
@@ -34,18 +43,45 @@ public:
         m_gBufferShader.setMat4("u_View", viewMatrix);
         m_gBufferShader.setMat4("u_Projection", camera->getProjectionMatrix());
 
+        // Render regular meshes
         registry.view<Mesh*, ModelMatrix>().each([&](Mesh* mesh, const ModelMatrix& modelMatrix) {
-            // Skip forward render materials
             if (!mesh->material->isDeferred) {
                 return;
             }
 
             m_gBufferShader.setMat4("u_Model", modelMatrix.matrix);
-
             mesh->material->bind(&m_gBufferShader);
             renderer.draw(mesh);
         });
 
+        // Render instanced meshes
+        registry.view<MeshInstance, ModelMatrix>().each([&](MeshInstance& instance, const ModelMatrix& modelMatrix) {
+            size_t id = instance.id;
+            if (id >= m_meshInstances.size()) {
+                return;
+            }
+
+            if (!m_meshInstances[id]->material->isDeferred) {
+                return;
+            }
+
+            // Check if this instance has already been drawn in this frame
+            if (m_instanceDrawnFlags[id]) {
+                return;
+            }
+
+            // TODO: this is where the logic doesnt add up
+            const glm::mat4& instanceModelMatrix = modelMatrix.matrix;
+            m_gBufferShader.setMat4("u_Model", instanceModelMatrix);
+            m_meshInstances[id]->material->bind(&m_gBufferShader);
+
+            // Render the mesh the number of times specified in instanceCounts
+            int instanceCount = m_instanceCounts[id];
+            renderer.drawInstanced(id, instanceCount);
+
+            // Mark this instance as drawn
+            m_instanceDrawnFlags[id] = true;
+        });
 
         std::pair<int, int> dimensions = renderer.getScreenDimensions();
         int width = dimensions.first;
@@ -58,10 +94,13 @@ public:
             0, 0, width, height,
             GL_DEPTH_BUFFER_BIT, GL_NEAREST);
         gbuffer->unbind();
-    };
+    }
 
 private:
     Shader m_gBufferShader;
+    std::vector<Mesh*> m_meshInstances;        // Mesh instances
+    std::vector<int> m_instanceCounts;         // Count of how many times each mesh should be drawn
+    std::vector<bool> m_instanceDrawnFlags;    // Track which instances have been drawn
 };
 
 #endif // GEOMETRYPASS_H

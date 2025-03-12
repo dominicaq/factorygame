@@ -28,6 +28,13 @@ struct SceneData {
 class Scene {
 public:
     entt::registry registry;
+    std::vector<Mesh*> instanceMeshes;
+    std::vector<int> instanceCounts;
+
+    // TODO: TEMP
+    void createAsteroids(int n, float circleRadius, float yPosition, Shader* basicShader);
+    void createLights(int n, float circleRadius, float yPosition, Shader* basicShader);
+    // END OF TEMP
 
     // Scene management
     void loadScene();

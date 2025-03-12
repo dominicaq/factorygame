@@ -122,10 +122,14 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 1;
+    int n = 5;
     float circleRadius = 4.0f;
     float yPosition = 0.0f;
+    // createLights(n, circleRadius, yPosition, basicShader);
+    createAsteroids(n, circleRadius, yPosition, basicShader);
+}
 
+void Scene::createLights(int n, float circleRadius, float yPosition, Shader* basicShader) {
     for (int i = 0; i < n; ++i) {
         float angle = i * (360.0f / n);
         float radians = glm::radians(angle);
@@ -133,10 +137,14 @@ void Scene::loadScene() {
         float z = circleRadius * std::sin(radians);
 
         entt::entity lightEntity = registry.create();
+
+        // Light meta data
         SceneData save_lightData;
         save_lightData.name = "Light(" + std::to_string(i) + ")";
         save_lightData.scale = glm::vec3(0.1f);
         save_lightData.position = glm::vec3(x, yPosition, z);
+
+        // Light game object
         GameObject* lightObject = addGameObjectComponent(registry, lightEntity, save_lightData);
         lightObject->addScript<CircularRotation>();
         CircularRotation* rotationScript = lightObject->getScript<CircularRotation>();
@@ -146,6 +154,7 @@ void Scene::loadScene() {
             rotationScript->rotationSpeed = 0.5f;
         }
 
+        // Light component
         Light lightData;
         glm::vec3 color;
         switch (i % n) {
@@ -162,6 +171,7 @@ void Scene::loadScene() {
         lightData.isActive = true;
         addPointLightComponents(registry, lightEntity, lightData);
 
+        // Cube mesh
         Mesh* lightCube = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
         if (lightCube != nullptr) {
             Material* cubeMaterial = new Material(basicShader);
@@ -172,6 +182,56 @@ void Scene::loadScene() {
             lightCube->material = cubeMaterial;
             registry.emplace<Mesh*>(lightEntity, lightCube);
         }
+    }
+}
+
+void Scene::createAsteroids(int n, float circleRadius, float yPosition, Shader* basicShader) {
+    Mesh* asteroidMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
+    if (!asteroidMesh) {
+        return;
+    }
+
+    Material* asteroidMaterial = new Material(basicShader);
+    asteroidMaterial->albedoColor = glm::vec3(0.0f, 0.0f, 1.0f);
+    asteroidMaterial->albedoMap = nullptr;
+    asteroidMaterial->normalMap = nullptr;
+    asteroidMaterial->isDeferred = true;
+    asteroidMesh->material = asteroidMaterial;
+
+    // Store mesh instance
+    size_t meshIndex = instanceMeshes.size();
+    instanceMeshes.push_back(asteroidMesh);
+    instanceCounts.push_back(0);
+
+    MeshInstance cubeInstance;
+    cubeInstance.id = meshIndex;
+
+    for (int i = 0; i < n; ++i) {
+        float angle = i * (360.0f / n);
+        float radians = glm::radians(angle);
+        float x = circleRadius * std::cos(radians);
+        float z = circleRadius * std::sin(radians);
+
+        entt::entity asteroidEntity = registry.create();
+
+        // Meta data
+        SceneData save_asteroid;
+        save_asteroid.name = "Asteroid(" + std::to_string(i) + ")";
+        save_asteroid.scale = glm::vec3(0.1f);
+        save_asteroid.position = glm::vec3(x, yPosition, z);
+
+        // Game object
+        GameObject* asteroidObject = addGameObjectComponent(registry, asteroidEntity, save_asteroid);
+        asteroidObject->addScript<CircularRotation>();
+        CircularRotation* rotationScript = asteroidObject->getScript<CircularRotation>();
+        if (rotationScript) {
+            rotationScript->radius = circleRadius;
+            rotationScript->center = glm::vec3(0.0f, yPosition, 0.0f);
+            rotationScript->rotationSpeed = 0.5f;
+        }
+
+        registry.emplace<MeshInstance>(asteroidEntity, cubeInstance);
+        instanceCounts[cubeInstance.id] += 1;
     }
 }
 
