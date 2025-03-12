@@ -7,10 +7,7 @@ class GeometryPass : public RenderPass {
 public:
     // Updated constructor to accept instance counts
     explicit GeometryPass(const std::vector<Mesh*>& meshInstances)
-        : m_meshInstances(meshInstances) {
-        // Initialize the drawn flags vector to false for all instances
-        m_instanceDrawnFlags.resize(meshInstances.size(), false);
-    }
+        : m_meshInstances(meshInstances) {}
 
     void setup() override {
         std::string gBufferVertexPath = ASSET_DIR "shaders/core/deferred/gbuff.vs";
@@ -20,15 +17,7 @@ public:
         }
     }
 
-    void resetInstanceDrawFlags() {
-        // Reset the drawn flags at the start of every frame
-        std::fill(m_instanceDrawnFlags.begin(), m_instanceDrawnFlags.end(), false);
-    }
-
     void execute(Renderer& renderer, entt::registry& registry) override {
-        // Reset flags before starting a new frame
-        resetInstanceDrawFlags();
-
         // Get resources
         Framebuffer* gbuffer = renderer.getFramebuffer();
         Camera* camera = renderer.getCamera();
@@ -74,14 +63,11 @@ public:
             // Update buffer with instance matrices for this mesh
             renderer.updateInstanceBuffer(meshId, matrices);
 
-            // Bind material once for all instances of this mesh
             m_meshInstances[meshId]->material->bind(&m_gBufferShader);
 
             // Set the first matrix as the model uniform (for gl_InstanceID == 0)
             // This ensures the first instance is drawn correctly
             m_gBufferShader.setMat4("u_Model", matrices[0]);
-
-            // Draw all instances of this mesh in one call
             renderer.drawInstanced(meshId);
         }
 
@@ -100,8 +86,7 @@ public:
 
 private:
     Shader m_gBufferShader;
-    std::vector<Mesh*> m_meshInstances;        // Mesh instances
-    std::vector<bool> m_instanceDrawnFlags;    // Track which instances have been drawn
+    std::vector<Mesh*> m_meshInstances;
 };
 
 #endif // GEOMETRYPASS_H

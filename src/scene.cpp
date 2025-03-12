@@ -53,7 +53,7 @@ void Scene::loadScene() {
     SceneData save_planeData;
     save_planeData.name = "Ground Plane";
     save_planeData.position = glm::vec3(0.0f, -1.1f, 0.0f);
-    save_planeData.scale = glm::vec3(10.0f, 0.1f, 10.0f);
+    save_planeData.scale = glm::vec3(30.0f, 0.1f, 30.0f);
     GameObject* planeObject = addGameObjectComponent(registry, planeEntity, save_planeData);
 
     Mesh* planeMesh = ResourceLoader::loadMesh(MODEL_DIR + "/cube.obj");
@@ -122,11 +122,11 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 5000;
+    int n = 10000;
     float circleRadius = 4.0f;
     float yPosition = 0.0f;
-    createLights(n / 1000, circleRadius, yPosition, basicShader);
-    createAsteroids(n, circleRadius, yPosition, basicShader);
+    createLights(1, circleRadius, yPosition + 5.0f, basicShader);
+    createAsteroids(n, circleRadius + 10.0f, yPosition, basicShader);
 }
 
 void Scene::createLights(int n, float circleRadius, float yPosition, Shader* basicShader) {
