@@ -53,7 +53,7 @@ int main() {
 
     FrameGraph frameGraph;
     frameGraph.addRenderPass(std::make_unique<ShadowPass>());
-    frameGraph.addRenderPass(std::make_unique<GeometryPass>(scene.instanceMeshes, scene.instanceCounts));
+    frameGraph.addRenderPass(std::make_unique<GeometryPass>(scene.instanceMeshes));
     frameGraph.addRenderPass(std::make_unique<LightPass>());
     frameGraph.addRenderPass(std::make_unique<ForwardPass>());
     frameGraph.addRenderPass(std::make_unique<SkyboxPass>());
@@ -64,11 +64,27 @@ int main() {
     renderQuery.each([&](auto entity, Mesh* mesh, ModelMatrix&) {
         renderer.initMeshBuffers(mesh);
     });
+
+    // Create a map to store vectors of model matrices grouped by instanceID
+    std::unordered_map<size_t, std::vector<glm::mat4>> instanceMatrices;
+
+    // Group model matrices by instanceID
     auto instanceQuery = scene.registry.view<MeshInstance, ModelMatrix>();
-    instanceQuery.each([&](auto entity, MeshInstance meshInstance, ModelMatrix&) {
-        size_t id = meshInstance.id;
-        renderer.initMeshBuffers(scene.instanceMeshes[id], false, id);
+    instanceQuery.each([&](auto entity, MeshInstance meshInstance, ModelMatrix& modelMatrix) {
+        size_t instanceID = meshInstance.id;
+        instanceMatrices[instanceID].push_back(modelMatrix.matrix);
     });
+
+    // Init mesh buffers for each vector of model matrices
+    for (const auto& pair : instanceMatrices) {
+        size_t instanceID = pair.first;
+        const std::vector<glm::mat4>& matrices = pair.second;
+
+        // Initialize mesh buffers with the instanceID
+        renderer.initMeshBuffers(scene.instanceMeshes[instanceID], false, instanceID);
+        // Set up instance attributes with the vector of matrices
+        renderer.setupInstanceAttributes(instanceID, matrices);
+    }
 
     frameGraph.setupPasses();
 

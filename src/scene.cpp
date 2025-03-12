@@ -201,7 +201,6 @@ void Scene::createAsteroids(int n, float circleRadius, float yPosition, Shader* 
     // Store mesh instance
     size_t meshIndex = instanceMeshes.size();
     instanceMeshes.push_back(asteroidMesh);
-    instanceCounts.push_back(0);
 
     MeshInstance cubeInstance;
     cubeInstance.id = meshIndex;
@@ -231,7 +230,6 @@ void Scene::createAsteroids(int n, float circleRadius, float yPosition, Shader* 
         }
 
         registry.emplace<MeshInstance>(asteroidEntity, cubeInstance);
-        instanceCounts[cubeInstance.id] += 1;
     }
 }
 

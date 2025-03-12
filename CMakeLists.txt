@@ -53,6 +53,8 @@ if(WIN32)
     set(GLFW_LIB_DIR "${GLFW_ROOT}/lib-vc2022")
 
 elseif(APPLE)
+    set(GLFW_ROOT "${CMAKE_SOURCE_DIR}/external/glfw-3.4")
+    include_directories("${GLFW_ROOT}/include")
     set(GLFW_LIB_DIR "${GLFW_ROOT}/lib-arm64")
     set(GLFW_LIB "${GLFW_LIB_DIR}/libglfw.3.dylib")
 

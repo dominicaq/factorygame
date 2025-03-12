@@ -2,7 +2,7 @@
 #define PCINFO_H
 
 #include <string>
-#include <GL/gl.h>
+// #include <GL/gl.h>
 #include <iostream>
 
 #ifdef _WIN32
@@ -51,7 +51,6 @@ inline std::string getCPUName() {
     return cpuName;
 }
 
-// Function to get GPU name
 inline std::string getGPUName() {
     const GLubyte* renderer = glGetString(GL_RENDERER);
 

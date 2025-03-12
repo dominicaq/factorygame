@@ -56,6 +56,22 @@ Renderer::~Renderer() {
         }
     }
 
+    // Clean up instance mesh buffers
+    for (auto& data : m_instanceMeshData) {
+        if (data.VAO) {
+            glDeleteVertexArrays(1, &data.VAO);
+        }
+        if (data.VBO) {
+            glDeleteBuffers(1, &data.VBO);
+        }
+        if (data.EBO) {
+            glDeleteBuffers(1, &data.EBO);
+        }
+        if (data.instanceVBO) {
+            glDeleteBuffers(1, &data.instanceVBO);
+        }
+    }
+
     // Clean up quad
     if (m_quadVAO) {
         glDeleteVertexArrays(1, &m_quadVAO);
@@ -104,22 +120,27 @@ void Renderer::draw(const Mesh* mesh) {
     glBindVertexArray(0);
 }
 
-void Renderer::drawInstanced(size_t index, size_t instanceCount) {
-    if (index >= m_instanceMeshData.size() || m_instanceMeshData[index].VAO == 0) {
+void Renderer::drawInstanced(size_t instanceID) {
+    if (instanceID >= m_instanceMeshData.size() || m_instanceMeshData[instanceID].VAO == 0) {
         std::cerr << "[Error] Renderer::drawInstanced: Mesh buffer id not found!\n";
         return;
     }
 
-    const MeshData& data = m_instanceMeshData[index];
+    const MeshData& data = m_instanceMeshData[instanceID];
+    const size_t count = data.instanceCount;
+    if (count <= 0) {
+        std::cerr << "[Warning] Renderer::drawInstanced: Instance count is zero or negative!\n";
+        return;
+    }
 
     // Bind VAO
     glBindVertexArray(data.VAO);
 
     // Draw the instanced mesh
     if (data.EBO != 0) {
-        glDrawElementsInstanced(GL_TRIANGLES, data.indexCount, GL_UNSIGNED_INT, 0, instanceCount);
+        glDrawElementsInstanced(GL_TRIANGLES, data.indexCount, GL_UNSIGNED_INT, 0, count);
     } else {
-        glDrawArraysInstanced(GL_TRIANGLES, 0, data.vertexCount, instanceCount);
+        glDrawArraysInstanced(GL_TRIANGLES, 0, data.vertexCount, count);
     }
 
     // Unbind VAO
@@ -138,7 +159,7 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic, size_t instanceID) {
     bool isInstance = (instanceID != SIZE_MAX);
 
     // Check if the instance already exists in m_instanceMeshData
-    if (isInstance && m_instanceMeshData[instanceID].VAO != 0) {
+    if (isInstance && instanceID < m_instanceMeshData.size() && m_instanceMeshData[instanceID].VAO != 0) {
         return;
     }
 
@@ -314,6 +335,68 @@ void Renderer::initScreenQuad() {
 
     // Unbind VAO
     glBindVertexArray(0);
+}
+
+void Renderer::setupInstanceAttributes(size_t instanceID, const std::vector<glm::mat4>& modelMatrices) {
+    if (instanceID >= m_instanceMeshData.size() || m_instanceMeshData[instanceID].VAO == 0) {
+        std::cerr << "[Error] Renderer::setupInstanceAttributes: Instance mesh not found!\n";
+        return;
+    }
+
+    MeshData& data = m_instanceMeshData[instanceID];
+
+    // Create and set up the instance buffer
+    GLuint instanceVBO;
+    glGenBuffers(1, &instanceVBO);
+    glBindVertexArray(data.VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+    glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_STATIC_DRAW);
+
+    // Set up vertex attribute pointers for the model matrix (takes up 4 attribute slots)
+    // Each mat4 needs to be broken into 4 vec4s due to GLSL attribute limitations
+    GLsizei vec4Size = sizeof(glm::vec4);
+
+    // mat4 column 0
+    glEnableVertexAttribArray(5);
+    glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)0);
+    glVertexAttribDivisor(5, 1); // Tell OpenGL this is an instanced attribute
+
+    // mat4 column 1
+    glEnableVertexAttribArray(6);
+    glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(vec4Size));
+    glVertexAttribDivisor(6, 1);
+
+    // mat4 column 2
+    glEnableVertexAttribArray(7);
+    glVertexAttribPointer(7, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(2 * vec4Size));
+    glVertexAttribDivisor(7, 1);
+
+    // mat4 column 3
+    glEnableVertexAttribArray(8);
+    glVertexAttribPointer(8, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(3 * vec4Size));
+    glVertexAttribDivisor(8, 1);
+
+    glBindVertexArray(0);
+
+    // Store the instance VBO in the mesh data
+    data.instanceVBO = instanceVBO;
+    data.instanceCount = modelMatrices.size();
+}
+
+void Renderer::deleteInstanceBuffer(size_t instanceID) {
+    if (instanceID >= m_instanceMeshData.size() || m_instanceMeshData[instanceID].VAO == 0) {
+        std::cerr << "[Error] Renderer::deleteInstanceBuffer: Instance buffer id not found!\n";
+        return;
+    }
+
+    MeshData& data = m_instanceMeshData[instanceID];
+
+    // Delete instance VBO if it exists
+    if (data.instanceVBO) {
+        glDeleteBuffers(1, &data.instanceVBO);
+        data.instanceVBO = 0;
+        data.instanceCount = 0;
+    }
 }
 
 void Renderer::drawScreenQuad() {

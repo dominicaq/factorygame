@@ -36,10 +36,16 @@ public:
     void resizeShadowAtlas();
 
     /*
+    * Instancing
+    */
+    void drawInstanced(size_t instanceID);
+    void setupInstanceAttributes(size_t instanceID, const std::vector<glm::mat4>& modelMatrices);
+    void deleteInstanceBuffer(size_t instanceID);
+
+    /*
      * Initialize and manage mesh buffers
      */
     void draw(const Mesh* mesh);
-    void drawInstanced(size_t index, size_t instanceCount);
     void initMeshBuffers(Mesh* mesh, bool isStatic = true, size_t instanceID = SIZE_MAX);
     void deleteMeshBuffer(const Mesh* mesh);
 
@@ -91,6 +97,9 @@ private:
         unsigned int VAO, VBO, EBO;
         GLsizei indexCount;
         GLsizei vertexCount;
+
+        unsigned int instanceVBO;
+        int instanceCount;
     };
 
     std::vector<MeshData> m_meshData;

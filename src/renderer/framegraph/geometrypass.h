@@ -6,8 +6,8 @@
 class GeometryPass : public RenderPass {
 public:
     // Updated constructor to accept instance counts
-    explicit GeometryPass(const std::vector<Mesh*>& meshInstances, const std::vector<int>& instanceCounts)
-        : m_meshInstances(meshInstances), m_instanceCounts(instanceCounts) {
+    explicit GeometryPass(const std::vector<Mesh*>& meshInstances)
+        : m_meshInstances(meshInstances) {
         // Initialize the drawn flags vector to false for all instances
         m_instanceDrawnFlags.resize(meshInstances.size(), false);
     }
@@ -75,11 +75,8 @@ public:
             m_gBufferShader.setMat4("u_Model", instanceModelMatrix);
             m_meshInstances[id]->material->bind(&m_gBufferShader);
 
-            // Render the mesh the number of times specified in instanceCounts
-            int instanceCount = m_instanceCounts[id];
-            renderer.drawInstanced(id, instanceCount);
-
-            // Mark this instance as drawn
+            // Draw and mark this instance as drawn
+            renderer.drawInstanced(id);
             m_instanceDrawnFlags[id] = true;
         });
 
@@ -99,7 +96,6 @@ public:
 private:
     Shader m_gBufferShader;
     std::vector<Mesh*> m_meshInstances;        // Mesh instances
-    std::vector<int> m_instanceCounts;         // Count of how many times each mesh should be drawn
     std::vector<bool> m_instanceDrawnFlags;    // Track which instances have been drawn
 };
 

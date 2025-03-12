@@ -5,6 +5,7 @@ layout (location = 1) in vec3 aNormal;
 layout (location = 2) in vec2 aTexCoords;
 layout (location = 3) in vec3 aTangent;
 layout (location = 4) in vec3 aBitangent;
+layout (location = 5) in mat4 instanceMatrix;
 
 // Outputs to the fragment shader
 out vec3 FragPos;
