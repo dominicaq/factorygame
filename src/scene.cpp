@@ -122,7 +122,7 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 10000;
+    int n = 1000;
     float circleRadius = 4.0f;
     float yPosition = 0.0f;
     createLights(1, circleRadius, yPosition + 5.0f, basicShader);

@@ -28,8 +28,6 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 
     int tileIndex = 0;
 
-    prepareInstanceMap(registry);
-
     // Render 2D shadow maps (directional/spotlights) to the atlas
     registry.view<LightSpaceMatrix, Light>().each([&](auto& lightSpaceMatrix, auto& light) {
         if (tileIndex >= maxShadowMaps) {
@@ -91,29 +89,19 @@ void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) 
         renderer.draw(mesh);
     });
 
-    // Instance rendering
-    for (const auto& [meshId, matrices] : m_instanceMap) {
-        if (matrices.empty()) {
+    // Get shared instance map from the frame graph
+    const auto& instanceMap = getInstanceMap();
+    const auto& meshInstances = getMeshInstances();
+
+    // Render all instances using the shared instance map
+    for (const auto& [meshId, matrices] : instanceMap) {
+        if (matrices.empty() || meshId >= meshInstances.size() ||
+            !meshInstances[meshId]->material->isDeferred) {
             continue;
         }
 
         // Set the first matrix as the model uniform (for gl_InstanceID == 0)
-        // This ensures the first instance is drawn correctly
         m_shadowShader.setMat4("u_Model", matrices[0]);
         renderer.drawInstanced(meshId);
     }
-}
-
-void ShadowPass::prepareInstanceMap(entt::registry& registry) {
-    // Clear the previous frame's instance map
-    m_instanceMap.clear();
-
-    // Collect all instances by mesh ID
-    registry.view<MeshInstance, ModelMatrix>().each([&](MeshInstance& instance, const ModelMatrix& modelMatrix) {
-        size_t id = instance.id;
-        if (id >= m_meshInstances.size()) {
-            return;
-        }
-        m_instanceMap[id].push_back(modelMatrix.matrix);
-    });
 }

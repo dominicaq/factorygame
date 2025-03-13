@@ -52,8 +52,9 @@ int main() {
     window.setRenderer(&renderer);
 
     FrameGraph frameGraph;
-    frameGraph.addRenderPass(std::make_unique<ShadowPass>(scene.instanceMeshes));
-    frameGraph.addRenderPass(std::make_unique<GeometryPass>(scene.instanceMeshes));
+    frameGraph.setMeshInstances(scene.instanceMeshes);
+    frameGraph.addRenderPass(std::make_unique<ShadowPass>());
+    frameGraph.addRenderPass(std::make_unique<GeometryPass>());
     frameGraph.addRenderPass(std::make_unique<LightPass>());
     frameGraph.addRenderPass(std::make_unique<ForwardPass>());
     frameGraph.addRenderPass(std::make_unique<SkyboxPass>());
