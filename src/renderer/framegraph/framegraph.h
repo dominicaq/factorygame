@@ -28,7 +28,10 @@ public:
     // Execute all render passes, passing in the renderer and registry
     void executePasses(Renderer& renderer, entt::registry& registry) {
         // Clear and rebuild the instance map once per frame
-        updateInstanceMap(registry);
+        if (!m_updateOnce) {
+            m_updateOnce = true;
+            updateInstanceMap(registry);
+        }
 
         // Execute each pass with access to the shared instance map
         for (auto& pass : m_renderPasses) {
@@ -55,6 +58,7 @@ private:
     // Instance data
     std::unordered_map<size_t, std::vector<glm::mat4>> m_instanceMap;
     std::vector<Mesh*> m_meshInstances;
+    bool m_updateOnce = false;
 
     // Pass data
     std::vector<std::unique_ptr<RenderPass>> m_renderPasses;
