@@ -1,5 +1,6 @@
 #include "shadowpass.h"
 #include <glad/glad.h>
+#include "../../scene.h"
 
 void ShadowPass::setup() {
     std::string shadowVertPath = ASSET_DIR "shaders/core/shadow.vs";
@@ -89,9 +90,9 @@ void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) 
         renderer.draw(mesh);
     });
 
-    // Get shared instance map from the frame graph
-    const auto& instanceMap = getInstanceMap();
-    const auto& meshInstances = getMeshInstances();
+    // Get scene data for rendering
+    const auto& instanceMap = m_scene->getInstanceMap();
+    const auto& meshInstances = m_scene->getMeshInstances();
 
     // Render all instances using the shared instance map
     for (const auto& [meshId, matrices] : instanceMap) {

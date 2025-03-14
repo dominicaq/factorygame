@@ -122,11 +122,14 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 50000;
+    int n = 5;
     float circleRadius = 4.0f;
     float yPosition = 0.0f;
     createLights(1, circleRadius, yPosition + 5.0f, basicShader);
     createAsteroids(n, circleRadius + 10.0f, yPosition, basicShader);
+
+    // Finally, update the mesh instance map if any for later use
+    updateInstanceMap();
 }
 
 void Scene::createLights(int n, float circleRadius, float yPosition, Shader* basicShader) {
@@ -199,8 +202,8 @@ void Scene::createAsteroids(int n, float circleRadius, float yPosition, Shader* 
     asteroidMesh->material = asteroidMaterial;
 
     // Store mesh instance
-    size_t meshIndex = instanceMeshes.size();
-    instanceMeshes.push_back(asteroidMesh);
+    size_t meshIndex = m_meshInstances.size();
+    m_meshInstances.push_back(asteroidMesh);
 
     MeshInstance cubeInstance;
     cubeInstance.id = meshIndex;
@@ -270,4 +273,15 @@ GameObject* Scene::addGameObjectComponent(entt::registry& registry, entt::entity
     registry.emplace<ModelMatrix>(entity);
 
     return &registry.emplace<GameObject>(entity, entity, registry);
+}
+
+// Scene instancing
+void Scene::updateInstanceMap() {
+    m_instanceMap.clear();
+
+    // Collect all instances by mesh ID
+    registry.view<MeshInstance, ModelMatrix>().each([&](MeshInstance& instance, const ModelMatrix& modelMatrix) {
+        size_t id = instance.id;
+        m_instanceMap[id].push_back(modelMatrix.matrix);
+    });
 }

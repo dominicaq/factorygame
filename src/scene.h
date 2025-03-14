@@ -28,7 +28,6 @@ struct SceneData {
 class Scene {
 public:
     entt::registry registry;
-    std::vector<Mesh*> instanceMeshes;
 
     // TODO: TEMP
     void createAsteroids(int n, float circleRadius, float yPosition, Shader* basicShader);
@@ -39,12 +38,23 @@ public:
     void loadScene();
     Camera& getPrimaryCamera();
     void setPrimaryCamera(entt::entity cameraEntity);
+
+    // Mesh Instancing
+    const std::unordered_map<size_t, std::vector<glm::mat4>>& getInstanceMap() const { return m_instanceMap; }
+    const std::vector<Mesh*>& getMeshInstances() const { return m_meshInstances; }
+    void updateInstanceMap();
+
 private:
     // Component Helpers
     GameObject* addGameObjectComponent(entt::registry& registry, entt::entity entity, const SceneData& data);
     void addLightComponents(entt::registry& registry, entt::entity entity, Light lightData);
     void addPointLightComponents(entt::registry& registry, entt::entity entity, Light lightData);
 
+    // Scene instancing
+    std::unordered_map<size_t, std::vector<glm::mat4>> m_instanceMap;
+    std::vector<Mesh*> m_meshInstances;
+
+    // Scene necessities
     entt::entity m_primaryCameraEntity = entt::null;
 };
 

@@ -10,6 +10,7 @@
 class Renderer;
 class FrameGraph;
 class Mesh;
+class Scene;
 
 class RenderPass {
 public:
@@ -17,20 +18,13 @@ public:
     virtual void setup() = 0;
     virtual void execute(Renderer& renderer, entt::registry& registry) = 0;
 
-    // Set the parent frame graph (called by FrameGraph when the pass is added)
-    void setFrameGraph(FrameGraph* frameGraph) {
-        m_frameGraph = frameGraph;
+    // Set the scene reference (this will be called by FrameGraph)
+    void setScene(Scene* scene) {
+        m_scene = scene;
     }
 
 protected:
-    // Access to the parent frame graph
-    FrameGraph* m_frameGraph = nullptr;
-
-    // Helper to get the shared instance map
-    const std::unordered_map<size_t, std::vector<glm::mat4>>& getInstanceMap() const;
-
-    // Helper to get the mesh instances
-    const std::vector<Mesh*>& getMeshInstances() const;
+    Scene* m_scene = nullptr;
 };
 
 #endif // RENDERPASS_H
