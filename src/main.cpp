@@ -105,10 +105,11 @@ int main() {
         }
 
         // -------------- System updates ------------
-        // TODO: bottle neck is in systems.
         profiler.start("Systems");
         gameObjectSystem.updateAll(deltaTime);
+        profiler.start("Transform");
         transformSystem.updateTransformComponents();
+        profiler.end("Transform");
         lightSystem.updateShadowMatrices();
         profiler.end("Systems");
 

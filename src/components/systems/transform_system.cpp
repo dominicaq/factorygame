@@ -1,3 +1,8 @@
+#ifndef __APPLE__
+    #define GLM_FORCE_INLINE
+    #define GLM_FORCE_SSE2
+#endif
+
 #include "transform_system.h"
 
 TransformSystem::TransformSystem(entt::registry& registry)
@@ -13,7 +18,20 @@ void TransformSystem::updateTransformComponents() {
     updateDirtyMatrices();
 }
 
+void TransformSystem::checkDirtyParents() {
+    auto parentEntityCache = m_registry.view<Parent>();
+    parentEntityCache.each([&](auto entity, Parent& parent) {
+        const auto& parentModelMatrix = m_registry.get<ModelMatrix>(parent.parent);
+
+        if (parentModelMatrix.dirty) {
+            auto& modelMatrix = m_registry.get<ModelMatrix>(entity);
+            modelMatrix.dirty = true;
+        }
+    });
+}
+
 void TransformSystem::updateDirtyMatrices() {
+    // TODO: massive bottle neck here.
     auto modelEntityCache = m_registry.view<ModelMatrix>();
     modelEntityCache.each([&](auto entity, ModelMatrix& modelMatrix) {
         if (!modelMatrix.dirty) {
@@ -37,17 +55,5 @@ void TransformSystem::updateDirtyMatrices() {
 
         modelMatrix.matrix = localMatrix;
         modelMatrix.dirty = false;
-    });
-}
-
-void TransformSystem::checkDirtyParents() {
-    auto parentEntityCache = m_registry.view<Parent>();
-    parentEntityCache.each([&](auto entity, Parent& parent) {
-        const auto& parentModelMatrix = m_registry.get<ModelMatrix>(parent.parent);
-
-        if (parentModelMatrix.dirty) {
-            auto& modelMatrix = m_registry.get<ModelMatrix>(entity);
-            modelMatrix.dirty = true;
-        }
     });
 }
