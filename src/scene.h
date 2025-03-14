@@ -44,6 +44,9 @@ public:
     const std::vector<Mesh*>& getMeshInstances() const { return m_meshInstances; }
     void updateInstanceMap();
 
+    // Add a mesh to be instanced, returns MeshInstance component
+    MeshInstance addMeshInstance(Mesh* mesh);
+
 private:
     // Component Helpers
     GameObject* addGameObjectComponent(entt::registry& registry, entt::entity entity, const SceneData& data);
@@ -53,6 +56,9 @@ private:
     // Scene instancing
     std::unordered_map<size_t, std::vector<glm::mat4>> m_instanceMap;
     std::vector<Mesh*> m_meshInstances;
+    std::unordered_map<size_t, size_t> m_instanceCounts;
+    std::unordered_map<size_t, size_t> m_currentIndices;
+    bool m_instanceCountsDirty = true;
 
     // Scene necessities
     entt::entity m_primaryCameraEntity = entt::null;

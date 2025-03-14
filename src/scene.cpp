@@ -122,7 +122,7 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 5;
+    int n = 100000;
     float circleRadius = 4.0f;
     float yPosition = 0.0f;
     createLights(1, circleRadius, yPosition + 5.0f, basicShader);
@@ -200,13 +200,7 @@ void Scene::createAsteroids(int n, float circleRadius, float yPosition, Shader* 
     asteroidMaterial->normalMap = nullptr;
     asteroidMaterial->isDeferred = true;
     asteroidMesh->material = asteroidMaterial;
-
-    // Store mesh instance
-    size_t meshIndex = m_meshInstances.size();
-    m_meshInstances.push_back(asteroidMesh);
-
-    MeshInstance cubeInstance;
-    cubeInstance.id = meshIndex;
+    MeshInstance meshInstance = addMeshInstance(asteroidMesh);
 
     for (int i = 0; i < n; ++i) {
         float angle = i * (360.0f / n);
@@ -232,7 +226,7 @@ void Scene::createAsteroids(int n, float circleRadius, float yPosition, Shader* 
             rotationScript->rotationSpeed = 0.5f;
         }
 
-        registry.emplace<MeshInstance>(asteroidEntity, cubeInstance);
+        registry.emplace<MeshInstance>(asteroidEntity, meshInstance);
     }
 }
 
@@ -276,12 +270,50 @@ GameObject* Scene::addGameObjectComponent(entt::registry& registry, entt::entity
 }
 
 // Scene instancing
-void Scene::updateInstanceMap() {
-    m_instanceMap.clear();
+MeshInstance Scene::addMeshInstance(Mesh* mesh) {
+    size_t meshIndex = m_meshInstances.size();
+    m_meshInstances.push_back(mesh);
 
-    // Collect all instances by mesh ID
-    registry.view<MeshInstance, ModelMatrix>().each([&](MeshInstance& instance, const ModelMatrix& modelMatrix) {
+    MeshInstance newInstance;
+    newInstance.id = meshIndex;
+    return newInstance;
+}
+
+void Scene::updateInstanceMap() {
+    // Handle instance count updates (less frequent)
+    if (m_instanceCountsDirty) {
+        // Reset counts while keeping map structure
+        for (auto& [id, count] : m_instanceCounts) {
+            count = 0;
+        }
+
+        // Count instances
+        registry.view<MeshInstance>().each([&](const MeshInstance& instance) {
+            m_instanceCounts[instance.id]++;
+        });
+
+        // Resize vectors based on new counts
+        for (const auto& [id, count] : m_instanceCounts) {
+            if (m_instanceMap.find(id) == m_instanceMap.end()) {
+                m_instanceMap[id] = std::vector<glm::mat4>(count);
+            } else {
+                m_instanceMap[id].resize(count);
+            }
+        }
+
+        m_instanceCountsDirty = false;
+    }
+
+    // Reset indices at the start of each update
+    for (auto& [id, index] : m_currentIndices) {
+        index = 0;
+    }
+
+    // Collect matrices in a single view iteration
+    registry.view<MeshInstance, ModelMatrix>().each([&](const MeshInstance& instance, const ModelMatrix& modelMatrix) {
         size_t id = instance.id;
-        m_instanceMap[id].push_back(modelMatrix.matrix);
+        size_t& idx = m_currentIndices[id]; // Reference to avoid double lookup
+        m_instanceMap[id][idx] = modelMatrix.matrix;
+        idx++;
     });
 }
