@@ -127,7 +127,7 @@ void Renderer::drawInstanced(size_t instanceID) {
     }
 
     const MeshData& data = m_instanceMeshData[instanceID];
-    const size_t count = data.instanceCount;
+    const GLsizei count = data.instanceCount;
     if (count <= 0) {
         std::cerr << "[Warning] Renderer::drawInstanced: Instance count is zero or negative!\n";
         return;
@@ -356,7 +356,7 @@ void Renderer::updateInstanceBuffer(size_t instanceID, const std::vector<glm::ma
     glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_DYNAMIC_DRAW);
 
     // Update the instance count
-    data.instanceCount = modelMatrices.size();
+    data.instanceCount = (GLsizei)modelMatrices.size();
 }
 
 void Renderer::setupInstanceAttributes(size_t instanceID, const std::vector<glm::mat4>& modelMatrices) {
@@ -388,7 +388,7 @@ void Renderer::setupInstanceAttributes(size_t instanceID, const std::vector<glm:
 
     // Store the instance VBO in the mesh data
     data.instanceVBO = instanceVBO;
-    data.instanceCount = modelMatrices.size();
+    data.instanceCount = (GLsizei)modelMatrices.size();
 }
 
 void Renderer::deleteInstanceBuffer(size_t instanceID) {

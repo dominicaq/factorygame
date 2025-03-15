@@ -1,3 +1,8 @@
+#ifndef __APPLE__
+    #define GLM_FORCE_INLINE
+    #define GLM_FORCE_SSE2
+#endif
+
 #include "gameobject.h"
 
 GameObject::GameObject(entt::entity entity, entt::registry& registry)

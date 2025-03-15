@@ -92,7 +92,7 @@ int main() {
     Profiler profiler;
     // -------------------- Game Loop -------------------
     while (!window.shouldClose()) {
-        float currentFrame = glfwGetTime();
+        float currentFrame = (float)glfwGetTime();
         deltaTime = currentFrame - lastFrame;
 
         // -------------- Input Management -----------
@@ -106,10 +106,10 @@ int main() {
 
         // -------------- System updates ------------
         profiler.start("Systems");
-        gameObjectSystem.updateAll(deltaTime);
         profiler.start("Transform");
-        transformSystem.updateTransformComponents();
+        gameObjectSystem.updateAll(deltaTime);
         profiler.end("Transform");
+        transformSystem.updateTransformComponents();
         lightSystem.updateShadowMatrices();
         profiler.end("Systems");
 

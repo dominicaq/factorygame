@@ -1,9 +1,11 @@
 #include "scene.h"
+#include <random>
 
 // User scripts
 #include "CircularRotation.h"
 #include "FreeCamera.h"
 #include "MoveScript.h"
+#include "BouncingMotion.h"
 #include "ViewFramebuffers.h"
 
 /*
@@ -125,8 +127,8 @@ void Scene::loadScene() {
     int n = 100000;
     float circleRadius = 4.0f;
     float yPosition = 0.0f;
-    createLights(1, circleRadius, yPosition + 5.0f, basicShader);
-    createAsteroids(n, circleRadius + 10.0f, yPosition, basicShader);
+    createLights(4, circleRadius, yPosition + 5.0f, basicShader);
+    createAsteroids(n, circleRadius * 10.0f, 0, 200, basicShader);
 
     // Finally, update the mesh instance map if any for later use
     updateInstanceMap();
@@ -188,43 +190,52 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
     }
 }
 
-void Scene::createAsteroids(int n, float circleRadius, float yPosition, Shader* basicShader) {
+void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHeight, Shader* basicShader) {
     Mesh* asteroidMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
     if (!asteroidMesh) {
         return;
     }
 
     Material* asteroidMaterial = new Material(basicShader);
-    asteroidMaterial->albedoColor = glm::vec3(0.0f, 0.0f, 1.0f);
+    asteroidMaterial->albedoColor = glm::vec3(0.5f, 0.5f, 0.5f); // Grayish color
     asteroidMaterial->albedoMap = nullptr;
     asteroidMaterial->normalMap = nullptr;
     asteroidMaterial->isDeferred = true;
     asteroidMesh->material = asteroidMaterial;
     MeshInstance meshInstance = addMeshInstance(asteroidMesh);
 
+    // Randomization setup
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> posDist(-fieldSize, fieldSize); // Random X, Z in a cube area
+    std::uniform_real_distribution<float> heightDist(minHeight, maxHeight); // Random Y height
+    std::uniform_real_distribution<float> scaleDist(0.05f, 0.2f);  // Random scale range
+    std::uniform_real_distribution<float> angleDist(0.0f, 360.0f); // Random rotation
+
     for (int i = 0; i < n; ++i) {
-        float angle = i * (360.0f / n);
-        float radians = glm::radians(angle);
-        float x = circleRadius * std::cos(radians);
-        float z = circleRadius * std::sin(radians);
+        // Random position
+        float x = posDist(gen);
+        float y = heightDist(gen); // Varies between minHeight and maxHeight
+        float z = posDist(gen);
+
+        // Random rotation
+        glm::vec3 randomRotation(angleDist(gen), angleDist(gen), angleDist(gen));
+
+        // Random scale
+        float randomScale = scaleDist(gen);
 
         entt::entity asteroidEntity = registry.create();
 
         // Meta data
         SceneData save_asteroid;
         save_asteroid.name = "Asteroid(" + std::to_string(i) + ")";
-        save_asteroid.scale = glm::vec3(0.1f);
-        save_asteroid.position = glm::vec3(x, yPosition, z);
+        save_asteroid.scale = glm::vec3(randomScale);
+        save_asteroid.position = glm::vec3(x, y, z);
+        save_asteroid.eulerAngles = randomRotation; // Assuming your system supports rotations
 
         // Game object
         GameObject* asteroidObject = addGameObjectComponent(registry, asteroidEntity, save_asteroid);
-        asteroidObject->addScript<CircularRotation>();
-        CircularRotation* rotationScript = asteroidObject->getScript<CircularRotation>();
-        if (rotationScript) {
-            rotationScript->radius = circleRadius;
-            rotationScript->center = glm::vec3(0.0f, yPosition, 0.0f);
-            rotationScript->rotationSpeed = 0.5f;
-        }
+        asteroidObject->addScript<BouncingMotion>();
 
         registry.emplace<MeshInstance>(asteroidEntity, meshInstance);
     }

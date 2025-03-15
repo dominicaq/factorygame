@@ -9,7 +9,7 @@
 #include "entt/entt.hpp"
 
 // Forward declaration
-class Mesh;
+struct Mesh;
 class Scene;
 
 class FrameGraph {

@@ -29,9 +29,7 @@ void GameObjectSystem::removeGameObject(entt::entity entity) {
 }
 
 void GameObjectSystem::startAll() {
-    auto view = m_registry.view<GameObject>();
-    for (auto entity : view) {
-        auto& gameObject = view.get<GameObject>(entity);
+    for (auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
         if (gameObject.isActive) {
             gameObject.startScripts();
         }
@@ -39,9 +37,7 @@ void GameObjectSystem::startAll() {
 }
 
 void GameObjectSystem::updateAll(float deltaTime) {
-    auto view = m_registry.view<GameObject>();
-    for (auto entity : view) {
-        auto& gameObject = view.get<GameObject>(entity);
+    for (auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
         if (gameObject.isActive) {
             gameObject.updateScripts(deltaTime);
         }
@@ -50,12 +46,11 @@ void GameObjectSystem::updateAll(float deltaTime) {
 
 std::vector<GameObject*> GameObjectSystem::getActiveGameObjects() const {
     std::vector<GameObject*> activeObjects;
-    auto view = m_registry.view<GameObject>();
-    for (auto entity : view) {
-        auto& gameObject = view.get<GameObject>(entity);
+    for (auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
         if (gameObject.isActive) {
             activeObjects.push_back(&gameObject);
         }
     }
+
     return activeObjects;
 }

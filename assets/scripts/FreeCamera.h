@@ -18,7 +18,7 @@ private:
 
 public:
     void start() override {
-        // inputManager.setCursorMode(GLFW_CURSOR_DISABLED);
+        inputManager.setCursorMode(GLFW_CURSOR_DISABLED);
     }
 
     void update(float deltaTime) override {
@@ -30,6 +30,14 @@ public:
         glm::vec3 right = gameObject->getRight();
 
         float dt = cameraSpeed * deltaTime;
+
+        // Lock cursor
+        if (inputManager.isKeyPressed(GLFW_KEY_Q)) {
+            inputManager.setCursorMode(GLFW_CURSOR_NORMAL);
+        }
+        if (inputManager.isKeyPressed(GLFW_KEY_E)) {
+            inputManager.setCursorMode(GLFW_CURSOR_DISABLED);
+        }
 
         // Handle movement based on input
         if (inputManager.isKeyPressed(GLFW_KEY_W)) {

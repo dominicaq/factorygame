@@ -30,7 +30,7 @@ public:
     entt::registry registry;
 
     // TODO: TEMP
-    void createAsteroids(int n, float circleRadius, float yPosition, Shader* basicShader);
+    void createAsteroids(int n, float fieldSize, float minHeight, float maxHeight, Shader* basicShader);
     void createLights(int n, float circleRadius, float yPosition, Shader* basicShader);
     // END OF TEMP
 

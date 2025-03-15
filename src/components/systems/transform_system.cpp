@@ -19,23 +19,19 @@ void TransformSystem::updateTransformComponents() {
 }
 
 void TransformSystem::checkDirtyParents() {
-    auto parentEntityCache = m_registry.view<Parent>();
-    parentEntityCache.each([&](auto entity, Parent& parent) {
+    for (auto& [entity, parent, modelMatrix] : m_registry.view<Parent, ModelMatrix>().each()) {
         const auto& parentModelMatrix = m_registry.get<ModelMatrix>(parent.parent);
 
         if (parentModelMatrix.dirty) {
-            auto& modelMatrix = m_registry.get<ModelMatrix>(entity);
             modelMatrix.dirty = true;
         }
-    });
+    }
 }
 
 void TransformSystem::updateDirtyMatrices() {
-    // TODO: massive bottle neck here.
-    auto modelEntityCache = m_registry.view<ModelMatrix>();
-    modelEntityCache.each([&](auto entity, ModelMatrix& modelMatrix) {
+    for (auto& [entity, modelMatrix] : m_registry.view<ModelMatrix>().each()) {
         if (!modelMatrix.dirty) {
-            return;
+            continue;
         }
 
         auto& position = m_registry.get<Position>(entity).position;
@@ -55,5 +51,5 @@ void TransformSystem::updateDirtyMatrices() {
 
         modelMatrix.matrix = localMatrix;
         modelMatrix.dirty = false;
-    });
+    }
 }

@@ -74,6 +74,10 @@ public:
         return m_cursorMode == GLFW_CURSOR_DISABLED;
     }
 
+    int getCursorMode() const {
+        return m_cursorMode;
+    }
+
 private:
     GLFWwindow* m_window = nullptr;  // Store reference to the window
     bool m_keyStates[MAX_KEYS];  // Track all key states

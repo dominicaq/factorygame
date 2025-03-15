@@ -9,7 +9,7 @@
 
 class Renderer;
 class FrameGraph;
-class Mesh;
+struct Mesh;
 class Scene;
 
 class RenderPass {

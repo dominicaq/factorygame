@@ -100,7 +100,7 @@ private:
         GLsizei vertexCount;
 
         unsigned int instanceVBO;
-        int instanceCount;
+        GLsizei instanceCount;
     };
 
     std::vector<MeshData> m_meshData;

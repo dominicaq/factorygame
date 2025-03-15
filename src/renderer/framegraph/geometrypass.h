@@ -43,11 +43,10 @@ public:
         });
 
         // Get scene data for rendering
-        const auto& instanceMap = m_scene->getInstanceMap();
         const auto& meshInstances = m_scene->getMeshInstances();
 
         // Render all instances using the shared instance map
-        for (const auto& [meshId, matrices] : instanceMap) {
+        for (const auto& [meshId, matrices] : m_scene->getInstanceMap()) {
             if (matrices.empty() || meshId >= meshInstances.size() ||
                 !meshInstances[meshId]->material->isDeferred) {
                 continue;

@@ -6,9 +6,14 @@ project(FactoryGame)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+# Ensure using static runtime library for MSVC
 if(WIN32 AND MSVC)
+    # Set the runtime library to static (MultiThreaded)
     set(CMAKE_C_RUNTIME_LIBRARY "MultiThreaded")
     set(CMAKE_CXX_RUNTIME_LIBRARY "MultiThreaded")
+
+    # Link against specific libraries to avoid default library conflicts
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /NODEFAULTLIB:LIBCMT")
 endif()
 
 # User-defined script directory
@@ -88,7 +93,7 @@ add_executable(${PROJECT_NAME} ${SOURCES} ${SCRIPT_SOURCES} ${IMGUI_SRC})
 target_link_libraries(${PROJECT_NAME} glad OpenGL::GL ${GLFW_LIB})
 
 # Platform-specific compiler options
-if (APPLE OR UNUX)
+if (APPLE OR UNIX)
     target_compile_options(${PROJECT_NAME} PRIVATE -Wno-deprecated-declarations)
 elseif (WIN32)
     target_compile_options(${PROJECT_NAME} PRIVATE /wd4996)
