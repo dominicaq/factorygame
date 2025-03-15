@@ -1,4 +1,5 @@
 #include "gameobject_system.h"
+#include "engine.h"
 #include <iostream>
 
 GameObjectSystem::GameObjectSystem(entt::registry& registry) : m_registry(registry) {}
@@ -36,10 +37,16 @@ void GameObjectSystem::startAll() {
     }
 }
 
-void GameObjectSystem::updateAll(float deltaTime) {
+void GameObjectSystem::updateAll(float currentTime, float deltaTime) {
     for (const auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
-        if (gameObject.isActive) {
-            gameObject.updateScripts(deltaTime);
+        if (!gameObject.isActive) {
+            return;
+        }
+
+        gameObject.updateScripts(deltaTime);
+        if (Mesh* mesh = m_registry.try_get<Mesh>(entity)) {
+            // Using a single pointer
+            mesh->material->time = currentTime;
         }
     }
 }

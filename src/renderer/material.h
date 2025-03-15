@@ -21,6 +21,7 @@ struct Material {
     glm::vec3 specularColor = glm::vec3(1.0f);
 
     float shininess = 32.0f;
+    float time;
 
     // Flag(s)
     bool isDeferred = false;
@@ -43,6 +44,10 @@ struct Material {
 
         // Requirement: Every material shader needs a color
         shaderOverride->setVec3("u_AlbedoColor", albedoColor);
+
+        if (shaderOverride->hasUniform("u_Time")) {
+            shaderOverride->setFloat("u_Time", time);
+        }
 
         // Bind albedo map if it exists, otherwise set default color
         if (albedoMap) {
