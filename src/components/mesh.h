@@ -16,6 +16,7 @@ struct Mesh {
     std::vector<glm::vec3> bitangents;
     std::vector<unsigned int> indices;
     Material* material = nullptr;
+    bool wireframe = false;
 
     // Method to clear CPU-side mesh data
     void clearData() {

@@ -29,7 +29,7 @@ void GameObjectSystem::removeGameObject(entt::entity entity) {
 }
 
 void GameObjectSystem::startAll() {
-    for (auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
+    for (const auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
         if (gameObject.isActive) {
             gameObject.startScripts();
         }
@@ -37,7 +37,7 @@ void GameObjectSystem::startAll() {
 }
 
 void GameObjectSystem::updateAll(float deltaTime) {
-    for (auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
+    for (const auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
         if (gameObject.isActive) {
             gameObject.updateScripts(deltaTime);
         }
@@ -46,7 +46,7 @@ void GameObjectSystem::updateAll(float deltaTime) {
 
 std::vector<GameObject*> GameObjectSystem::getActiveGameObjects() const {
     std::vector<GameObject*> activeObjects;
-    for (auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
+    for (const auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
         if (gameObject.isActive) {
             activeObjects.push_back(&gameObject);
         }

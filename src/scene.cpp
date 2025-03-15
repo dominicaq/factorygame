@@ -124,12 +124,12 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 100000;
+    int n = 1000;
     float circleRadius = 4.0f;
     float yPosition = 0.0f;
     createLights(4, circleRadius, yPosition + 5.0f, basicShader);
     createAsteroids(n, circleRadius * 10.0f, 0, 200, basicShader);
-
+    createGizmos();
     // Finally, update the mesh instance map if any for later use
     updateInstanceMap();
 }
@@ -207,15 +207,16 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
     // Randomization setup
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_real_distribution<float> posDist(-fieldSize, fieldSize); // Random X, Z in a cube area
-    std::uniform_real_distribution<float> heightDist(minHeight, maxHeight); // Random Y height
-    std::uniform_real_distribution<float> scaleDist(0.05f, 0.2f);  // Random scale range
-    std::uniform_real_distribution<float> angleDist(0.0f, 360.0f); // Random rotation
+    // Random values within ranges
+    std::uniform_real_distribution<float> posDist(-fieldSize, fieldSize);
+    std::uniform_real_distribution<float> heightDist(minHeight, maxHeight);
+    std::uniform_real_distribution<float> scaleDist(0.05f, 0.2f);
+    std::uniform_real_distribution<float> angleDist(0.0f, 360.0f);
 
     for (int i = 0; i < n; ++i) {
         // Random position
         float x = posDist(gen);
-        float y = heightDist(gen); // Varies between minHeight and maxHeight
+        float y = heightDist(gen);
         float z = posDist(gen);
 
         // Random rotation
@@ -231,13 +232,42 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
         save_asteroid.name = "Asteroid(" + std::to_string(i) + ")";
         save_asteroid.scale = glm::vec3(randomScale);
         save_asteroid.position = glm::vec3(x, y, z);
-        save_asteroid.eulerAngles = randomRotation; // Assuming your system supports rotations
+        save_asteroid.eulerAngles = randomRotation;
 
         // Game object
         GameObject* asteroidObject = addGameObjectComponent(registry, asteroidEntity, save_asteroid);
         asteroidObject->addScript<BouncingMotion>();
 
         registry.emplace<MeshInstance>(asteroidEntity, meshInstance);
+    }
+}
+
+void Scene::createGizmos() {
+    std::string vertexPath = SHADER_DIR + "debug/wireframe.vs";
+    std::string fragmentPath = SHADER_DIR + "debug/wireframe.fs";
+    Shader* gizmoShader = new Shader(vertexPath, fragmentPath);
+
+    // --------------------- Gizmo Cube ---------------------
+    entt::entity gizmoEntity = registry.create();
+    SceneData save_gizmo;
+    save_gizmo.name = "Gizmo";
+    save_gizmo.position = glm::vec3(0.0f, -0.1f, -1.0f);
+    save_gizmo.scale = glm::vec3(1.0f);
+    GameObject* gizmoObject = addGameObjectComponent(registry, gizmoEntity, save_gizmo);
+
+    // Create gizmo mesh
+    Mesh* squareGizmoMesh = Gizmos::createCube();
+    if (squareGizmoMesh != nullptr) {
+        // Create material for the gizmo
+        Material* gizmoMaterial = new Material(gizmoShader);
+        gizmoMaterial->albedoColor = glm::vec3(1.0f, 0.0f, 0.0f);
+        gizmoMaterial->isDeferred = false;
+
+        // Set the material on the mesh
+        squareGizmoMesh->material = gizmoMaterial;
+
+        // Add mesh component to the entity
+        registry.emplace<Mesh*>(gizmoEntity, squareGizmoMesh);
     }
 }
 
@@ -323,7 +353,7 @@ void Scene::updateInstanceMap() {
     // Collect matrices in a single view iteration
     registry.view<MeshInstance, ModelMatrix>().each([&](const MeshInstance& instance, const ModelMatrix& modelMatrix) {
         size_t id = instance.id;
-        size_t& idx = m_currentIndices[id]; // Reference to avoid double lookup
+        size_t& idx = m_currentIndices[id];
         m_instanceMap[id][idx] = modelMatrix.matrix;
         idx++;
     });

@@ -106,21 +106,31 @@ void Renderer::draw(const Mesh* mesh) {
 
     const MeshData& data = m_meshData[index];
 
+    if (mesh->wireframe) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    }
+
     // Bind VAO
     glBindVertexArray(data.VAO);
 
+    GLenum drawMode = mesh->wireframe ? GL_LINES : GL_TRIANGLES;
+
     // Draw the mesh
     if (data.EBO != 0) {
-        glDrawElements(GL_TRIANGLES, data.indexCount, GL_UNSIGNED_INT, 0);
+        glDrawElements(drawMode, data.indexCount, GL_UNSIGNED_INT, 0);
     } else {
-        glDrawArrays(GL_TRIANGLES, 0, data.vertexCount);
+        glDrawArrays(drawMode, 0, data.vertexCount);
     }
 
     // Unbind VAO
     glBindVertexArray(0);
+
+    if (mesh->wireframe) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    }
 }
 
-void Renderer::drawInstanced(size_t instanceID) {
+void Renderer::drawInstanced(size_t instanceID, bool wireframe) {
     if (instanceID >= m_instanceMeshData.size() || m_instanceMeshData[instanceID].VAO == 0) {
         std::cerr << "[Error] Renderer::drawInstanced: Mesh buffer id not found!\n";
         return;
@@ -131,6 +141,11 @@ void Renderer::drawInstanced(size_t instanceID) {
     if (count <= 0) {
         std::cerr << "[Warning] Renderer::drawInstanced: Instance count is zero or negative!\n";
         return;
+    }
+
+    // Add wireframe support
+    if (wireframe) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     }
 
     // Bind VAO
@@ -145,6 +160,11 @@ void Renderer::drawInstanced(size_t instanceID) {
 
     // Unbind VAO
     glBindVertexArray(0);
+
+    // Reset polygon mode if wireframe was enabled
+    if (wireframe) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    }
 }
 
 void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic, size_t instanceID) {

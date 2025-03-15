@@ -19,7 +19,7 @@ void TransformSystem::updateTransformComponents() {
 }
 
 void TransformSystem::checkDirtyParents() {
-    for (auto& [entity, parent, modelMatrix] : m_registry.view<Parent, ModelMatrix>().each()) {
+    for (const auto& [entity, parent, modelMatrix] : m_registry.view<Parent, ModelMatrix>().each()) {
         const auto& parentModelMatrix = m_registry.get<ModelMatrix>(parent.parent);
 
         if (parentModelMatrix.dirty) {
@@ -29,7 +29,7 @@ void TransformSystem::checkDirtyParents() {
 }
 
 void TransformSystem::updateDirtyMatrices() {
-    for (auto& [entity, modelMatrix] : m_registry.view<ModelMatrix>().each()) {
+    for (const auto& [entity, modelMatrix] : m_registry.view<ModelMatrix>().each()) {
         if (!modelMatrix.dirty) {
             continue;
         }

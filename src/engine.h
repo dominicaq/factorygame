@@ -30,4 +30,7 @@
 #include "renderer/texture.h"
 #include "renderer/renderer.h"
 
+// Runtime debugging
+#include "debugging/gizmos.h"
+
 #endif // ENGINE_H

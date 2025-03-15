@@ -86,6 +86,9 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) {
     // Normal rendering
     registry.view<Mesh*, ModelMatrix>().each([&](Mesh* mesh, const ModelMatrix& modelMatrix) {
+        if (mesh->wireframe) {
+            return;
+        }
         m_shadowShader.setMat4("u_Model", modelMatrix.matrix);
         renderer.draw(mesh);
     });
@@ -96,8 +99,7 @@ void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) 
 
     // Render all instances using the shared instance map
     for (const auto& [meshId, matrices] : instanceMap) {
-        if (matrices.empty() || meshId >= meshInstances.size() ||
-            !meshInstances[meshId]->material->isDeferred) {
+        if (matrices.empty() || meshId >= meshInstances.size() || meshInstances[meshId]->wireframe) {
             continue;
         }
 
