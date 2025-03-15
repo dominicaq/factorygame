@@ -30,6 +30,13 @@ void Shader::use() const {
 /*
 * Uniform data
 */
+bool Shader::hasUniform(const std::string& name) const {
+    GLint location = glGetUniformLocation(m_ID, name.c_str());
+
+    // If location is -1, the uniform doesn't exist or isn't active
+    return location != -1;
+}
+
 void Shader::setBool(const std::string& name, bool value) const {
     GLint location = glGetUniformLocation(m_ID, name.c_str());
     if (location != -1) {

@@ -41,36 +41,41 @@ struct Material {
             shaderOverride = shader;
         }
 
+        // Requirement: Every material shader needs a color
+        shaderOverride->setVec3("u_AlbedoColor", albedoColor);
+
         // Bind albedo map if it exists, otherwise set default color
         if (albedoMap) {
-            shaderOverride->setInt("u_AlbedoMap", 0);
-            albedoMap->bind(0);
+            if (shaderOverride->hasUniform("u_AlbedoMap")) {
+                shaderOverride->setInt("u_AlbedoMap", 0);
+                albedoMap->bind(0);
+            }
         }
-        shaderOverride->setVec3("u_AlbedoColor", albedoColor);
 
         // Bind normal map if it exists, otherwise set flag for shader
         if (normalMap) {
-            shaderOverride->setInt("u_NormalMap", 1);
-            shaderOverride->setBool("u_HasNormalMap", true);
-            normalMap->bind(1);
+            if (shaderOverride->hasUniform("u_NormalMap")) {
+                shaderOverride->setInt("u_NormalMap", 1);
+                normalMap->bind(1);
+            }
+
+            if (shaderOverride->hasUniform("u_HasNormalMap")) {
+                shaderOverride->setBool("u_HasNormalMap", true);
+            }
         } else {
-            shaderOverride->setBool("u_HasNormalMap", false);
+            if (shaderOverride->hasUniform("u_HasNormalMap")) {
+                shaderOverride->setBool("u_HasNormalMap", false);
+            }
         }
 
         // Bind specular map if it exists
-        // if (specularMap) {
-        //     shaderOverride->setInt("u_SpecularMap", 1);
-        //     specularMap->bind(1);
-        // }
-
-        // Set material properties like specular color and shininess
-        // shaderOverride->setVec3("u_SpecularColor", specularColor);
-        // shaderOverride->setFloat("u_Shininess", shininess);
-
-        // TODO: Unbind texture(s) if they exist
+        if (specularMap) {
+            if (shaderOverride->hasUniform("u_SpecularMap")) {
+                shaderOverride->setInt("u_SpecularMap", 2);
+                specularMap->bind(2);
+            }
+        }
     }
-
-
 };
 
 #endif
