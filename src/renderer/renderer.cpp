@@ -83,6 +83,7 @@ Renderer::~Renderer() {
  */
 void Renderer::initOpenGLState() {
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_CLAMP);
     glDepthFunc(GL_LESS);
 
     // Face Culling

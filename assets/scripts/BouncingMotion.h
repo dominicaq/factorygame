@@ -16,6 +16,9 @@ private:
     float gravity = 9.8f;
     glm::vec3 rotationSpeed;
 
+    float elapsedTime = 0.0f;  // Time passed since the object was created
+    float lifetime;             // Lifetime in seconds (randomly set)
+
     void start() override {
         startY = gameObject->getPosition().y;
 
@@ -25,13 +28,23 @@ private:
             static_cast<float>(std::rand() % 90 + 10),
             static_cast<float>(std::rand() % 90 + 10)
         );
+
+        // Set a random lifetime between 3 and 10 seconds
+        lifetime = static_cast<float>(std::rand() % 8 + 3);  // Random lifetime between 3 and 10 seconds
     }
 
     void update(const float& deltaTime) override {
+        elapsedTime += deltaTime;  // Increment the elapsed time by deltaTime
+
+        // Check if lifetime has passed and destroy the object if necessary
+        if (elapsedTime >= lifetime) {
+            gameObject->destroy();
+        }
+
         glm::vec3 position = gameObject->getPosition();
 
         // Apply gravity to the object
-        velocity -= gravity * deltaTime; // Apply gravity
+        velocity -= gravity * deltaTime;  // Apply gravity
         position.y += velocity * deltaTime;
 
         // Check if the object has hit the ground (y = 0.0f)

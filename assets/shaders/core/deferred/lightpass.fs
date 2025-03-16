@@ -83,7 +83,7 @@ void main() {
         // Specular component
         vec3 viewDir = normalize(u_CameraPosition - FragPos);
         vec3 reflectDir = reflect(-lightDir, Normal);
-        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
+        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 4.0);
         vec3 specular = light.color * spec * light.intensity * 0.5;
 
         // Shadow calculation

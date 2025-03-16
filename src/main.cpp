@@ -107,8 +107,8 @@ int main() {
         // -------------- System updates ------------
         profiler.start("Systems");
         profiler.start("Transform");
-        gameObjectSystem.updateAll(currentFrame, deltaTime);
         profiler.end("Transform");
+        gameObjectSystem.updateAll(currentFrame, deltaTime);
         transformSystem.updateTransformComponents();
         lightSystem.updateShadowMatrices();
         profiler.end("Systems");

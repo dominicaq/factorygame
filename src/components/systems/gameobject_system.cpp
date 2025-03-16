@@ -40,16 +40,16 @@ void GameObjectSystem::startAll() {
 void GameObjectSystem::updateAll(const float& currentTime, const float& deltaTime) {
     for (const auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
         if (!gameObject.isActive) {
-            return;
+            continue;
         }
 
-        gameObject.updateScripts(deltaTime);
         if (Mesh** meshPtr = m_registry.try_get<Mesh*>(entity)) {
             Mesh* mesh = *meshPtr;
             if (mesh && mesh->material) {
                 mesh->material->time = currentTime;
             }
         }
+        gameObject.updateScripts(deltaTime);
     }
 }
 

@@ -4,6 +4,7 @@
 #endif
 
 #include "gameobject.h"
+#include "mesh.h"
 
 GameObject::GameObject(entt::entity entity, entt::registry& registry)
     : m_entity(entity), m_registry(registry) {
@@ -35,7 +36,7 @@ void GameObject::startScripts() {
 void GameObject::updateScripts(const float& deltaTime) {
     for (auto& script : m_scripts) {
         if (!script->isActive) {
-            return;
+            continue;
         }
         // Function pointer call
         script->updateFunc(script.get(), deltaTime);
@@ -47,6 +48,64 @@ void GameObject::destroyScripts() {
         script->onDestroy();
     }
     m_scripts.clear();
+}
+
+void GameObject::destroy() {
+    if (!m_registry.valid(m_entity)) {
+        return; // Entity already destroyed
+    }
+
+    destroyScripts();
+
+    // Get the list of all descendants before we start destroying entities
+    std::vector<entt::entity> entitiesToDestroy;
+    entitiesToDestroy.push_back(m_entity);
+
+    // Remove from parent's children list
+    if (auto* parent = m_registry.try_get<Parent>(m_entity)) {
+        if (m_registry.valid(parent->parent) && m_registry.any_of<Children>(parent->parent)) {
+            auto& siblings = m_registry.get<Children>(parent->parent).children;
+            siblings.erase(std::remove(siblings.begin(), siblings.end(), m_entity), siblings.end());
+        }
+    }
+
+    // Collect all descendants with breadth-first search
+    size_t index = 0;
+    while (index < entitiesToDestroy.size()) {
+        entt::entity current = entitiesToDestroy[index++];
+
+        if (m_registry.valid(current) && m_registry.any_of<Children>(current)) {
+            auto& children = m_registry.get<Children>(current).children;
+            for (auto child : children) {
+                if (m_registry.valid(child)) {
+                    entitiesToDestroy.push_back(child);
+                }
+            }
+            // Clear the children list to prevent invalid references
+            children.clear();
+        }
+    }
+
+    // Now process in reverse order (children first, then parents)
+    for (auto it = entitiesToDestroy.rbegin(); it != entitiesToDestroy.rend(); ++it) {
+        entt::entity entity = *it;
+        if (m_registry.valid(entity)) {
+            // Remove specific components
+            m_registry.remove<Position>(entity);
+            m_registry.remove<EulerAngles>(entity);
+            m_registry.remove<Rotation>(entity);
+            m_registry.remove<Scale>(entity);
+            m_registry.remove<ModelMatrix>(entity);
+            m_registry.remove<MetaData>(entity);
+            m_registry.remove<Parent>(entity);
+            m_registry.remove<Children>(entity);
+
+            // Finally destroy the entity
+            m_registry.destroy(entity);
+        }
+    }
+
+    m_entity = entt::null;
 }
 
 /*
