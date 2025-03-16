@@ -44,9 +44,11 @@ void GameObjectSystem::updateAll(float currentTime, float deltaTime) {
         }
 
         gameObject.updateScripts(deltaTime);
-        if (Mesh* mesh = m_registry.try_get<Mesh>(entity)) {
-            // Using a single pointer
-            mesh->material->time = currentTime;
+        if (Mesh** meshPtr = m_registry.try_get<Mesh*>(entity)) {
+            Mesh* mesh = *meshPtr;
+            if (mesh && mesh->material) {
+                mesh->material->time = currentTime;
+            }
         }
     }
 }

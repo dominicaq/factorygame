@@ -8,7 +8,7 @@ uniform float u_Time;
 
 void main()
 {
-    float pulseIntensity = sin(u_Time) * 0.5 + 0.5;
+    float pulseIntensity = sin(u_Time * 5) * 0.25 + 0.75;
 
     // Apply pulsing effect to the albedo color
     vec3 pulsedColor = u_AlbedoColor * pulseIntensity;
