@@ -20,7 +20,7 @@ private:
         gameObject->setPosition(startPosition);
     }
 
-    void update(float deltaTime) override {
+    void update(const float& deltaTime) override {
         m_angle += rotationSpeed * deltaTime;
         if (m_angle > glm::two_pi<float>()) {
             m_angle -= glm::two_pi<float>();

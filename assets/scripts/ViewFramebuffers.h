@@ -31,7 +31,7 @@ public:
         }
     }
 
-    void update(float deltaTime) override {
+    void update(const float& deltaTime) override {
         cycleModes();
     }
 };

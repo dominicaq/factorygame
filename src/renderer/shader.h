@@ -6,6 +6,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <string>
+#include <unordered_map>
 
 class Shader {
 public:
@@ -28,9 +29,11 @@ public:
 
 private:
     unsigned int m_ID;
+    mutable std::unordered_map<std::string, GLint> m_UniformLocationCache;
 
     unsigned int compileShader(unsigned int type, const char* source, int* status);
     void linkProgram(unsigned int vertexShader, unsigned int fragmentShader, unsigned int geometryShader, int* status);
+    GLint getUniformLocation(const std::string& name) const;
 };
 
 #endif

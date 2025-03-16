@@ -22,7 +22,7 @@ public:
         m_eulerRotation = gameObject->getEuler();
     }
 
-    void update(float deltaTime) override {
+    void update(const float& deltaTime) override {
         if (!gameObject) {
             std::cout << "MoveScript: No GameObject for entity: " << "\n";
             return;

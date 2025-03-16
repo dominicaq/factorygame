@@ -37,7 +37,7 @@ void GameObjectSystem::startAll() {
     }
 }
 
-void GameObjectSystem::updateAll(float currentTime, float deltaTime) {
+void GameObjectSystem::updateAll(const float& currentTime, const float& deltaTime) {
     for (const auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
         if (!gameObject.isActive) {
             return;

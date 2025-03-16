@@ -21,7 +21,7 @@ public:
         inputManager.setCursorMode(GLFW_CURSOR_DISABLED);
     }
 
-    void update(float deltaTime) override {
+    void update(const float& deltaTime) override {
         // Get the camera's position and Euler angles from the GameObject
         glm::vec3 position = gameObject->getPosition();
         glm::vec3 eulerAngles = gameObject->getEuler();

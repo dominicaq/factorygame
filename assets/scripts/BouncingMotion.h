@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <cmath>
 
-class BouncingMotion : public Script {
+class BouncingMotion final : public Script {
 public:
     float fallSpeed = 2.0f;
     float riseSpeed = 3.0f;
@@ -18,15 +18,16 @@ private:
 
     void start() override {
         startY = gameObject->getPosition().y;
-        velocity = 0.0f;  // Start with zero initial velocity
+
+        // Random X, Y, Z rotation speed between 10 and 100
         rotationSpeed = glm::vec3(
-            static_cast<float>(std::rand() % 90 + 10), // Random X rotation speed between 10 and 100
-            static_cast<float>(std::rand() % 90 + 10), // Random Y rotation speed between 10 and 100
-            static_cast<float>(std::rand() % 90 + 10)  // Random Z rotation speed between 10 and 100
+            static_cast<float>(std::rand() % 90 + 10),
+            static_cast<float>(std::rand() % 90 + 10),
+            static_cast<float>(std::rand() % 90 + 10)
         );
     }
 
-    void update(float deltaTime) override {
+    void update(const float& deltaTime) override {
         glm::vec3 position = gameObject->getPosition();
 
         // Apply gravity to the object
@@ -36,7 +37,7 @@ private:
         // Check if the object has hit the ground (y = 0.0f)
         if (position.y <= -0.5f) {
             position.y = -0.5f;  // Make sure it doesn't go below the ground
-            velocity = std::sqrt(2 * gravity * (startY)); // Bounce back to the starting height (startY)
+            velocity = std::sqrt(2 * gravity * (startY));
         }
 
         // Apply the position update

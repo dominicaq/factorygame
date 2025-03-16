@@ -16,7 +16,7 @@ public:
 
     // Start() and Update() calls
     void startAll();
-    void updateAll(float currentTime, float deltaTime);
+    void updateAll(const float& currentTime, const float& deltaTime);
 
     // Access all gameobjects
     std::vector<GameObject*> getActiveGameObjects() const;

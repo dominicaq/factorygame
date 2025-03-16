@@ -12,16 +12,20 @@ protected:
 
 public:
     bool isActive = true;
+    void (*updateFunc)(Script*, float) = nullptr;
 
     virtual ~Script() = default;
 
     // Virtual functions with default implementations
     virtual void start() {}
-    virtual void update(float deltaTime) {}
+    virtual void update(const float& deltaTime) {}
+
     virtual void onDestroy() {}
 
     // Protected constructor to prevent direct instantiation
-    Script() = default;
+    Script() {
+        updateFunc = [](Script* self, float dt) { self->update(dt); };
+    }
 
     // Allow GameObject to set gameObject pointer
     friend class GameObject;

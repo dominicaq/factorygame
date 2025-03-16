@@ -6,6 +6,32 @@ project(FactoryGame)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+# Option to enable/disable NDEBUG
+option(ENABLE_NDEBUG "Disable assertions and enable release optimizations" ON)
+
+# Base optimization flags
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native")
+
+# Add -DNDEBUG only if ENABLE_NDEBUG is ON
+if (ENABLE_NDEBUG)
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -DNDEBUG")
+endif()
+
+# Ensure the project is built in Release mode by default
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# Optimization settings for MSVC (Windows)
+if (WIN32 AND MSVC)
+    set(CMAKE_CXX_FLAGS_RELEASE "/O2 /GL")
+    set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/LTCG")
+
+    if (ENABLE_NDEBUG)
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /DNDEBUG")
+    endif()
+endif()
+
 # Ensure using static runtime library for MSVC
 if(WIN32 AND MSVC)
     # Set the runtime library to static (MultiThreaded)

@@ -48,7 +48,7 @@ public:
     }
 
     void startScripts();
-    void updateScripts(float deltaTime);
+    void updateScripts(const float& deltaTime);
     void destroyScripts();
 
     /*

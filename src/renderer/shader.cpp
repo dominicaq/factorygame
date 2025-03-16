@@ -30,15 +30,27 @@ void Shader::use() const {
 /*
 * Uniform data
 */
-bool Shader::hasUniform(const std::string& name) const {
-    GLint location = glGetUniformLocation(m_ID, name.c_str());
+GLint Shader::getUniformLocation(const std::string& name) const {
+    // Check if location is already cached
+    auto it = m_UniformLocationCache.find(name);
+    if (it != m_UniformLocationCache.end()) {
+        return it->second;
+    }
 
+    // If not in cache, query it and store for future use
+    GLint location = glGetUniformLocation(m_ID, name.c_str());
+    m_UniformLocationCache[name] = location;
+    return location;
+}
+
+bool Shader::hasUniform(const std::string& name) const {
+    GLint location = getUniformLocation(name);
     // If location is -1, the uniform doesn't exist or isn't active
     return location != -1;
 }
 
 void Shader::setBool(const std::string& name, bool value) const {
-    GLint location = glGetUniformLocation(m_ID, name.c_str());
+    GLint location = getUniformLocation(name);
     if (location != -1) {
         glUniform1i(location, (int)value);
     } else {
@@ -47,7 +59,7 @@ void Shader::setBool(const std::string& name, bool value) const {
 }
 
 void Shader::setInt(const std::string& name, int value) const {
-    GLint location = glGetUniformLocation(m_ID, name.c_str());
+    GLint location = getUniformLocation(name);
     if (location != -1) {
         glUniform1i(location, value);
     } else {
@@ -56,7 +68,7 @@ void Shader::setInt(const std::string& name, int value) const {
 }
 
 void Shader::setFloat(const std::string& name, float value) const {
-    GLint location = glGetUniformLocation(m_ID, name.c_str());
+    GLint location = getUniformLocation(name);
     if (location != -1) {
         glUniform1f(location, value);
     } else {
@@ -65,7 +77,7 @@ void Shader::setFloat(const std::string& name, float value) const {
 }
 
 void Shader::setMat4(const std::string& name, const glm::mat4& mat) const {
-    GLint location = glGetUniformLocation(m_ID, name.c_str());
+    GLint location = getUniformLocation(name);
     if (location != -1) {
         glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(mat));
     } else {
@@ -74,7 +86,7 @@ void Shader::setMat4(const std::string& name, const glm::mat4& mat) const {
 }
 
 void Shader::setVec3(const std::string& name, const glm::vec3& value) const {
-    GLint location = glGetUniformLocation(m_ID, name.c_str());
+    GLint location = getUniformLocation(name);
     if (location != -1) {
         glUniform3fv(location, 1, glm::value_ptr(value));
     } else {
@@ -87,6 +99,8 @@ void Shader::setVec3(const std::string& name, const glm::vec3& value) const {
 */
 bool Shader::load(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath) {
     m_ID = 0;
+    // Clear the uniform location cache when loading a new shader
+    m_UniformLocationCache.clear();
 
     // Load shaders from files
     std::string vertexCode = ResourceLoader::readFile(vertexPath);

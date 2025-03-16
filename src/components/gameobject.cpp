@@ -32,11 +32,13 @@ void GameObject::startScripts() {
     }
 }
 
-void GameObject::updateScripts(float deltaTime) {
-    for (const auto& script : m_scripts) {
-        if (script->isActive) {
-            script->update(deltaTime);
+void GameObject::updateScripts(const float& deltaTime) {
+    for (auto& script : m_scripts) {
+        if (!script->isActive) {
+            return;
         }
+        // Function pointer call
+        script->updateFunc(script.get(), deltaTime);
     }
 }
 
