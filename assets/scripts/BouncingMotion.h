@@ -38,7 +38,7 @@ private:
 
         // Check if lifetime has passed and destroy the object if necessary
         if (elapsedTime >= lifetime) {
-            gameObject->destroy();
+            // gameObject->destroy();
         }
 
         glm::vec3 position = gameObject->getPosition();

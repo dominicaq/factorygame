@@ -90,17 +90,6 @@ void GameObject::destroy() {
     for (auto it = entitiesToDestroy.rbegin(); it != entitiesToDestroy.rend(); ++it) {
         entt::entity entity = *it;
         if (m_registry.valid(entity)) {
-            // Remove specific components
-            m_registry.remove<Position>(entity);
-            m_registry.remove<EulerAngles>(entity);
-            m_registry.remove<Rotation>(entity);
-            m_registry.remove<Scale>(entity);
-            m_registry.remove<ModelMatrix>(entity);
-            m_registry.remove<MetaData>(entity);
-            m_registry.remove<Parent>(entity);
-            m_registry.remove<Children>(entity);
-
-            // Finally destroy the entity
             m_registry.destroy(entity);
         }
     }
