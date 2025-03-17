@@ -10,6 +10,7 @@ extern InputManager inputManager;
 struct DebugContext {
     int mode;
     int numDepthSlices;
+    bool drawGizmos = true;
 };
 extern DebugContext DEBUG_CTX;
 

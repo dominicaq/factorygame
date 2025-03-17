@@ -1,6 +1,6 @@
 #include "shadowpass.h"
 #include <glad/glad.h>
-#include "../../scene.h"
+#include "../../scene/scene.h"
 
 void ShadowPass::setup() {
     std::string shadowVertPath = ASSET_DIR "shaders/core/shadow.vs";

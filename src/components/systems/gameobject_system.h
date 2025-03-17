@@ -10,10 +10,6 @@ public:
     GameObjectSystem(entt::registry& registry);
     ~GameObjectSystem();
 
-    // GameObject management
-    GameObject* getGameObject(entt::entity entity) const;
-    void removeGameObject(entt::entity entity);
-
     // Start() and Update() calls
     void startAll();
     void updateAll(const float& currentTime, const float& deltaTime);

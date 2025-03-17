@@ -1,5 +1,5 @@
 #include "engine.h"
-#include "scene.h"
+#include "scene/scene.h"
 
 // Render passes
 #include "renderer/framegraph/geometrypass.h"
@@ -133,5 +133,6 @@ int main() {
         lastFrame = currentFrame;
     }
 
+    scene.registry.clear();
     return 0;
 }

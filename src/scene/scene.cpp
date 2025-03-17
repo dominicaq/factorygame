@@ -14,13 +14,18 @@
 
 // TODO: In the future, this will be user generated through UI, not code.
 void Scene::loadScene() {
+    // Wireframe shader setup
+    std::string wireframeVert = SHADER_DIR + "debug/wireframe.vs";
+    std::string wireframeFrag = SHADER_DIR + "debug/wireframe.fs";
+    m_wireframeShader = new Shader(wireframeVert, wireframeFrag);
+
     // ------------------------ Setup Camera ------------------------
     entt::entity cameraEntity = registry.create();
     SceneData save_cameraData;
     save_cameraData.name = "Main Camera";
     save_cameraData.position = glm::vec3(4.0f, 0.21f, 4.04f);
     save_cameraData.eulerAngles = glm::vec3(-2.38f, 239.0f, 0.0f);
-    GameObject* cameraObject = addGameObjectComponent(registry, cameraEntity, save_cameraData);
+    GameObject* cameraObject = SceneUtils::addGameObjectComponent(registry, cameraEntity, save_cameraData);
     cameraObject->addScript<FreeCamera>();
 
     Camera cameraComponent(cameraEntity, registry);
@@ -38,7 +43,7 @@ void Scene::loadScene() {
     save_carData.name = "Buggy";
     save_carData.position = glm::vec3(6.0f, -2.5f, -0.5f);
     save_carData.scale = glm::vec3(5.0f);
-    GameObject* carObject = addGameObjectComponent(registry, carEntity, save_carData);
+    GameObject* carObject = SceneUtils::addGameObjectComponent(registry, carEntity, save_carData);
     carObject->addScript<MoveScript>();
 
     Mesh* carMesh = ResourceLoader::loadMesh(MODEL_DIR + "../obj-assets/data/beetle.obj");
@@ -56,7 +61,7 @@ void Scene::loadScene() {
     save_planeData.name = "Ground Plane";
     save_planeData.position = glm::vec3(0.0f, -1.1f, 0.0f);
     save_planeData.scale = glm::vec3(30.0f, 0.1f, 30.0f);
-    GameObject* planeObject = addGameObjectComponent(registry, planeEntity, save_planeData);
+    GameObject* planeObject = SceneUtils::addGameObjectComponent(registry, planeEntity, save_planeData);
 
     Mesh* planeMesh = ResourceLoader::loadMesh(MODEL_DIR + "/cube.obj");
     if (planeMesh != nullptr) {
@@ -74,7 +79,7 @@ void Scene::loadScene() {
     save_bunnyData.name = "Bunny";
     save_bunnyData.position = glm::vec3(6.0f, -0.5f, 0.0f);
     save_bunnyData.scale = glm::vec3(5.0f);
-    GameObject* bunnyObject = addGameObjectComponent(registry, bunnyEntity, save_bunnyData);
+    GameObject* bunnyObject = SceneUtils::addGameObjectComponent(registry, bunnyEntity, save_bunnyData);
     // Parent bunny to car
     bunnyObject->setParent(carEntity);
 
@@ -97,8 +102,8 @@ void Scene::loadScene() {
     save_diabloData.name = "Diablo";
     save_diabloData.position = glm::vec3(0.0f, -0.1f, -1.0f);
     save_diabloData.scale = glm::vec3(1.0f);
-    GameObject* diabloObject = addGameObjectComponent(registry, diabloEntity, save_diabloData);
-    // diabloObject->addScript<MoveScript>();
+    GameObject* diabloObject = SceneUtils::addGameObjectComponent(registry, diabloEntity, save_diabloData);
+    diabloObject->addScript<MoveScript>();
 
     Mesh* diabloMesh = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
     if (diabloMesh != nullptr) {
@@ -120,7 +125,7 @@ void Scene::loadScene() {
     entt::entity dummyEntity = registry.create();
     SceneData save_dummyData;
     save_dummyData.name = "GLOBAL SCRIPT HOLDER";
-    GameObject* dummyObject = addGameObjectComponent(registry, dummyEntity, save_dummyData);
+    GameObject* dummyObject = SceneUtils::addGameObjectComponent(registry, dummyEntity, save_dummyData);
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
@@ -129,7 +134,7 @@ void Scene::loadScene() {
     float yPosition = 0.0f;
     createLights(4, circleRadius, yPosition + 5.0f, basicShader);
     createAsteroids(n, circleRadius * 10.0f, 0, 200, basicShader);
-    createGizmos();
+
     // Finally, update the mesh instance map if any for later use
     updateInstanceMap();
 }
@@ -150,7 +155,7 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
         save_lightData.position = glm::vec3(x, yPosition, z);
 
         // Light game object
-        GameObject* lightObject = addGameObjectComponent(registry, lightEntity, save_lightData);
+        GameObject* lightObject = SceneUtils::addGameObjectComponent(registry, lightEntity, save_lightData);
         lightObject->addScript<CircularRotation>();
         CircularRotation* rotationScript = lightObject->getScript<CircularRotation>();
         if (rotationScript != nullptr) {
@@ -174,7 +179,7 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
         lightData.type = LightType::Point;
         lightData.castsShadows = true;
         lightData.isActive = true;
-        addPointLightComponents(registry, lightEntity, lightData);
+        SceneUtils::addPointLightComponents(registry, lightEntity, lightData);
 
         // Cube mesh
         Mesh* lightCube = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
@@ -235,39 +240,10 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
         save_asteroid.eulerAngles = randomRotation;
 
         // Game object
-        GameObject* asteroidObject = addGameObjectComponent(registry, asteroidEntity, save_asteroid);
+        GameObject* asteroidObject = SceneUtils::addGameObjectComponent(registry, asteroidEntity, save_asteroid);
         asteroidObject->addScript<BouncingMotion>();
 
         registry.emplace<MeshInstance>(asteroidEntity, meshInstance);
-    }
-}
-
-void Scene::createGizmos() {
-    std::string vertexPath = SHADER_DIR + "debug/wireframe.vs";
-    std::string fragmentPath = SHADER_DIR + "debug/wireframe.fs";
-    Shader* gizmoShader = new Shader(vertexPath, fragmentPath);
-
-    // --------------------- Gizmo Cube ---------------------
-    entt::entity gizmoEntity = registry.create();
-    SceneData save_gizmo;
-    save_gizmo.name = "Gizmo";
-    save_gizmo.position = glm::vec3(0.0f, -0.1f, -1.0f);
-    save_gizmo.scale = glm::vec3(1.0f);
-    GameObject* gizmoObject = addGameObjectComponent(registry, gizmoEntity, save_gizmo);
-
-    // Create gizmo mesh
-    Mesh* squareGizmoMesh = Gizmos::createCube();
-    if (squareGizmoMesh != nullptr) {
-        // Create material for the gizmo
-        Material* gizmoMaterial = new Material(gizmoShader);
-        gizmoMaterial->albedoColor = glm::vec3(1.0f, 0.0f, 0.0f);
-        gizmoMaterial->isDeferred = false;
-
-        // Set the material on the mesh
-        squareGizmoMesh->material = gizmoMaterial;
-
-        // Add mesh component to the entity
-        registry.emplace<Mesh*>(gizmoEntity, squareGizmoMesh);
     }
 }
 
@@ -277,37 +253,6 @@ Camera& Scene::getPrimaryCamera() {
 
 void Scene::setPrimaryCamera(entt::entity cameraEntity) {
     m_primaryCameraEntity = cameraEntity;
-}
-
-/*
-* Component Helpers
-*/
-void Scene::addLightComponents(entt::registry& registry, entt::entity entity, Light lightData) {
-    registry.emplace<Light>(entity, lightData);
-    registry.emplace<LightSpaceMatrix>(entity);
-}
-
-void Scene::addPointLightComponents(entt::registry& registry, entt::entity entity, Light lightData) {
-    registry.emplace<Light>(entity, lightData);
-    registry.emplace<LightSpaceMatrixCube>(entity);
-}
-
-GameObject* Scene::addGameObjectComponent(entt::registry& registry, entt::entity entity, const SceneData& data) {
-    if (!registry.valid(entity)) {
-        return nullptr;
-    }
-
-    // Meta data
-    registry.emplace<MetaData>(entity, data.name);
-
-    // Transform
-    registry.emplace<Position>(entity, data.position);
-    registry.emplace<EulerAngles>(entity, data.eulerAngles);
-    registry.emplace<Rotation>(entity, glm::quat(glm::radians(data.eulerAngles)));
-    registry.emplace<Scale>(entity, data.scale);
-    registry.emplace<ModelMatrix>(entity);
-
-    return &registry.emplace<GameObject>(entity, entity, registry);
 }
 
 // Scene instancing

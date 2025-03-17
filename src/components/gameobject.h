@@ -50,6 +50,8 @@ public:
     void startScripts();
     void updateScripts(const float& deltaTime);
     void destroyScripts();
+
+    GameObject* getGameObject() { return this; }
     void destroy();
 
     /*
