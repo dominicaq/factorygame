@@ -33,33 +33,36 @@ void SceneUtils::createEmptyGameObject(entt::registry& registry, const SceneData
     addGameObjectComponent(registry, entity, data);
 }
 
-void SceneUtils::createGizmo(entt::registry& registry, const SceneData& data, Material* mat, PrimitiveType type) {
+void SceneUtils::createGizmo(entt::registry& registry, const SceneData& data, Material* mat, GizmoType type) {
     entt::entity entity = registry.create();
     GameObject* gameObject = addGameObjectComponent(registry, entity, data);
 
-    Mesh* primitiveMesh = nullptr;
+    Mesh* gizmoMesh = nullptr;
 
     switch (type) {
-        case PrimitiveType::AXIS:
-            primitiveMesh = Gizmos::createAxis();
+        case GizmoType::AXIS:
+            gizmoMesh = Gizmos::createAxis();
             break;
-        case PrimitiveType::CUBE:
-            primitiveMesh = Gizmos::createCube();
+        case GizmoType::CUBE:
+            gizmoMesh = Gizmos::createCube();
             break;
-        case PrimitiveType::PLANE:
-            primitiveMesh = Gizmos::createPlane();
+        case GizmoType::PLANE:
+            gizmoMesh = Gizmos::createPlane();
             break;
     }
 
-    if (primitiveMesh != nullptr) {
+    if (gizmoMesh != nullptr) {
         mat->isDeferred = false;
-        primitiveMesh->material = mat;
-        registry.emplace<Mesh*>(entity, primitiveMesh);
+        gizmoMesh->material = mat;
+        gizmoMesh->wireframe = true;
+        registry.emplace<Mesh*>(entity, gizmoMesh);
     }
 }
 
 void SceneUtils::createModel(entt::registry& registry, const SceneData& data, Mesh* mesh) {
-    if (!mesh) return;
+    if (!mesh) {
+        return;
+    }
 
     entt::entity entity = registry.create();
     GameObject* gameObject = addGameObjectComponent(registry, entity, data);

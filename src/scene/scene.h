@@ -86,10 +86,10 @@ private:
     bool m_instanceCountsDirty = true;
 
     // Misc
-    Shader* m_wireframeShader;
+    Material* m_wireframeMaterial;
 
     // Scene Management
-    // std::unique_ptr<Octree<entt::entity>> m_octree;
+    std::unique_ptr<Octree<entt::entity>> m_octree;
     entt::entity m_primaryCameraEntity = entt::null;
 };
 

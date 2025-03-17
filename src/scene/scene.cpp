@@ -14,10 +14,9 @@
 
 // TODO: In the future, this will be user generated through UI, not code.
 void Scene::loadScene() {
-    // Wireframe shader setup
-    std::string wireframeVert = SHADER_DIR + "debug/wireframe.vs";
-    std::string wireframeFrag = SHADER_DIR + "debug/wireframe.fs";
-    m_wireframeShader = new Shader(wireframeVert, wireframeFrag);
+    // Wireframe material
+    Shader* wireframeShader = new Shader(SHADER_DIR + "debug/wireframe.vs", SHADER_DIR + "debug/wireframe.fs");
+    m_wireframeMaterial = new Material(wireframeShader);
 
     // ------------------------ Setup Camera ------------------------
     entt::entity cameraEntity = registry.create();
