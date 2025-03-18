@@ -3,7 +3,7 @@ out vec4 FragColor;
 
 in vec2 TexCoords;
 
-uniform vec3 u_AlbedoColor;
+uniform vec4 u_AlbedoColor;
 uniform float u_Time;
 
 void main()
@@ -11,7 +11,7 @@ void main()
     float pulseIntensity = sin(u_Time * 5) * 0.25 + 0.75;
 
     // Apply pulsing effect to the albedo color
-    vec3 pulsedColor = u_AlbedoColor * pulseIntensity;
+    vec3 pulsedColor = u_AlbedoColor.xyz * pulseIntensity;
 
     FragColor = vec4(pulsedColor, 1.0f);
 }

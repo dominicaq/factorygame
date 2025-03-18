@@ -37,7 +37,7 @@ public:
         m_elaspedTime += deltaTime;
         if (m_elaspedTime >= m_lifeTime) {
             // gameObject->destroy();
-            return;
+            // return;
         }
 
         // Calculate the rotation amount in degrees

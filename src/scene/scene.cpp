@@ -17,7 +17,7 @@ void Scene::loadScene() {
     // ------------------------ Wireframe Setup ------------------------
     Shader* wireframeShader = new Shader(SHADER_DIR + "debug/wireframe.vs", SHADER_DIR + "debug/wireframe.fs");
     m_wireframeMaterial = new Material(wireframeShader);
-    m_wireframeMaterial->albedoColor = glm::vec3(1.0f, 0.0f, 0.0f);
+    m_wireframeMaterial->albedoColor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
 
     // ------------------------ Setup Camera ------------------------
     entt::entity cameraEntity = registry.create();
@@ -38,21 +38,53 @@ void Scene::loadScene() {
     Shader* basicShader = new Shader(vertexPath, fragmentPath);
 
     // --------------------- Beetle Car ---------------------
-    entt::entity carEntity = registry.create();
-    SceneData save_carData;
-    save_carData.name = "Buggy";
-    save_carData.position = glm::vec3(6.0f, -2.5f, -0.5f);
-    save_carData.scale = glm::vec3(5.0f);
-    GameObject* carObject = SceneUtils::addGameObjectComponent(registry, carEntity, save_carData);
-    carObject->addScript<MoveScript>();
+    const int numRows = 5;  // Adjust for more rows
+    const float spacing = 10.0f;  // Distance between rows
+    const float startZ = -((numRows - 1) * spacing) / 2.0f;  // Center the rows
 
-    Mesh* carMesh = ResourceLoader::loadMesh(MODEL_DIR + "../obj-assets/data/beetle.obj");
-    if (carMesh != nullptr) {
-        Material* carMaterial = new Material(basicShader);
-        carMaterial->albedoColor = glm::vec3(0.2f, 0.7f, 0.2f);
-        carMaterial->isDeferred = true;
-        carMesh->material = carMaterial;
-        registry.emplace<Mesh*>(carEntity, carMesh);
+    // Create Bunny
+    entt::entity bunnyEntity = registry.create();
+    SceneData save_bunnyData;
+    save_bunnyData.name = "Bunny";
+    save_bunnyData.position = glm::vec3(6.0f, -0.5f, startZ); // Set to first buggy position
+    save_bunnyData.scale = glm::vec3(5.0f);
+    GameObject* bunnyObject = SceneUtils::addGameObjectComponent(registry, bunnyEntity, save_bunnyData);
+
+    Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
+    if (bunnyMesh != nullptr) {
+        Material* bunnyMaterial = new Material(basicShader);
+        bunnyMaterial->albedoColor = glm::vec4(1.0f, 0.5f, 0.31f, 1.0f);
+        bunnyMaterial->isDeferred = true;
+
+        Texture* bunnyAlbedoMap = new Texture(TEXTURE_DIR + "uv_map.jpg");
+        bunnyMaterial->albedoMap = bunnyAlbedoMap;
+
+        bunnyMesh->material = bunnyMaterial;
+        registry.emplace<Mesh*>(bunnyEntity, bunnyMesh);
+    }
+
+    for (int row = 0; row < numRows; ++row) {
+        entt::entity carEntity = registry.create();
+        SceneData save_carData;
+        save_carData.name = "Buggy";
+        save_carData.position = glm::vec3(6.0f, -2.5f, startZ + row * spacing);
+        save_carData.scale = glm::vec3(5.0f);
+        GameObject* carObject = SceneUtils::addGameObjectComponent(registry, carEntity, save_carData);
+        carObject->addScript<MoveScript>();
+
+        Mesh* carMesh = ResourceLoader::loadMesh(MODEL_DIR + "../obj-assets/data/beetle.obj");
+        if (carMesh != nullptr) {
+            Material* carMaterial = new Material(basicShader);
+            carMaterial->albedoColor = glm::vec4(0.2f, 0.7f, 0.2f, 0.5f);
+            carMaterial->isDeferred = false;
+            carMesh->material = carMaterial;
+            registry.emplace<Mesh*>(carEntity, carMesh);
+        }
+
+        // Parent bunny to the first buggy
+        if (row == 0) {
+            bunnyObject->setParent(carEntity);
+        }
     }
 
     // --------------------- Ground Plane ---------------------
@@ -66,34 +98,11 @@ void Scene::loadScene() {
     Mesh* planeMesh = ResourceLoader::loadMesh(MODEL_DIR + "/cube.obj");
     if (planeMesh != nullptr) {
         Material* planeMaterial = new Material(basicShader);
-        planeMaterial->albedoColor = glm::vec3(1.0f);
+        planeMaterial->albedoColor = glm::vec4(1.0f);
         planeMaterial->albedoMap = new Texture(TEXTURE_DIR + "dev.jpg");
         planeMaterial->isDeferred = true;
         planeMesh->material = planeMaterial;
         registry.emplace<Mesh*>(planeEntity, planeMesh);
-    }
-
-    // --------------------- Stanford Bunny Model ---------------------
-    entt::entity bunnyEntity = registry.create();
-    SceneData save_bunnyData;
-    save_bunnyData.name = "Bunny";
-    save_bunnyData.position = glm::vec3(6.0f, -0.5f, 0.0f);
-    save_bunnyData.scale = glm::vec3(5.0f);
-    GameObject* bunnyObject = SceneUtils::addGameObjectComponent(registry, bunnyEntity, save_bunnyData);
-    // Parent bunny to car
-    bunnyObject->setParent(carEntity);
-
-    Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
-    if (bunnyMesh != nullptr) {
-        Material* bunnyMaterial = new Material(basicShader);
-        bunnyMaterial->albedoColor = glm::vec3(1.0f, 0.5f, 0.31f);
-        bunnyMaterial->isDeferred = true;
-
-        Texture* bunnyAlbedoMap = new Texture(TEXTURE_DIR + "uv_map.jpg");
-        bunnyMaterial->albedoMap = bunnyAlbedoMap;
-
-        bunnyMesh->material = bunnyMaterial;
-        registry.emplace<Mesh*>(bunnyEntity, bunnyMesh);
     }
 
     // --------------------- Diablo Model ---------------------
@@ -108,7 +117,7 @@ void Scene::loadScene() {
     Mesh* diabloMesh = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
     if (diabloMesh != nullptr) {
         Material* diabloMaterial = new Material(basicShader);
-        diabloMaterial->albedoColor = glm::vec3(0.7f, 0.7f, 0.7f);
+        diabloMaterial->albedoColor = glm::vec4(0.7f, 0.7f, 0.7f, 1.0f);
         diabloMaterial->isDeferred = true;
 
         Texture* diabloAlbedoMap = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_diffuse.tga");
@@ -184,12 +193,12 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
 
         // Light component
         Light lightData;
-        glm::vec3 color;
+        glm::vec4 color;
         switch (i % n) {
-            case 0: color = glm::vec3(1.0f, 1.0f, 1.0f); break; // White
-            case 1: color = glm::vec3(1.0f, 0.0f, 0.0f); break; // Red
-            case 2: color = glm::vec3(0.0f, 1.0f, 0.0f); break; // Green
-            default: color = glm::vec3(0.0f, 0.0f, 1.0f); break; // Blue
+            case 0: color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f); break; // White
+            case 1: color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f); break; // Red
+            case 2: color = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f); break; // Green
+            default: color = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f); break; // Blue
         }
         lightData.color = color;
         lightData.intensity = 1.0f;
@@ -220,7 +229,7 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
     }
 
     Material* asteroidMaterial = new Material(basicShader);
-    asteroidMaterial->albedoColor = glm::vec3(0.5f, 0.5f, 0.5f); // Grayish color
+    asteroidMaterial->albedoColor = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f); // Grayish color
     asteroidMaterial->albedoMap = nullptr;
     asteroidMaterial->normalMap = nullptr;
     asteroidMaterial->isDeferred = true;

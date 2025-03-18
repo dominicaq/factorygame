@@ -17,7 +17,7 @@ struct Material {
     Texture* normalMap = nullptr;
 
     // RGB Material properties
-    glm::vec3 albedoColor = glm::vec3(1.0f);
+    glm::vec4 albedoColor = glm::vec4(1.0f);
     glm::vec3 specularColor = glm::vec3(1.0f);
 
     float shininess = 32.0f;
@@ -29,7 +29,7 @@ struct Material {
     // Constructor
     Material(Shader* shader)
         : shader(shader),
-          albedoColor(glm::vec3(1.0f)),
+          albedoColor(glm::vec4(1.0f)),
           specularColor(glm::vec3(1.0f)),
           shininess(32.0f),
           isDeferred(false)
@@ -43,7 +43,7 @@ struct Material {
         }
 
         // Requirement: Every material shader needs a color
-        shaderOverride->setVec3("u_AlbedoColor", albedoColor);
+        shaderOverride->setVec4("u_AlbedoColor", albedoColor);
 
         if (shaderOverride->hasUniform("u_Time")) {
             shaderOverride->setFloat("u_Time", time);

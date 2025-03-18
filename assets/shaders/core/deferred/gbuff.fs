@@ -10,7 +10,7 @@ in vec3 Normal;
 in vec3 Tangent;
 in vec3 Bitangent;
 
-uniform vec3 u_AlbedoColor;
+uniform vec4 u_AlbedoColor;
 uniform sampler2D u_AlbedoMap;
 
 uniform bool u_HasNormalMap;
@@ -36,7 +36,7 @@ void main() {
     gNormal = mappedNormal;
 
     // Store the albedo color in gAlbedo
-    vec3 albedo = texture(u_AlbedoMap, TexCoords).rgb * u_AlbedoColor;
+    vec3 albedo = texture(u_AlbedoMap, TexCoords).rgb * u_AlbedoColor.xyz;
     gAlbedo.rgb = albedo;
     gAlbedo.a = 1.0;
 }

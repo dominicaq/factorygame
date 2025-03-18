@@ -94,6 +94,15 @@ void Shader::setVec3(const std::string& name, const glm::vec3& value) const {
     }
 }
 
+void Shader::setVec4(const std::string& name, const glm::vec4& value) const {
+    GLint location = getUniformLocation(name);
+    if (location != -1) {
+        glUniform4fv(location, 1, glm::value_ptr(value));
+    } else {
+        std::cerr << "[Error] Shader::setVec4: Uniform not found: " << name << "\n";
+    }
+}
+
 /*
 * Shader creation
 */
