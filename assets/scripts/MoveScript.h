@@ -16,8 +16,8 @@ public:
 
 private:
     glm::vec3 m_eulerRotation;
-    float elapsedTime = 0.0f;  // Track elapsed time
-    float lifetime;             // Random lifetime
+    float m_elaspedTime = 0.0f;
+    float m_lifeTime;
 
 public:
     void start() override {
@@ -25,7 +25,7 @@ public:
         m_eulerRotation = gameObject->getEuler();
 
         // Set a random lifetime between 3 and 10 seconds
-        lifetime = static_cast<float>(std::rand() % 8 + 3);
+        m_lifeTime = static_cast<float>(std::rand() % 8 + 3);
     }
 
     void update(const float& deltaTime) override {
@@ -34,11 +34,9 @@ public:
             return;
         }
 
-        elapsedTime += deltaTime;  // Increment elapsed time
-
-        // Check if lifetime has passed and destroy the object if necessary
-        if (elapsedTime >= lifetime) {
-            gameObject->destroy();
+        m_elaspedTime += deltaTime;
+        if (m_elaspedTime >= m_lifeTime) {
+            // gameObject->destroy();
             return;
         }
 

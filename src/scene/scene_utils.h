@@ -69,8 +69,9 @@ public:
      * @param data - The scene data to associate with the GameObject.
      * @param mat - The material to apply to the gizmo mesh.
      * @param type - The type of primitive to create (Axis, Cube, or Plane).
+     * @return The entity handle of the created gizmo.
      */
-    static void createGizmo(entt::registry& registry, const SceneData& data, Material* mat, GizmoType type);
+    static entt::entity createGizmo(entt::registry& registry, const SceneData& data, Material* mat, GizmoType type);
 
     /*
      * Creates a model GameObject in the registry and associates it with the provided scene data and mesh.

@@ -14,9 +14,10 @@
 
 // TODO: In the future, this will be user generated through UI, not code.
 void Scene::loadScene() {
-    // Wireframe material
+    // ------------------------ Wireframe Setup ------------------------
     Shader* wireframeShader = new Shader(SHADER_DIR + "debug/wireframe.vs", SHADER_DIR + "debug/wireframe.fs");
     m_wireframeMaterial = new Material(wireframeShader);
+    m_wireframeMaterial->albedoColor = glm::vec3(1.0f, 0.0f, 0.0f);
 
     // ------------------------ Setup Camera ------------------------
     entt::entity cameraEntity = registry.create();
@@ -133,6 +134,24 @@ void Scene::loadScene() {
     float yPosition = 0.0f;
     createLights(4, circleRadius, yPosition + 5.0f, basicShader);
     createAsteroids(n, circleRadius * 10.0f, 0, 200, basicShader);
+
+    // Gizmo Cube
+    // Box dimensions
+    int sizeX = 5, sizeY = 5, sizeZ = 5;
+    glm::vec3 cubeScale = glm::vec3(1.0f);
+
+    int numCubes = sizeX * sizeY * sizeZ;
+    for (int x = 0; x < sizeX; x++) {
+        for (int y = 0; y < sizeY; y++) {
+            for (int z = 0; z < sizeZ; z++) {
+                SceneData data;
+                data.position = glm::vec3(x, y, z) * cubeScale;
+                data.scale = cubeScale;
+
+                auto temp = SceneUtils::createGizmo(registry, data, m_wireframeMaterial, GizmoType::CUBE);
+            }
+        }
+    }
 
     // Finally, update the mesh instance map if any for later use
     updateInstanceMap();

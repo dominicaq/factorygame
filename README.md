@@ -8,24 +8,25 @@ This project is an OpenGL deferred renderer with plans to become a game engine, 
 
 
 ## Features
-- **Cube Maps**
-    - Used for SkyboxPass and ShadowPass (point lights)
-    - **Note**: Not using compute shaders, cube maps are x6 draw calls for the scene
-- **Deferred Rendering**:
-    - G-buffers: Position, Normal, and Color.
-- **Shadow Atlas (WIP)**:
-    - Spot lights will draw to a shadow atlas for sampling within the light pass. Shadow atlas can be any size.
-    - **Note** By default, shadow atlas is 8k resolution
-- **Render Graph (WIP)**
-    - Every render pass inherits RenderPass for compilation, resource gathering, and running.
+- **Deferred Rendering** – Uses G-buffer separation for Position, Normal, and Color channels.
+- **ECS Architecture** – The rendering pipeline is built on an ECS system, ensuring efficient, on-demand updates only when necessary.
+- **Cube Maps** – Utilized in `SkyboxPass` and `ShadowPass` (point lights). *Note: The engine doesn't support compute shaders (yet), so cube maps require 6 draw calls per scene.*
+- **Shadow Atlas (WIP)** – Spotlights render to a shadow atlas, which can be resized as needed. *Default resolution: 8K.*
+- **Simple Frame Graph** – Each render pass inherits from `RenderPass` for compilation, resource management, and execution.
+- **Script Interface** – Allows each `GameObject` to run its own custom scripts. The `Script` class provides an interface for defining custom logic for each object, with lifecycle functions like `start()`, `update()`, and `onDestroy()` that can be implemented per object.
+- **GameObject Parent-Child Hierarchy** – Supports a parent-child structure for `GameObject` transformations, where child objects inherit transformations from their parent objects.
+- **Debug Gizmos** - Draw wireframe gizmos for visual debugging
 
 ## Installation
 ```sh
 git clone git@github.com:dominicaq/factorygame.git
 ```
-
+## Downloading Additional Assets (Optional)
+If you wish to download the additional 3D model assets along with the project, run:
+```sh
+git submodule update --init --recursive
+```
 ## Build Instructions
-
 1. MacOS/Linux:
     ```sh
     mkdir build
@@ -43,7 +44,6 @@ git clone git@github.com:dominicaq/factorygame.git
 The compiled executable will be located in the `build/Release/FactoryGame.exe` directory on Windows.
 
 ## Dependencies
-
 - A PC with OpenGL support (minimum OpenGL version 3.3)
 - CMake 3.10 or higher
 - A C++ compiler supporting C++17 or higher

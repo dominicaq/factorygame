@@ -33,7 +33,7 @@ void SceneUtils::createEmptyGameObject(entt::registry& registry, const SceneData
     addGameObjectComponent(registry, entity, data);
 }
 
-void SceneUtils::createGizmo(entt::registry& registry, const SceneData& data, Material* mat, GizmoType type) {
+entt::entity SceneUtils::createGizmo(entt::registry& registry, const SceneData& data, Material* mat, GizmoType type) {
     entt::entity entity = registry.create();
     GameObject* gameObject = addGameObjectComponent(registry, entity, data);
 
@@ -56,7 +56,11 @@ void SceneUtils::createGizmo(entt::registry& registry, const SceneData& data, Ma
         gizmoMesh->material = mat;
         gizmoMesh->wireframe = true;
         registry.emplace<Mesh*>(entity, gizmoMesh);
+        return entity;
     }
+
+    std::cerr << "[Error] createGizmo() failed to create gizmo mesh!\n";
+    return entt::null;
 }
 
 void SceneUtils::createModel(entt::registry& registry, const SceneData& data, Mesh* mesh) {
