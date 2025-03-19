@@ -138,11 +138,11 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 1000;
-    float circleRadius = 4.0f;
+    int n = 100;
+    float circleRadius = 3.0f;
     float yPosition = 0.0f;
-    createLights(4, circleRadius, yPosition + 5.0f, basicShader);
-    createAsteroids(n, circleRadius * 10.0f, 0, 200, basicShader);
+    createLights(6, circleRadius, yPosition + 5.0f, basicShader);
+    createAsteroids(n, circleRadius * 10.0f, 0, 10, basicShader);
 
     // Gizmo Cube
     // Box dimensions
@@ -239,7 +239,6 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
     // Randomization setup
     std::random_device rd;
     std::mt19937 gen(rd());
-    // Random values within ranges
     std::uniform_real_distribution<float> posDist(-fieldSize, fieldSize);
     std::uniform_real_distribution<float> heightDist(minHeight, maxHeight);
     std::uniform_real_distribution<float> scaleDist(0.05f, 0.2f);
@@ -269,6 +268,17 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
         // Game object
         GameObject* asteroidObject = SceneUtils::addGameObjectComponent(registry, asteroidEntity, save_asteroid);
         asteroidObject->addScript<BouncingMotion>();
+
+        // Add a point light to each asteroid
+        // Light asteroidLight;
+        // asteroidLight.color = glm::vec3(1.0f, 1.0f, 0.0f); // Yellow light for example
+        // asteroidLight.intensity = 0.8f;
+        // asteroidLight.radius = 5.0f; // Adjust the radius as needed
+        // asteroidLight.type = LightType::Point;
+        // asteroidLight.castsShadows = false;
+        // asteroidLight.isActive = true;
+
+        // SceneUtils::addPointLightComponents(registry, asteroidEntity, asteroidLight);
 
         registry.emplace<MeshInstance>(asteroidEntity, meshInstance);
     }

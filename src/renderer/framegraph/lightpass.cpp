@@ -1,6 +1,7 @@
 #include "lightpass.h"
 #include <iostream>
 #include <string>
+#include <algorithm>
 
 // TODO: clustered deferred lighting
 // https://www.aortiz.me/2018/12/21/CG.html
@@ -32,37 +33,53 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     Camera* camera = renderer.getCamera();
     m_lightPassShader.setVec3("u_CameraPosition", camera->getPosition());
 
+    // Get the maximum number of lights the shader can handle
+    // const int MAX_LIGHTSs = 20; // Should match the MAX_LIGHTS define in the shader
+
+    // Limit the number of lights we process to MAX_LIGHTS
+    auto view = registry.view<Light, Position>();
+    // int lightCount = std::min(static_cast<int>(view.size()), MAX_LIGHTSs);
+
     // Pass each light's data to the shader
     int i = 0;
-    registry.view<Light, Position>().each([&](entt::entity entity, const Light& lightComponent, const Position& positionComponent) {
+    for (auto entity : view) {
+        if (i >= MAX_LIGHTS) break;
+
+        const auto& [lightComponent, positionComponent] = view.get<Light, Position>(entity);
         std::string indexStr = "[" + std::to_string(i) + "]";
 
-        // Light properties
+        // Light properties (always set these)
         m_lightPassShader.setVec3("lights" + indexStr + ".position", positionComponent.position);
         m_lightPassShader.setVec3("lights" + indexStr + ".color", lightComponent.color);
         m_lightPassShader.setFloat("lights" + indexStr + ".intensity", lightComponent.intensity);
+        m_lightPassShader.setFloat("lights" + indexStr + ".radius", lightComponent.radius);
+        m_lightPassShader.setBool("lights" + indexStr + ".castsShadows", lightComponent.castsShadows);
 
-        // Atlas indices
-        for (size_t j = 0; j < 6; ++j) {
-            std::string atlasIndexStr = "lights" + indexStr + ".atlasIndices[" + std::to_string(j) + "]";
-            m_lightPassShader.setInt(atlasIndexStr, lightComponent.atlasIndices[j]);
-        }
-
-        // Light-space matrix
-        if (auto* lightSpaceMatrix = registry.try_get<LightSpaceMatrix>(entity)) {
-            m_lightPassShader.setMat4("lights" + indexStr + ".lightSpaceMatrices[0]", lightSpaceMatrix->matrix);
-        } else if (auto* lightSpaceMatrices = registry.try_get<LightSpaceMatrixCube>(entity)) {
-            // Cubemap light-space matrices (6 faces)
+        // Only set shadow-related data if the light casts shadows
+        if (lightComponent.castsShadows) {
+            // Atlas indices
             for (size_t j = 0; j < 6; ++j) {
-                std::string matrixStr = "lights" + indexStr + ".lightSpaceMatrices[" + std::to_string(j) + "]";
-                m_lightPassShader.setMat4(matrixStr, lightSpaceMatrices->matrices[j]);
+                std::string atlasIndexStr = "lights" + indexStr + ".atlasIndices[" + std::to_string(j) + "]";
+                m_lightPassShader.setInt(atlasIndexStr, lightComponent.atlasIndices[j]);
+            }
+
+            // Light-space matrix
+            if (auto* lightSpaceMatrix = registry.try_get<LightSpaceMatrix>(entity)) {
+                m_lightPassShader.setMat4("lights" + indexStr + ".lightSpaceMatrices[0]", lightSpaceMatrix->matrix);
+            } else if (auto* lightSpaceMatrices = registry.try_get<LightSpaceMatrixCube>(entity)) {
+                // Cubemap light-space matrices (6 faces)
+                for (size_t j = 0; j < 6; ++j) {
+                    std::string matrixStr = "lights" + indexStr + ".lightSpaceMatrices[" + std::to_string(j) + "]";
+                    m_lightPassShader.setMat4(matrixStr, lightSpaceMatrices->matrices[j]);
+                }
             }
         }
 
         ++i;
-    });
+    }
 
-    m_lightPassShader.setInt("numLights", i + 1);
+    // Set the actual number of lights
+    m_lightPassShader.setInt("numLights", i);
 
     // Setup G-buffer textures for lighting
     Framebuffer* gbuffer = renderer.getFramebuffer();
