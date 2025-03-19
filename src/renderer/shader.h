@@ -11,10 +11,10 @@
 class Shader {
 public:
     Shader();
-    Shader(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath = "");
+    Shader(const std::string& vertexPath, const std::string& fragmentPath);
     ~Shader();
 
-    bool load(const std::string& vertexPath, const std::string& fragmentPath, const std::string& geometryPath = "");
+    bool load(const std::string& vertexPath, const std::string& fragmentPath);
     void use() const;
 
     /*
@@ -33,7 +33,7 @@ private:
     mutable std::unordered_map<std::string, GLint> m_UniformLocationCache;
 
     unsigned int compileShader(unsigned int type, const char* source, int* status);
-    void linkProgram(unsigned int vertexShader, unsigned int fragmentShader, unsigned int geometryShader, int* status);
+    void linkProgram(unsigned int vertexShader, unsigned int fragmentShader, int* status);
     GLint getUniformLocation(const std::string& name) const;
 };
 

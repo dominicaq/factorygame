@@ -31,6 +31,10 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 
     // Render 2D shadow maps (directional/spotlights) to the atlas
     registry.view<LightSpaceMatrix, Light>().each([&](auto& lightSpaceMatrix, auto& light) {
+        if (!light.castsShadows) {
+            return;
+        }
+
         if (tileIndex >= maxShadowMaps) {
             std::cerr << "[Warning] Exceeded maximum number of shadow maps in the atlas!" << std::endl;
             return;
@@ -52,6 +56,10 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
     // TODO: render cube maps to their own texture, use geometry shader for instancing
     // Render point light shadow maps
     registry.view<LightSpaceMatrixCube, Light>().each([&](auto entity, auto& lightSpaceCube, auto& light) {
+        if (!light.castsShadows) {
+            return;
+        }
+
         if (tileIndex + 6 > maxShadowMaps) {
             std::cerr << "[Warning] Exceeded maximum number of shadow maps in the atlas!" << std::endl;
             return;

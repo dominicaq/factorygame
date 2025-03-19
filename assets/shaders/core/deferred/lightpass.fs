@@ -33,9 +33,9 @@ struct Light {
 };
 
 // Light array
-#define MAX_LIGHTS 20
+#define BATCH_SIZE 16
 uniform int numLights;
-uniform Light lights[MAX_LIGHTS];
+uniform Light lights[BATCH_SIZE];
 
 // Material properties - keeping the original values
 const float AMBIENT_STRENGTH = 0.4;
