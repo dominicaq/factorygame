@@ -11,7 +11,6 @@ This project is an OpenGL deferred renderer with plans to become a game engine, 
 - **Deferred Rendering** – Uses G-buffer separation for Position, Normal, and Color channels.
 - **ECS Architecture** – The rendering pipeline is built on an ECS system, ensuring efficient, on-demand updates only when necessary.
 - **Cube Maps** – Utilized in `SkyboxPass` and `ShadowPass` (point lights). *Note: The engine doesn't support compute shaders (yet), so cube maps require 6 draw calls per scene.*
-- **Shadow Atlas (WIP)** – Spotlights render to a shadow atlas, which can be resized as needed. *Default resolution: 8K.*
 - **Simple Frame Graph** – Each render pass inherits from `RenderPass` for compilation, resource management, and execution.
 - **Script Interface** – Allows each `GameObject` to run its own custom scripts. The `Script` class provides an interface for defining custom logic for each object, with lifecycle functions like `start()`, `update()`, and `onDestroy()` that can be implemented per object.
 - **GameObject Parent-Child Hierarchy** – Supports a parent-child structure for `GameObject` transformations, where child objects inherit transformations from their parent objects.
