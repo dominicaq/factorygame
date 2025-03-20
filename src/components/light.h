@@ -22,17 +22,6 @@ struct Light {
     LightType type = LightType::Point;
     bool castsShadows = false;
     bool isActive = true;
-
-    // Destructor to clean up OpenGL resources
-    ~Light() {
-        // NOTE: glIsTextureHandleResidentARB will crash renderdoc!
-        if (depthHandle != 0) {
-            if (glIsTextureHandleResidentARB(depthHandle)) {
-                glMakeTextureHandleNonResidentARB(depthHandle);
-            }
-            depthHandle = 0;
-        }
-    }
 };
 
 struct LightSpaceMatrix {
