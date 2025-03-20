@@ -8,7 +8,12 @@
 
 // Constructor and Destructor
 Window::Window(const char *title, int width, int height)
-    : m_title(title), m_width(width), m_height(height), m_window(nullptr), m_renderer(nullptr) {}
+    : m_title(title), m_width(width), m_height(height), m_window(nullptr), m_renderer(nullptr)
+{
+    // Initialize settings with constructor parameters
+    m_settings.width = width;
+    m_settings.height = height;
+}
 
 Window::~Window() {
     // Cleanup ImGui
@@ -47,8 +52,20 @@ bool Window::init() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
+    // Apply MSAA setting
+    if (m_settings.msaaSamples > 0) {
+        glfwWindowHint(GLFW_SAMPLES, m_settings.msaaSamples);
+    }
+
+    // Apply borderless setting if needed
+    if (m_settings.borderless) {
+        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+    }
+
     // Create a windowed mode window and its OpenGL context
-    m_window = glfwCreateWindow(m_width, m_height, m_title, NULL, NULL);
+    GLFWmonitor* monitor = m_settings.fullscreen ? glfwGetPrimaryMonitor() : nullptr;
+
+    m_window = glfwCreateWindow(m_width, m_height, m_title, monitor, NULL);
     if (!m_window) {
         std::cerr << "Failed to create GLFW window" << "\n";
         glfwTerminate();
@@ -58,6 +75,9 @@ bool Window::init() {
     // Make the window's context current
     glfwMakeContextCurrent(m_window);
     glfwSetFramebufferSizeCallback(m_window, framebufferSizeCallback);
+
+    // Apply VSync setting
+    setVSync(m_settings.vsync);
 
     // Set this Window object as the user pointer for the GLFW window
     glfwSetWindowUserPointer(m_window, this);
@@ -108,6 +128,8 @@ void Window::swapBuffersAndPollEvents() {
 void Window::resize(int newWidth, int newHeight) {
     m_width = newWidth;
     m_height = newHeight;
+    m_settings.width = newWidth;
+    m_settings.height = newHeight;
     glfwSetWindowSize(m_window, m_width, m_height);
 
     // Get the framebuffer size (in pixels) instead of using the window size
@@ -133,10 +155,108 @@ GLFWwindow* Window::getGLFWwindow() {
 }
 
 /*
+ * Settings Management
+ */
+bool Window::applySettings(const config::GraphicsSettings& settings) {
+    bool requiresRestart = false;
+
+    // Check if any settings require a restart
+    if (settings.msaaSamples != m_settings.msaaSamples) {
+        requiresRestart = true;
+    }
+
+    if (settings.borderless != m_settings.borderless) {
+        requiresRestart = true;
+    }
+
+    // Apply settings that can be changed at runtime
+    if (settings.width != m_settings.width || settings.height != m_settings.height) {
+        resize(settings.width, settings.height);
+    }
+
+    if (settings.vsync != m_settings.vsync) {
+        setVSync(settings.vsync);
+    }
+
+    if (settings.fullscreen != m_settings.fullscreen) {
+        setFullscreen(settings.fullscreen);
+    }
+
+    // Apply renderer settings if a renderer is attached
+    if (m_renderer) {
+        Renderer* renderer = static_cast<Renderer*>(m_renderer);
+        // Assume the renderer has a method to apply settings
+        bool rendererNeedsRestart = renderer->applySettings(settings);
+        requiresRestart = requiresRestart || rendererNeedsRestart;
+    }
+
+    // Save the new settings
+    m_settings = settings;
+
+    return requiresRestart;
+}
+
+void Window::setVSync(bool enabled) {
+    glfwSwapInterval(enabled ? 1 : 0);
+    m_settings.vsync = enabled;
+}
+
+void Window::setFullscreen(bool fullscreen) {
+    if (fullscreen == m_settings.fullscreen) {
+        return;
+    }
+
+    if (fullscreen) {
+        // Get the primary monitor
+        GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+
+        // Save windowed dimensions before switching
+        if (!m_settings.fullscreen) {
+            glfwGetWindowSize(m_window, &m_settings.width, &m_settings.height);
+        }
+
+        // Switch to fullscreen
+        glfwSetWindowMonitor(m_window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+        m_width = mode->width;
+        m_height = mode->height;
+    } else {
+        // Switch back to windowed mode
+        glfwSetWindowMonitor(m_window, nullptr, 100, 100, m_settings.width, m_settings.height, 0);
+        m_width = m_settings.width;
+        m_height = m_settings.height;
+    }
+
+    m_settings.fullscreen = fullscreen;
+
+    // Re-apply vsync setting as it might be reset when changing monitors
+    setVSync(m_settings.vsync);
+}
+
+void Window::setBorderless(bool borderless) {
+    m_settings.borderless = borderless;
+}
+
+void Window::setMSAA(int samples) {
+    m_settings.msaaSamples = samples;
+}
+
+void Window::setMaxFrameRate(int frameRate) {
+    m_settings.maxFrameRate = frameRate;
+}
+
+/*
  * Attach a renderer for G-buffer resizing
  */
 void Window::setRenderer(void* renderer) {
     m_renderer = renderer;
+
+    // Apply initial settings to the renderer
+    if (m_renderer) {
+        Renderer* rendererPtr = static_cast<Renderer*>(m_renderer);
+        rendererPtr->applySettings(m_settings);
+    }
+
     // Ensure the G-buffer is set up when the renderer is attached
     resize(m_width, m_height);
 }

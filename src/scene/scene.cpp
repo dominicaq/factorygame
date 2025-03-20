@@ -111,8 +111,8 @@ void Scene::loadScene() {
     entt::entity diabloEntity = registry.create();
     SceneData save_diabloData;
     save_diabloData.name = "Diablo";
-    save_diabloData.position = glm::vec3(0.0f, -0.1f, -1.0f);
-    save_diabloData.scale = glm::vec3(1.0f);
+    save_diabloData.position = glm::vec3(0.0f, 1.75f, -1.0f);
+    save_diabloData.scale = glm::vec3(3.0f);
     GameObject* diabloObject = SceneUtils::addGameObjectComponent(registry, diabloEntity, save_diabloData);
     diabloObject->addScript<MoveScript>();
 
@@ -140,10 +140,10 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 1000;
-    float circleRadius = 3.0f;
-    float yPosition = 0.0f;
-    createLights(6, circleRadius, yPosition + 5.0f, basicShader);
+    int n = 200;
+    float circleRadius = 10.0f;
+    float yPosition = 5.0f;
+    createLights(1, circleRadius, yPosition, basicShader);
     createAsteroids(n, circleRadius * 10.0f, 0, 1.0f, basicShader);
 
     // Gizmo Cube
@@ -203,7 +203,7 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
             default: color = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f); break; // Blue
         }
         lightData.color = color;
-        lightData.intensity = 1.0f;
+        lightData.intensity = 5.0f;
         lightData.radius = 20.0f;
         lightData.type = LightType::Point;
         lightData.castsShadows = true;
@@ -275,15 +275,14 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
         asteroidObject->addScript<BouncingMotion>();
 
         // Add a point light to each asteroid
-        Light asteroidLight;
-        asteroidLight.color = glm::vec3(colorDist(gen), colorDist(gen), colorDist(gen));
-        asteroidLight.intensity = intensityDist(gen);
-        asteroidLight.radius = radiusDist(gen);
-        asteroidLight.type = LightType::Point;
-        asteroidLight.castsShadows = false;
-        asteroidLight.isActive = true;
-
-        SceneUtils::addPointLightComponents(registry, asteroidEntity, asteroidLight);
+        // Light asteroidLight;
+        // asteroidLight.color = glm::vec3(colorDist(gen), colorDist(gen), colorDist(gen));
+        // asteroidLight.intensity = intensityDist(gen);
+        // asteroidLight.radius = radiusDist(gen);
+        // asteroidLight.type = LightType::Point;
+        // asteroidLight.castsShadows = false;
+        // asteroidLight.isActive = true;
+        // SceneUtils::addPointLightComponents(registry, asteroidEntity, asteroidLight);
 
         registry.emplace<MeshInstance>(asteroidEntity, meshInstance);
     }

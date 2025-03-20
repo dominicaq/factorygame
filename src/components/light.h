@@ -17,11 +17,22 @@ enum class LightType {
 struct Light {
     glm::vec3 color = glm::vec3(1.0f);
     float intensity = 1.0f;
+    unsigned int depthHandle = 0;
     float radius = 1.0f;
     LightType type = LightType::Point;
     bool castsShadows = false;
     bool isActive = true;
-    unsigned int depthHandle = 0;
+
+    // Destructor to clean up OpenGL resources
+    ~Light() {
+        // NOTE: glIsTextureHandleResidentARB will crash renderdoc!
+        if (depthHandle != 0) {
+            if (glIsTextureHandleResidentARB(depthHandle)) {
+                glMakeTextureHandleNonResidentARB(depthHandle);
+            }
+            depthHandle = 0;
+        }
+    }
 };
 
 struct LightSpaceMatrix {

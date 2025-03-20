@@ -28,7 +28,7 @@ unsigned int Framebuffer::getColorAttachment(unsigned int index) const {
     unsigned int numColorAttachments = m_data.getNumColorAttachments();
 
     if (index >= numColorAttachments) {
-        std::cerr << "[Error] Framebuffer::getColorAttachment: Invalid color attachment index!" << std::endl;
+        std::cerr << "[Error] Framebuffer::getColorAttachment: Invalid color attachment index!" << "\n";
         return 0;
     }
     return m_colorAttachments[index];
@@ -36,10 +36,18 @@ unsigned int Framebuffer::getColorAttachment(unsigned int index) const {
 
 unsigned int Framebuffer::getDepthAttachment() const {
     if (m_depthBuffer == 0) {
-        std::cerr << "[Error] Framebuffer::getDepthAttachment: No depth buffer available!" << std::endl;
+        std::cerr << "[Error] Framebuffer::getDepthAttachment: No depth buffer available!" << "\n";
         return 0;
     }
     return m_depthBuffer;
+}
+
+void Framebuffer::resetDepthAttachment() const {
+    if (m_depthBuffer == 0) {
+        std::cerr << "[Error] Framebuffer::resetDepthAttachment: No depth buffer available!" << "\n";
+        return;
+    }
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
 }
 
 void Framebuffer::resize(unsigned int width, unsigned int height) {

@@ -7,8 +7,6 @@
 #include <unordered_map>
 #include <entt/entity/registry.hpp>
 
-#define SHADOW_RESOLUTION 1024
-
 class ShadowPass : public RenderPass {
 public:
     explicit ShadowPass() = default;
@@ -20,7 +18,7 @@ public:
 
 private:
     Shader m_shadowShader;
-    unsigned int m_shadowFrameBuffer = 0;
+    Framebuffer* m_shadowFrameBuffer;
 
     // Caches for storing shadow textures per light entity
     std::unordered_map<entt::entity, unsigned int> m_lightShadowMapMap;
@@ -30,8 +28,8 @@ private:
     void renderSceneDepth(Renderer& renderer, entt::registry& registry);
 
     // Texture creation helpers
-    unsigned int createShadowMap();
-    unsigned int createCubeMapAtlas();
+    unsigned int createShadowMap(int shadowRes);
+    unsigned int createCubeMapAtlas(int shadowREs);
 };
 
 #endif // SHADOWPASS_H

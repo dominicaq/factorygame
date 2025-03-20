@@ -5,6 +5,7 @@
 
 #include "framebuffer.h"
 #include "cube_map.h"
+#include "config/settings.h"
 
 #include <glad/glad.h>
 #include <memory>
@@ -16,8 +17,11 @@
  */
 class Renderer {
 public:
-    Renderer(int width, int height, int atlasSize, int atlasTileSize, Camera* camera);
+    Renderer(config::GraphicsSettings settings, Camera* camera);
     ~Renderer();
+
+    config::GraphicsSettings config;
+    bool applySettings(const config::GraphicsSettings& settings);
 
     /*
     * Getters
@@ -27,13 +31,6 @@ public:
     }
     Framebuffer* getFramebuffer() const { return m_gBuffer.get(); }
     Camera* getCamera() const { return m_camera; }
-
-    /*
-    * Shadow Atlas
-    */
-    Framebuffer* getShadowAtlas() const { return m_shadowAtlas.get(); }
-    std::pair<int, int> getShadowAtlasDimensions() const { return {m_atlasSize, m_atlasTileSize}; }
-    void resizeShadowAtlas();
 
     /*
     * Instancing
@@ -72,12 +69,6 @@ private:
     Camera* m_camera;
 
     /*
-    * Shadow Atlas
-    */
-    int m_atlasSize;
-    int m_atlasTileSize;
-
-    /*
      * Initialize OpenGL state (depth testing, face culling, etc.)
      */
     void initOpenGLState();
@@ -99,7 +90,6 @@ private:
         GLsizei indexCount;
         GLsizei vertexCount;
 
-        unsigned int instanceVBO;
         GLsizei instanceCount;
     };
 

@@ -1,5 +1,6 @@
 #include "engine.h"
 #include "scene/scene.h"
+#include "config/settings.h"
 
 // Render passes
 #include "renderer/framegraph/geometrypass.h"
@@ -19,21 +20,18 @@
 #include <iostream>
 #include <sstream>
 
-#define SCREEN_WIDTH 800
-#define SCREEN_HEIGHT 600
-#define SHADOW_ATLAS_SIZE 8192
-#define SHADOW_ATLAS_TILE_SIZE 512
-
 // Define globals
 InputManager inputManager;
 DebugContext DEBUG_CTX;
+
+config::GraphicsSettings settings;
 
 int main() {
     DEBUG_CTX.mode = -1;
     DEBUG_CTX.numDepthSlices = 50;
 
     // Initialize window
-    Window window("Factory Game", SCREEN_WIDTH, SCREEN_HEIGHT);
+    Window window("Factory Game", settings.width, settings.height);
     if (!window.init()) {
         return -1;
     }
@@ -48,15 +46,15 @@ int main() {
 
     // Create renderer and send mesh data to GPU
     Camera& camera = scene.getPrimaryCamera();
-    Renderer renderer(SCREEN_WIDTH, SCREEN_HEIGHT, SHADOW_ATLAS_SIZE, SHADOW_ATLAS_TILE_SIZE, &camera);
+    Renderer renderer(settings, &camera);
     window.setRenderer(&renderer);
 
     FrameGraph frameGraph(scene);
     frameGraph.addRenderPass(std::make_unique<ShadowPass>());
     frameGraph.addRenderPass(std::make_unique<GeometryPass>());
     frameGraph.addRenderPass(std::make_unique<LightPass>());
-    frameGraph.addRenderPass(std::make_unique<ForwardPass>());
     frameGraph.addRenderPass(std::make_unique<SkyboxPass>());
+    frameGraph.addRenderPass(std::make_unique<ForwardPass>());
     frameGraph.addRenderPass(std::make_unique<DebugPass>(&camera));
 
     // Init all meshses
@@ -106,10 +104,10 @@ int main() {
 
         // -------------- System updates ------------
         profiler.start("Systems");
-        profiler.start("Transform");
-        profiler.end("Transform");
         gameObjectSystem.updateAll(currentFrame, deltaTime);
+        profiler.start("Transform");
         transformSystem.updateTransformComponents();
+        profiler.end("Transform");
         lightSystem.updateShadowMatrices();
         profiler.end("Systems");
 

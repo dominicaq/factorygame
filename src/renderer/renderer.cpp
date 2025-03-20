@@ -6,37 +6,19 @@
 // Define the number of G-buffer attachments
 #define NUM_ATTACHMENTS 4
 
-Renderer::Renderer(int width, int height, int atlasSize, int atlasTileSize, Camera* camera) {
+Renderer::Renderer(config::GraphicsSettings settings, Camera* camera) {
+    config = settings;
+
     // Viewport
     m_camera = camera;
-    m_width = width;
-    m_height = height;
-
-    // Shadow Atlas
-    m_atlasSize = atlasSize;
-    m_atlasTileSize = atlasTileSize;
+    m_width = config.width;
+    m_height = config.height;
 
     initOpenGLState();
     initScreenQuad();
 
     // Initialize G-Buffer
-    m_gBuffer = std::make_unique<Framebuffer>(width, height, NUM_ATTACHMENTS, true);
-
-    // Initialize Shadow Atlas
-    m_shadowAtlas = std::make_unique<Framebuffer>(atlasSize, atlasSize, 0, true);
-    m_shadowAtlas->bind();
-
-    // Set up the depth texture parameters for the shadow map
-    glBindTexture(GL_TEXTURE_2D, m_shadowAtlas->getDepthAttachment());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-
-    float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-
-    m_shadowAtlas->unbind();
+    m_gBuffer = std::make_unique<Framebuffer>(m_width, m_height, NUM_ATTACHMENTS, true);
 
     // Make the first mesh instance blank
     m_instanceMeshData.push_back(MeshData{0});
@@ -66,9 +48,6 @@ Renderer::~Renderer() {
         }
         if (data.EBO) {
             glDeleteBuffers(1, &data.EBO);
-        }
-        if (data.instanceVBO) {
-            glDeleteBuffers(1, &data.instanceVBO);
         }
     }
 
@@ -367,13 +346,13 @@ void Renderer::updateInstanceBuffer(size_t instanceID, const std::vector<glm::ma
     MeshData& data = m_instanceMeshData[instanceID];
 
     // Check if instance buffer exists
-    if (data.instanceVBO == 0) {
+    if (data.VBO == 0) {
         std::cerr << "[Error] Renderer::updateInstanceBuffer: Instance buffer doesn't exist! Call setupInstanceAttributes first.\n";
         return;
     }
 
     // Update the existing buffer
-    glBindBuffer(GL_ARRAY_BUFFER, data.instanceVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, data.VBO);
     glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_DYNAMIC_DRAW);
 
     // Update the instance count
@@ -408,7 +387,7 @@ void Renderer::setupInstanceAttributes(size_t instanceID, const std::vector<glm:
     glBindVertexArray(0);
 
     // Store the instance VBO in the mesh data
-    data.instanceVBO = instanceVBO;
+    data.VBO = instanceVBO;
     data.instanceCount = (GLsizei)modelMatrices.size();
 }
 
@@ -420,12 +399,22 @@ void Renderer::deleteInstanceBuffer(size_t instanceID) {
 
     MeshData& data = m_instanceMeshData[instanceID];
 
-    // Delete instance VBO if it exists
-    if (data.instanceVBO) {
-        glDeleteBuffers(1, &data.instanceVBO);
-        data.instanceVBO = 0;
-        data.instanceCount = 0;
+    // Delete mesh resources
+    if (data.VAO) {
+        glDeleteVertexArrays(1, &data.VAO);
+        data.VAO = 0;
     }
+    if (data.VBO) {
+        glDeleteBuffers(1, &data.VBO);
+        data.VBO = 0;
+    }
+    if (data.EBO) {
+        glDeleteBuffers(1, &data.EBO);
+        data.EBO = 0;
+    }
+
+    // Reset mesh at index
+    m_instanceMeshData[instanceID] = MeshData{};
 }
 
 void Renderer::drawScreenQuad() {
@@ -449,3 +438,11 @@ void Renderer::resizeGBuffer(int width, int height) {
 * Misc
 */
 int Renderer::getNumAttachments()  { return NUM_ATTACHMENTS; }
+
+bool Renderer::applySettings(const config::GraphicsSettings& settings) {
+    bool requiresRestart = false;
+
+    config = settings;
+
+    return requiresRestart;
+}

@@ -20,6 +20,7 @@ public:
 
     unsigned int getColorAttachment(unsigned int index) const;
     unsigned int getDepthAttachment() const;
+    void resetDepthAttachment() const;
 
     void resize(unsigned int width, unsigned int height);
 

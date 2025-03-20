@@ -10,21 +10,15 @@ public:
     void execute(Renderer& renderer, entt::registry& registry) override;
 
 private:
-    // Note: structure must be aligned 16 bytes pad if needed.
     struct LightSSBO {
-        // 16 bytes
-        glm::vec3 position; int _pad1; // Padding to align vec3 to 16 bytes
-        // 16 bytes
-        glm::vec3 color; int _pad2;
-        // 16 bytes
-        float radius;
-        float intensity;
-        unsigned int depthHandle;
-        int isPointLight;
+        glm::vec3 position; float radius;                  // 16 bytes
+        glm::vec3 color; float intensity;                  // 16 bytes
+        int isPointLight; int castShadow; int pad_2; int pad_3; // 16 bytes
+        glm::mat4 lightSpaceMatrices[6]; // 64 * 6 bytes
     };
 
-    GLuint m_lightSSBO;
     Shader m_lightPassShader;
+    GLuint m_lightSSBO;
 };
 
 #endif // LIGHTPASS_H
