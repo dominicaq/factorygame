@@ -42,17 +42,19 @@ float calculateShadow(vec3 fragPos, Light light, int shadowMapIndex) {
     if (light.castShadow == 0) return 0.0; // No shadow
 
     vec3 lightToFrag = fragPos - light.position;
-    float bias = 0.025;
+    vec3 normal = normalize(texture(gNormal, TexCoords).rgb);
+    vec3 lightDir = normalize(light.position - fragPos);
+
+    // Dynamically adjusted bias to reduce shadow acne and peter-panning
+    float bias = clamp(0.005 * tan(acos(dot(normal, lightDir))), 0.001, 0.03);
 
     if (light.isPointLight == 1) {
-        // Find the dominant face direction
         vec3 absVec = abs(lightToFrag);
         float maxComponent = max(max(absVec.x, absVec.y), absVec.z);
 
         int faceIndex;
         mat4 lightMatrix;
 
-        // Determine which face to use based on the dominant direction
         if (absVec.x == maxComponent) {
             faceIndex = (lightToFrag.x > 0.0) ? 0 : 1; // +X or -X
         } else if (absVec.y == maxComponent) {
@@ -63,38 +65,77 @@ float calculateShadow(vec3 fragPos, Light light, int shadowMapIndex) {
 
         lightMatrix = light.lightSpaceMatrices[faceIndex];
 
-        // Transform fragment position to light space
+        // Transform to light space
         vec4 fragPosLightSpace = lightMatrix * vec4(fragPos, 1.0);
         vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
         projCoords = projCoords * 0.5 + 0.5; // Convert to [0,1] range
 
-        // Skip if outside visible range
         if (projCoords.x < 0.0 || projCoords.x > 1.0 ||
             projCoords.y < 0.0 || projCoords.y > 1.0 ||
             projCoords.z < 0.0 || projCoords.z > 1.0) {
             return 0.0;
         }
 
-        // Calculate UV coordinates for the horizontal atlas
+        // Calculate face width with inset padding to avoid bleeding
         float faceWidth = 1.0 / 6.0;
+
+        // Add a small inset to avoid sampling across face boundaries
+        float inset = 0.001; // Small value to move sampling away from edges
+
+        // Scale down the UV coordinates within each face to avoid edge sampling
+        float scaledX = projCoords.x * (1.0 - 2.0 * inset) + inset;
+
+        // Calculate atlas coordinates with padding between faces
         vec2 atlasCoords = vec2(
-            projCoords.x * faceWidth + faceIndex * faceWidth,
+            scaledX * faceWidth + faceIndex * faceWidth,
             projCoords.y
         );
 
-        // Sample depth from the atlas
-        float closestDepth = texture(shadowMaps[shadowMapIndex], atlasCoords).r;
-        return (projCoords.z - bias > closestDepth) ? 1.0 : 0.0;
+        // PCF Sampling - ensure we don't sample across face boundaries
+        float shadowFactor = 0.0;
+        int kernelSize = 3;
+        float samples = float(kernelSize * kernelSize);
+        vec2 texelSize = 1.0 / vec2(textureSize(shadowMaps[shadowMapIndex], 0));
+
+        // Calculate the maximum allowed offset to stay within face boundaries
+        float maxOffsetX = faceWidth * 0.5 - inset * 2.0;
+
+        for (int x = -1; x <= 1; ++x) {
+            for (int y = -1; y <= 1; ++y) {
+                // Limit the X offset to stay within current face
+                float limitedOffsetX = clamp(float(x) * texelSize.x, -maxOffsetX, maxOffsetX);
+                vec2 offset = vec2(limitedOffsetX, float(y) * texelSize.y);
+
+                float depthSample = texture(shadowMaps[shadowMapIndex], atlasCoords + offset).r;
+                shadowFactor += (projCoords.z - bias > depthSample) ? 1.0 : 0.0;
+            }
+        }
+
+        shadowFactor /= samples;
+        return shadowFactor;
     } else {
-        // Non-point light shadow (directional/spot)
+        // Directional/spot lights (unchanged)
         vec4 fragPosLightSpace = light.lightSpaceMatrices[0] * vec4(fragPos, 1.0);
         vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
         projCoords = projCoords * 0.5 + 0.5;
 
         if (projCoords.z < 0.0 || projCoords.z > 1.0) return 0.0;
 
-        float closestDepth = texture(shadowMaps[shadowMapIndex], projCoords.xy).r;
-        return (projCoords.z - bias > closestDepth) ? 1.0 : 0.0;
+        float shadowFactor = 0.0;
+        int kernelSize = 3;
+        float samples = float(kernelSize * kernelSize);
+        vec2 texelSize = 1.0 / vec2(textureSize(shadowMaps[shadowMapIndex], 0));
+
+        for (int x = -1; x <= 1; ++x) {
+            for (int y = -1; y <= 1; ++y) {
+                vec2 offset = vec2(x, y) * texelSize;
+                float depthSample = texture(shadowMaps[shadowMapIndex], projCoords.xy + offset).r;
+                shadowFactor += (projCoords.z - bias > depthSample) ? 1.0 : 0.0;
+            }
+        }
+
+        shadowFactor /= samples;
+        return shadowFactor;
     }
 }
 

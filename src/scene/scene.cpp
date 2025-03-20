@@ -114,12 +114,12 @@ void Scene::loadScene() {
     save_diabloData.position = glm::vec3(0.0f, 1.75f, -1.0f);
     save_diabloData.scale = glm::vec3(3.0f);
     GameObject* diabloObject = SceneUtils::addGameObjectComponent(registry, diabloEntity, save_diabloData);
-    diabloObject->addScript<MoveScript>();
+    // diabloObject->addScript<MoveScript>();
 
     Mesh* diabloMesh = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
     if (diabloMesh != nullptr) {
         Material* diabloMaterial = new Material(basicShader);
-        diabloMaterial->albedoColor = glm::vec4(0.7f, 0.7f, 0.7f, 1.0f);
+        diabloMaterial->albedoColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
         diabloMaterial->isDeferred = true;
 
         Texture* diabloAlbedoMap = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_diffuse.tga");
@@ -140,10 +140,10 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 200;
-    float circleRadius = 10.0f;
+    int n = 1000;
+    float circleRadius = 5.0f;
     float yPosition = 5.0f;
-    createLights(1, circleRadius, yPosition, basicShader);
+    createLights(2, circleRadius, yPosition, basicShader);
     createAsteroids(n, circleRadius * 10.0f, 0, 1.0f, basicShader);
 
     // Gizmo Cube
@@ -198,13 +198,13 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
         glm::vec4 color;
         switch (i % n) {
             case 0: color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f); break; // White
-            case 1: color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f); break; // Red
-            case 2: color = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f); break; // Green
-            default: color = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f); break; // Blue
+            case 1: color = glm::vec4(0.5f, 0.0f, 0.0f, 1.0f); break; // Red
+            case 2: color = glm::vec4(0.0f, 0.5f, 0.0f, 1.0f); break; // Green
+            default: color = glm::vec4(0.0f, 0.0f, 0.5f, 1.0f); break; // Blue
         }
         lightData.color = color;
         lightData.intensity = 5.0f;
-        lightData.radius = 20.0f;
+        lightData.radius = 30.0f;
         lightData.type = LightType::Point;
         lightData.castsShadows = true;
         lightData.isActive = true;
