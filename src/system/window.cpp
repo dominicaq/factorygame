@@ -30,8 +30,17 @@ bool Window::init() {
     }
 
     // Set GLFW window hints for OpenGL version and profile
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+#ifdef __APPLE__
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+    std::cerr << "[Warning] MacOS only supports up to OpenGL 4.1\n";
+    std::cerr << "[Warning] defaulting to OpenGL 4.1, errors may occur.\n";
+#else
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    std::cout << "Running on OpenGL 4.3\n";
+#endif
+
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 #ifdef __APPLE__
@@ -73,7 +82,7 @@ bool Window::init() {
 
     // Initialize ImGui for GLFW and OpenGL3
     ImGui_ImplGlfw_InitForOpenGL(m_window, true);
-    ImGui_ImplOpenGL3_Init("#version 330");
+    ImGui_ImplOpenGL3_Init("#version 430");
 
     return true;
 }

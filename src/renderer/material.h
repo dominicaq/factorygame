@@ -16,9 +16,17 @@ struct Material {
     Texture* specularMap = nullptr;
     Texture* normalMap = nullptr;
 
+    // PBR Textures
+    Texture* roughnessMap = nullptr;
+    Texture* metallicMap = nullptr;
+    Texture* aoMap = nullptr;  // Ambient Occlusion Map
+
     // RGB Material properties
     glm::vec4 albedoColor = glm::vec4(1.0f);
     glm::vec3 specularColor = glm::vec3(1.0f);
+
+    // Scale for texture tiling
+    glm::vec2 tileScale = glm::vec2(1.0f, 1.0f);
 
     float shininess = 32.0f;
     float time;
@@ -78,6 +86,28 @@ struct Material {
             if (shaderOverride->hasUniform("u_SpecularMap")) {
                 shaderOverride->setInt("u_SpecularMap", 2);
                 specularMap->bind(2);
+            }
+        }
+
+        // Bind PBR maps if they exist
+        if (roughnessMap) {
+            if (shaderOverride->hasUniform("u_RoughnessMap")) {
+                shaderOverride->setInt("u_RoughnessMap", 3);
+                roughnessMap->bind(3);
+            }
+        }
+
+        if (metallicMap) {
+            if (shaderOverride->hasUniform("u_MetallicMap")) {
+                shaderOverride->setInt("u_MetallicMap", 4);
+                metallicMap->bind(4);
+            }
+        }
+
+        if (aoMap) {
+            if (shaderOverride->hasUniform("u_AmbientOcclusionMap")) {
+                shaderOverride->setInt("u_AmbientOcclusionMap", 5);
+                aoMap->bind(5);
             }
         }
     }

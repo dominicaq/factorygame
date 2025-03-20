@@ -45,38 +45,52 @@ public:
     };
 
     void execute(Renderer& renderer, entt::registry& registry) override {
+        // Save ALL relevant OpenGL states
+        GLint originalDepthFunc;
+        glGetIntegerv(GL_DEPTH_FUNC, &originalDepthFunc);
+
+        GLboolean depthMaskEnabled;
+        glGetBooleanv(GL_DEPTH_WRITEMASK, &depthMaskEnabled);
+
         // Resources
         Camera* camera = renderer.getCamera();
         const glm::mat4& viewMatrix = camera->getViewMatrix();
-        // Remove translation from the view matrix for the skybox
         glm::mat4 viewNoTranslation = glm::mat4(glm::mat3(viewMatrix));
-
-        // Change depth function so the skybox renders behind everything
-        glDepthFunc(GL_LEQUAL);
-
-        // Disable depth writing so the skybox doesn't overwrite depth buffer values
-        glDepthMask(GL_FALSE);
 
         // Use skybox shader
         m_skyboxShader.use();
-
         m_skyboxShader.setMat4("view", viewNoTranslation);
         m_skyboxShader.setMat4("projection", camera->getProjectionMatrix());
 
-        // Bind the skybox VAO and texture
-        glBindVertexArray(m_skyboxVAO);
+        // Explicitly ensure depth testing is enabled
+        glEnable(GL_DEPTH_TEST);
+
+        // Disable depth clamp (important for skybox correct rendering)
+        glDisable(GL_DEPTH_CLAMP);
+
+        // Change depth function for skybox
+        glDepthFunc(GL_LEQUAL);
+
+        // Disable depth writing
+        glDepthMask(GL_FALSE);
+
+        // Ensure we're using texture unit 0
+        glActiveTexture(GL_TEXTURE0);
+
+        // Bind the skybox texture and VAO
         glBindTexture(GL_TEXTURE_CUBE_MAP, m_skyboxTexture);
-        glDrawArrays(GL_TRIANGLES, 0, 36);  // Draw the skybox
+        glBindVertexArray(m_skyboxVAO);
 
-        // Unbind VAO
+        // Draw the skybox
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+
+        // Reset bindings
         glBindVertexArray(0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
-        // Re-enable depth writing after drawing the skybox
-        glDepthMask(GL_TRUE);
-
-        // Reset depth function to default (GL_LESS)
-        glDepthFunc(GL_LESS);
-    };
+        glDepthFunc(originalDepthFunc);
+        glDepthMask(depthMaskEnabled);
+    }
 
 private:
     unsigned int m_skyboxVAO, m_skyboxVBO;

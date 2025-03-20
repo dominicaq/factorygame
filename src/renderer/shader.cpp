@@ -85,6 +85,15 @@ void Shader::setMat4(const std::string& name, const glm::mat4& mat) const {
     }
 }
 
+void Shader::setVec2(const std::string& name, const glm::vec2& value) const {
+    GLint location = getUniformLocation(name);
+    if (location != -1) {
+        glUniform2fv(location, 1, glm::value_ptr(value));
+    } else {
+        std::cerr << "[Error] Shader::setVec2: Uniform not found: " << name << "\n";
+    }
+}
+
 void Shader::setVec3(const std::string& name, const glm::vec3& value) const {
     GLint location = getUniformLocation(name);
     if (location != -1) {

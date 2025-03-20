@@ -7,58 +7,63 @@
 
 class BouncingMotion final : public Script {
 public:
-    float fallSpeed = 2.0f;
-    float riseSpeed = 3.0f;
+    float borderSize = 40.0f;  // Set the border size as a parameter
+    float movementSpeed = 5.0f; // Speed at which the object moves
+    float directionChangeDuration = 5.0f;  // Duration to smoothly change direction (in seconds)
 
 private:
-    float startY;
-    float velocity = 0.0f;
-    float gravity = 9.8f;
-    glm::vec3 rotationSpeed;
-
-    float elapsedTime = 0.0f;  // Time passed since the object was created
-    float lifetime;             // Lifetime in seconds (randomly set)
+    glm::vec3 velocityDirection;  // Current direction of the object (only X and Z components)
+    glm::vec3 targetDirection;    // Target direction after change (only X and Z components)
+    float timeSinceDirectionChange = 0.0f; // Time elapsed since last direction change
 
     void start() override {
-        startY = gameObject->getPosition().y;
-
-        // Random X, Y, Z rotation speed between 10 and 100
-        rotationSpeed = glm::vec3(
-            static_cast<float>(std::rand() % 90 + 10),
-            static_cast<float>(std::rand() % 90 + 10),
-            static_cast<float>(std::rand() % 90 + 10)
-        );
-
-        // Set a random lifetime between 3 and 10 seconds
-        lifetime = static_cast<float>(std::rand() % 8 + 3);  // Random lifetime between 3 and 10 seconds
+        // Set initial random direction (X and Z only, Y is fixed)
+        setRandomDirection();
+        targetDirection = velocityDirection; // Initially, the target direction is the same as the starting direction
+        glm::vec3 startPos = gameObject->getPosition();
+        startPos.y = 0;
+        gameObject->setPosition(startPos);
     }
 
     void update(const float& deltaTime) override {
-        elapsedTime += deltaTime;  // Increment the elapsed time by deltaTime
-
-        // Check if lifetime has passed and destroy the object if necessary
-        if (elapsedTime >= lifetime) {
-            // gameObject->destroy();
-        }
-
         glm::vec3 position = gameObject->getPosition();
 
-        // Apply gravity to the object
-        velocity -= gravity * deltaTime;  // Apply gravity
-        position.y += velocity * deltaTime;
+        // Move the object in the current direction (X and Z only)
+        position.x += velocityDirection.x * deltaTime * movementSpeed;
+        position.z += velocityDirection.z * deltaTime * movementSpeed;
 
-        // Check if the object has hit the ground (y = 0.0f)
-        if (position.y <= -0.5f) {
-            position.y = -0.5f;  // Make sure it doesn't go below the ground
-            velocity = std::sqrt(2 * gravity * (startY));
-        }
+        // Make the object face the direction it's moving towards
+        glm::vec3 forwardDirection = velocityDirection;
+        glm::vec3 objectToTarget = glm::normalize(forwardDirection);
 
-        // Apply the position update
-        gameObject->setPosition(position);
-
-        // Apply rotation on all axes
+        // Calculate the rotation to face the target direction
         glm::vec3 rotation = gameObject->getEuler();
-        rotation += rotationSpeed * deltaTime;
+        rotation.x = std::atan2(objectToTarget.z, objectToTarget.y); // Update rotation on the X axis
+        rotation.y = std::atan2(objectToTarget.x, objectToTarget.z); // Update rotation on the Y axis
         gameObject->setEuler(rotation);
+
+        // Check for borders and teleport if needed
+        checkAndTeleportBorders(position);
+
+        // Apply the position update (preserve the Y position)
+        gameObject->setPosition(glm::vec3(position.x, 0, position.z));
+    }
+
+    void setRandomDirection() {
+        // Set a random direction for the velocity (only X and Z components)
+        velocityDirection = glm::vec3(
+            static_cast<float>(std::rand() % 200 - 100) / 100.0f, // Random X direction (-1 to 1)
+            0.0f, // Y is fixed
+            static_cast<float>(std::rand() % 200 - 100) / 100.0f  // Random Z direction (-1 to 1)
+        );
+        velocityDirection = glm::normalize(velocityDirection);  // Normalize direction to keep speed consistent
+    }
+
+    void checkAndTeleportBorders(glm::vec3& position) {
+        // Teleport the object to the opposite side if it goes beyond the borders in the X or Z axis
+        if (position.x > borderSize) position.x = -borderSize; // Teleport to the left side in the X axis
+        if (position.x < -borderSize) position.x = borderSize; // Teleport to the right side in the X axis
+        if (position.z > borderSize) position.z = -borderSize; // Teleport to the front side in the Z axis
+        if (position.z < -borderSize) position.z = borderSize; // Teleport to the back side in the Z axis
     }
 };

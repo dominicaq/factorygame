@@ -92,15 +92,17 @@ void Scene::loadScene() {
     SceneData save_planeData;
     save_planeData.name = "Ground Plane";
     save_planeData.position = glm::vec3(0.0f, -1.1f, 0.0f);
-    save_planeData.scale = glm::vec3(30.0f, 0.1f, 30.0f);
+    save_planeData.scale = glm::vec3(40.0f, 0.1f, 40.0f);
     GameObject* planeObject = SceneUtils::addGameObjectComponent(registry, planeEntity, save_planeData);
 
     Mesh* planeMesh = ResourceLoader::loadMesh(MODEL_DIR + "/cube.obj");
     if (planeMesh != nullptr) {
         Material* planeMaterial = new Material(basicShader);
         planeMaterial->albedoColor = glm::vec4(1.0f);
-        planeMaterial->albedoMap = new Texture(TEXTURE_DIR + "dev.jpg");
+        planeMaterial->albedoMap = new Texture(TEXTURE_DIR + "mortar.png");
+        planeMaterial->normalMap = new Texture(TEXTURE_DIR + "mortar-n.png");
         planeMaterial->isDeferred = true;
+        planeMaterial->tileScale = glm::vec2(40.0f);
         planeMesh->material = planeMaterial;
         registry.emplace<Mesh*>(planeEntity, planeMesh);
     }
@@ -138,29 +140,29 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 20;
+    int n = 1000;
     float circleRadius = 3.0f;
     float yPosition = 0.0f;
     createLights(6, circleRadius, yPosition + 5.0f, basicShader);
-    createAsteroids(n, circleRadius * 10.0f, 0, 10, basicShader);
+    createAsteroids(n, circleRadius * 10.0f, 0, 1.0f, basicShader);
 
     // Gizmo Cube
     // Box dimensions
-    int sizeX = 5, sizeY = 5, sizeZ = 5;
-    glm::vec3 cubeScale = glm::vec3(1.0f);
+    // int sizeX = 5, sizeY = 5, sizeZ = 5;
+    // glm::vec3 cubeScale = glm::vec3(1.0f);
 
-    int numCubes = sizeX * sizeY * sizeZ;
-    for (int x = 0; x < sizeX; x++) {
-        for (int y = 0; y < sizeY; y++) {
-            for (int z = 0; z < sizeZ; z++) {
-                SceneData data;
-                data.position = glm::vec3(x, y, z) * cubeScale;
-                data.scale = cubeScale;
+    // int numCubes = sizeX * sizeY * sizeZ;
+    // for (int x = 0; x < sizeX; x++) {
+    //     for (int y = 0; y < sizeY; y++) {
+    //         for (int z = 0; z < sizeZ; z++) {
+    //             SceneData data;
+    //             data.position = glm::vec3(x, y, z) * cubeScale;
+    //             data.scale = cubeScale;
 
-                auto temp = SceneUtils::createGizmo(registry, data, m_wireframeMaterial, GizmoType::CUBE);
-            }
-        }
-    }
+    //             auto temp = SceneUtils::createGizmo(registry, data, m_wireframeMaterial, GizmoType::CUBE);
+    //         }
+    //     }
+    // }
 
     // Finally, update the mesh instance map if any for later use
     updateInstanceMap();
@@ -243,6 +245,9 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
     std::uniform_real_distribution<float> heightDist(minHeight, maxHeight);
     std::uniform_real_distribution<float> scaleDist(0.05f, 0.2f);
     std::uniform_real_distribution<float> angleDist(0.0f, 360.0f);
+    std::uniform_real_distribution<float> colorDist(0.0f, 1.0f);  // For color
+    std::uniform_real_distribution<float> intensityDist(1.0f, 4.0f);  // For intensity
+    std::uniform_real_distribution<float> radiusDist(3.0f, 3.0f);  // For radius
 
     for (int i = 0; i < n; ++i) {
         // Random position
@@ -271,9 +276,9 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
 
         // Add a point light to each asteroid
         Light asteroidLight;
-        asteroidLight.color = glm::vec3(1.0f, 1.0f, 0.0f); // Yellow light for example
-        asteroidLight.intensity = 0.8f;
-        asteroidLight.radius = 5.0f; // Adjust the radius as needed
+        asteroidLight.color = glm::vec3(colorDist(gen), colorDist(gen), colorDist(gen));
+        asteroidLight.intensity = intensityDist(gen);
+        asteroidLight.radius = radiusDist(gen);
         asteroidLight.type = LightType::Point;
         asteroidLight.castsShadows = false;
         asteroidLight.isActive = true;

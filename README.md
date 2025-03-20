@@ -27,7 +27,7 @@ If you wish to download the additional 3D model assets along with the project, r
 git submodule update --init --recursive
 ```
 ## Build Instructions
-1. MacOS/Linux:
+1. Linux:
     ```sh
     mkdir build
     cd build
@@ -44,6 +44,6 @@ git submodule update --init --recursive
 The compiled executable will be located in the `build/Release/FactoryGame.exe` directory on Windows.
 
 ## Dependencies
-- A PC with OpenGL support (minimum OpenGL version 3.3)
+- A PC with OpenGL support (minimum OpenGL version 4.3)
 - CMake 3.10 or higher
 - A C++ compiler supporting C++17 or higher

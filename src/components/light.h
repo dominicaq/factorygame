@@ -21,7 +21,7 @@ struct Light {
     LightType type = LightType::Point;
     bool castsShadows = false;
     bool isActive = true;
-    int atlasIndices[6] = {-1};
+    unsigned int depthHandle = 0;
 };
 
 struct LightSpaceMatrix {

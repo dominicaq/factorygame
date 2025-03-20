@@ -2,97 +2,147 @@
 #include <glad/glad.h>
 #include "../../scene/scene.h"
 
+ShadowPass::~ShadowPass() {
+    // Clean up the framebuffer
+    if (m_shadowFrameBuffer != 0) {
+        glDeleteFramebuffers(1, &m_shadowFrameBuffer);
+    }
+
+    // Clean up all shadow maps
+    for (auto& [entity, texture] : m_lightShadowMapMap) {
+        glDeleteTextures(1, &texture);
+    }
+    m_lightShadowMapMap.clear();
+
+    // Clean up all cubemaps
+    for (auto& [entity, cubemap] : m_lightCubemapMap) {
+        glDeleteTextures(1, &cubemap);
+    }
+    m_lightCubemapMap.clear();
+}
+
 void ShadowPass::setup() {
     std::string shadowVertPath = ASSET_DIR "shaders/core/shadow.vs";
     std::string shadowFragPath = ASSET_DIR "shaders/core/shadow.fs";
     if (!m_shadowShader.load(shadowVertPath, shadowFragPath)) {
-        std::cerr << "[Error] Renderer::Renderer: Failed to load shadow shader!\n";
+        std::cerr << "[Error] ShadowPass: Failed to load shadow shader!\n";
     }
+
+    // Create a shared framebuffer for all shadow rendering
+    glGenFramebuffers(1, &m_shadowFrameBuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFrameBuffer);
+
+    // Configure for depth-only rendering
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+
+    // Check if framebuffer is complete (basic configuration)
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "[Error] ShadowPass: Shadow framebuffer not complete" << std::endl;
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
+    // Save only essential states
+    GLint originalFramebuffer;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &originalFramebuffer);
+
+    GLint originalViewport[4];
+    glGetIntegerv(GL_VIEWPORT, originalViewport);
+
+    // Setup for shadow rendering - minimal state changes
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    // Access and bind the Renderer’s shadow atlas directly
-    Framebuffer* shadowAtlas = renderer.getShadowAtlas();
-    shadowAtlas->bind();
-    glClear(GL_DEPTH_BUFFER_BIT);
-
     m_shadowShader.use();
 
-    // Get atlas data
-    auto atlasDimensions = renderer.getShadowAtlasDimensions();
-    int atlasSize = atlasDimensions.first;
-    int tileSize = atlasDimensions.second;
-    int maxShadowMaps = (atlasSize / tileSize) * (atlasSize / tileSize);
-
-    int tileIndex = 0;
-
-    // Render 2D shadow maps (directional/spotlights) to the atlas
-    registry.view<LightSpaceMatrix, Light>().each([&](auto& lightSpaceMatrix, auto& light) {
+    // Render 2D shadow maps (directional/spotlights)
+    registry.view<LightSpaceMatrix, Light>().each([&](auto entity, auto& lightSpaceMatrix, auto& light) {
         if (!light.castsShadows) {
             return;
         }
 
-        if (tileIndex >= maxShadowMaps) {
-            std::cerr << "[Warning] Exceeded maximum number of shadow maps in the atlas!" << std::endl;
+        // Create or reuse a shadow map for this light
+        if (m_lightShadowMapMap.find(entity) == m_lightShadowMapMap.end()) {
+            m_lightShadowMapMap[entity] = createShadowMap();
+        }
+
+        // Bind framebuffer and attach this light's shadow map
+        glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFrameBuffer);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                              GL_TEXTURE_2D, m_lightShadowMapMap[entity], 0);
+
+        // Check if framebuffer is complete with this texture
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            std::cerr << "[Error] ShadowPass: Shadow framebuffer not complete for light " << (uint32_t)entity << std::endl;
             return;
         }
 
-        // Compute the viewport for this shadow map
-        int tileX = (tileIndex % (atlasSize / tileSize)) * tileSize;
-        int tileY = (tileIndex / (atlasSize / tileSize)) * tileSize;
-        glViewport(tileX, tileY, tileSize, tileSize);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glViewport(0, 0, SHADOW_MAP_RESOLUTION, SHADOW_MAP_RESOLUTION);
 
-        light.atlasIndices[0] = tileIndex;
+        // Set the view/projection matrix and render the scene
         m_shadowShader.setMat4("u_LightSpaceMatrix", lightSpaceMatrix.matrix);
-
-        // Draw scene from light's point of view
         renderSceneDepth(renderer, registry);
-        ++tileIndex;
+
+        // Store the handle in the light component
+        light.depthHandle = m_lightShadowMapMap[entity];
     });
 
-    // TODO: render cube maps to their own texture, use geometry shader for instancing
-    // Render point light shadow maps
+    // Render cubemaps for point lights
     registry.view<LightSpaceMatrixCube, Light>().each([&](auto entity, auto& lightSpaceCube, auto& light) {
         if (!light.castsShadows) {
             return;
         }
 
-        if (tileIndex + 6 > maxShadowMaps) {
-            std::cerr << "[Warning] Exceeded maximum number of shadow maps in the atlas!" << std::endl;
-            return;
+        // Create or reuse a cubemap for this light
+        if (m_lightCubemapMap.find(entity) == m_lightCubemapMap.end()) {
+            m_lightCubemapMap[entity] = createShadowCubemap();
         }
 
-        // Render each face separately
+        // Get the cubemap for this light
+        unsigned int depthCubemap = m_lightCubemapMap[entity];
+        glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFrameBuffer);
+        glViewport(0, 0, SHADOW_CUBEMAP_SIZE, SHADOW_CUBEMAP_SIZE);
+
+        // Render each face of the cubemap
         for (int face = 0; face < 6; ++face) {
-            int currentTileIndex = tileIndex + face;
+            // Attach the current face of the cubemap to the FBO
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                                  GL_TEXTURE_CUBE_MAP_POSITIVE_X + face,
+                                  depthCubemap, 0);
 
-            // Compute the viewport for this face
-            int tileX = (currentTileIndex % (atlasSize / tileSize)) * tileSize;
-            int tileY = (currentTileIndex / (atlasSize / tileSize)) * tileSize;
-            glViewport(tileX, tileY, tileSize, tileSize);
+            glClear(GL_DEPTH_BUFFER_BIT);
 
-            // Set atlas index for this face
-            light.atlasIndices[face] = currentTileIndex;
+            // Set the view/projection matrix for this face
             m_shadowShader.setMat4("u_LightSpaceMatrix", lightSpaceCube.matrices[face]);
-
-            // Draw the scene from this face's point of view
             renderSceneDepth(renderer, registry);
         }
 
-        // Increment for next group of faces
-        tileIndex += 6;
+        // Store the cubemap handle in the light component
+        light.depthHandle = depthCubemap;
     });
 
-    shadowAtlas->unbind();
-    auto screenDimensions = renderer.getScreenDimensions();
-    glViewport(0, 0, screenDimensions.first, screenDimensions.second);
+    // Reset only what's necessary
+    glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFrameBuffer);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
+
+    // Restore original framebuffer and viewport
+    glBindFramebuffer(GL_FRAMEBUFFER, originalFramebuffer);
+    glViewport(originalViewport[0], originalViewport[1], originalViewport[2], originalViewport[3]);
+
+    // Critical - disable depth clamp which was affecting skybox
+    glDisable(GL_DEPTH_CLAMP);
+
+    // Reset texture bindings
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) {
-    // Normal rendering
+    // Normal rendering of non-instanced meshes
     registry.view<Mesh*, ModelMatrix>().each([&](Mesh* mesh, const ModelMatrix& modelMatrix) {
         if (mesh->wireframe) {
             return;
@@ -101,7 +151,7 @@ void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) 
         renderer.draw(mesh);
     });
 
-    // Get scene data for rendering
+    // Get scene data for instanced rendering
     const auto& instanceMap = m_scene->getInstanceMap();
     const auto& meshInstances = m_scene->getMeshInstances();
 
@@ -115,4 +165,63 @@ void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) 
         m_shadowShader.setMat4("u_Model", matrices[0]);
         renderer.drawInstanced(meshId);
     }
+}
+
+void ShadowPass::cleanupLightResources(entt::entity lightEntity) {
+    // Clean up directional/spot light shadow map
+    auto shadowIt = m_lightShadowMapMap.find(lightEntity);
+    if (shadowIt != m_lightShadowMapMap.end()) {
+        glDeleteTextures(1, &shadowIt->second);
+        m_lightShadowMapMap.erase(shadowIt);
+    }
+
+    // Clean up point light cubemap
+    auto cubemapIt = m_lightCubemapMap.find(lightEntity);
+    if (cubemapIt != m_lightCubemapMap.end()) {
+        glDeleteTextures(1, &cubemapIt->second);
+        m_lightCubemapMap.erase(cubemapIt);
+    }
+}
+
+unsigned int ShadowPass::createShadowMap() {
+    unsigned int shadowMap;
+    glGenTextures(1, &shadowMap);
+    glBindTexture(GL_TEXTURE_2D, shadowMap);
+
+    // Consider using GL_DEPTH_COMPONENT24 for better precision/performance balance
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24,
+                SHADOW_MAP_RESOLUTION, SHADOW_MAP_RESOLUTION,
+                0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+
+    // Set texture parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+    return shadowMap;
+}
+
+unsigned int ShadowPass::createShadowCubemap() {
+    unsigned int cubemap;
+    glGenTextures(1, &cubemap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap);
+
+    // Use GL_DEPTH_COMPONENT24 for better precision/performance balance
+    for (unsigned int i = 0; i < 6; ++i) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT24,
+                    SHADOW_CUBEMAP_SIZE, SHADOW_CUBEMAP_SIZE, 0,
+                    GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    }
+
+    // Set texture parameters
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    return cubemap;
 }

@@ -38,7 +38,7 @@ Texture::Texture(const std::string& filePath) : m_textureID(0), width(0), height
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
         // Set texture filtering parameters
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);  // Use linear filtering for better quality
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         // Upload the texture data to the GPU
@@ -52,6 +52,11 @@ Texture::Texture(const std::string& filePath) : m_textureID(0), width(0), height
 
         // Generate mipmaps for the texture
         glGenerateMipmap(GL_TEXTURE_2D);
+
+        // Apply anisotropic filtering
+        GLfloat maxAniso = 0.0f;
+        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &maxAniso);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, maxAniso);
 
         // Unbind the texture
         glBindTexture(GL_TEXTURE_2D, 0);
@@ -68,6 +73,7 @@ Texture::Texture(const std::string& filePath) : m_textureID(0), width(0), height
     // Free image data after uploading to the GPU
     ResourceLoader::freeImage(data);
 }
+
 
 Texture::~Texture() {
     glDeleteTextures(1, &m_textureID);
