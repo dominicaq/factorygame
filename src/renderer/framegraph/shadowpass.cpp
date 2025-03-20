@@ -81,7 +81,7 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
         }
 
         glClear(GL_DEPTH_BUFFER_BIT);
-        glViewport(0, 0, SHADOW_MAP_RESOLUTION, SHADOW_MAP_RESOLUTION);
+        glViewport(0, 0, SHADOW_RESOLUTION, SHADOW_RESOLUTION);
 
         // Set the view/projection matrix and render the scene
         m_shadowShader.setMat4("u_LightSpaceMatrix", lightSpaceMatrix.matrix);
@@ -99,30 +99,33 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 
         // Create or reuse a cubemap for this light
         if (m_lightCubemapMap.find(entity) == m_lightCubemapMap.end()) {
-            m_lightCubemapMap[entity] = createShadowCubemap();
+            m_lightCubemapMap[entity] = createCubeMapAtlas();
         }
 
         // Get the cubemap for this light
-        unsigned int depthCubemap = m_lightCubemapMap[entity];
+        unsigned int depthAtlas = m_lightCubemapMap[entity];
+
+        // Bind the framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFrameBuffer);
-        glViewport(0, 0, SHADOW_CUBEMAP_SIZE, SHADOW_CUBEMAP_SIZE);
+        // Attach the texture atlas to the FBO
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthAtlas, 0);
 
-        // Render each face of the cubemap
+        // Clear the depth buffer for the atlas
+        glClear(GL_DEPTH_BUFFER_BIT);
+
+        // Render each face to its section in the atlas
         for (int face = 0; face < 6; ++face) {
-            // Attach the current face of the cubemap to the FBO
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                                  GL_TEXTURE_CUBE_MAP_POSITIVE_X + face,
-                                  depthCubemap, 0);
+            // Calculate the viewport position for this face
+            int xOffset = face * SHADOW_RESOLUTION;
+            glViewport(xOffset, 0, SHADOW_RESOLUTION, SHADOW_RESOLUTION);
 
-            glClear(GL_DEPTH_BUFFER_BIT);
-
-            // Set the view/projection matrix for this face
+            // Render the scene from the face index
             m_shadowShader.setMat4("u_LightSpaceMatrix", lightSpaceCube.matrices[face]);
             renderSceneDepth(renderer, registry);
         }
 
-        // Store the cubemap handle in the light component
-        light.depthHandle = depthCubemap;
+        // Store the atlas handle in the light component
+        light.depthHandle = depthAtlas;
     });
 
     // Reset only what's necessary
@@ -190,7 +193,7 @@ unsigned int ShadowPass::createShadowMap() {
 
     // Consider using GL_DEPTH_COMPONENT24 for better precision/performance balance
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24,
-                SHADOW_MAP_RESOLUTION, SHADOW_MAP_RESOLUTION,
+                SHADOW_RESOLUTION, SHADOW_RESOLUTION,
                 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 
     // Set texture parameters
@@ -204,24 +207,20 @@ unsigned int ShadowPass::createShadowMap() {
     return shadowMap;
 }
 
-unsigned int ShadowPass::createShadowCubemap() {
+unsigned int ShadowPass::createCubeMapAtlas() {
     unsigned int cubemap;
     glGenTextures(1, &cubemap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap);
+    glBindTexture(GL_TEXTURE_2D, cubemap);
 
-    // Use GL_DEPTH_COMPONENT24 for better precision/performance balance
-    for (unsigned int i = 0; i < 6; ++i) {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT24,
-                    SHADOW_CUBEMAP_SIZE, SHADOW_CUBEMAP_SIZE, 0,
-                    GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    }
+    // Create a 2D texture with the width being 6 * SHADOW_RESOLUTION and the height being SHADOW_RESOLUTION
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, SHADOW_RESOLUTION * 6, SHADOW_RESOLUTION, 0,
+                 GL_DEPTH_COMPONENT, GL_FLOAT, NULL);  // Initialize with NULL, which sets all depth values to 1.0
 
     // Set texture parameters
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     return cubemap;
 }

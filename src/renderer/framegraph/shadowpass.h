@@ -7,8 +7,7 @@
 #include <unordered_map>
 #include <entt/entity/registry.hpp>
 
-#define SHADOW_MAP_RESOLUTION 1024
-#define SHADOW_CUBEMAP_SIZE 1024
+#define SHADOW_RESOLUTION 1024
 
 class ShadowPass : public RenderPass {
 public:
@@ -21,9 +20,6 @@ public:
 
 private:
     Shader m_shadowShader;
-
-    // Shared framebuffer for all shadow rendering
-    // We attach different textures to this framebuffer for each light
     unsigned int m_shadowFrameBuffer = 0;
 
     // Caches for storing shadow textures per light entity
@@ -35,7 +31,7 @@ private:
 
     // Texture creation helpers
     unsigned int createShadowMap();
-    unsigned int createShadowCubemap();
+    unsigned int createCubeMapAtlas();
 };
 
 #endif // SHADOWPASS_H
