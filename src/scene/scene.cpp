@@ -111,12 +111,12 @@ void Scene::loadScene() {
     entt::entity diabloEntity = registry.create();
     SceneData save_diabloData;
     save_diabloData.name = "Diablo";
-    save_diabloData.position = glm::vec3(0.0f, 1.75f, -1.0f);
+    save_diabloData.position = glm::vec3(0.0f, 2.0f, -1.0f);
     save_diabloData.scale = glm::vec3(3.0f);
     GameObject* diabloObject = SceneUtils::addGameObjectComponent(registry, diabloEntity, save_diabloData);
-    // diabloObject->addScript<MoveScript>();
+    diabloObject->addScript<MoveScript>();
 
-    Mesh* diabloMesh = ResourceLoader::loadMesh(MODEL_DIR + "diablo3_pose.obj");
+    Mesh* diabloMesh = ResourceLoader::loadMesh(MODEL_DIR + "/diablo3_pose.obj");
     if (diabloMesh != nullptr) {
         Material* diabloMaterial = new Material(basicShader);
         diabloMaterial->albedoColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -140,10 +140,10 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 1000;
+    int n = 100;
     float circleRadius = 5.0f;
     float yPosition = 5.0f;
-    createLights(2, circleRadius, yPosition, basicShader);
+    createLights(3, circleRadius, yPosition, basicShader);
     createAsteroids(n, circleRadius * 10.0f, 0, 1.0f, basicShader);
 
     // Gizmo Cube
@@ -197,7 +197,7 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
         Light lightData;
         glm::vec4 color;
         switch (i % n) {
-            case 0: color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f); break; // White
+            case 0: color = glm::vec4(0.25f, 0.25f, 0.25f, 1.0f); break; // White
             case 1: color = glm::vec4(0.5f, 0.0f, 0.0f, 1.0f); break; // Red
             case 2: color = glm::vec4(0.0f, 0.5f, 0.0f, 1.0f); break; // Green
             default: color = glm::vec4(0.0f, 0.0f, 0.5f, 1.0f); break; // Blue
@@ -275,14 +275,14 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
         asteroidObject->addScript<BouncingMotion>();
 
         // Add a point light to each asteroid
-        // Light asteroidLight;
-        // asteroidLight.color = glm::vec3(colorDist(gen), colorDist(gen), colorDist(gen));
-        // asteroidLight.intensity = intensityDist(gen);
-        // asteroidLight.radius = radiusDist(gen);
-        // asteroidLight.type = LightType::Point;
-        // asteroidLight.castsShadows = false;
-        // asteroidLight.isActive = true;
-        // SceneUtils::addPointLightComponents(registry, asteroidEntity, asteroidLight);
+        Light asteroidLight;
+        asteroidLight.color = glm::vec3(colorDist(gen), colorDist(gen), colorDist(gen));
+        asteroidLight.intensity = 5.0f;
+        asteroidLight.radius = 5.0f;
+        asteroidLight.type = LightType::Point;
+        asteroidLight.castsShadows = false;
+        asteroidLight.isActive = true;
+        SceneUtils::addPointLightComponents(registry, asteroidEntity, asteroidLight);
 
         registry.emplace<MeshInstance>(asteroidEntity, meshInstance);
     }

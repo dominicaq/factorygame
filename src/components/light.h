@@ -6,7 +6,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#define MAX_LIGHTS 100
+#define MAX_LIGHTS 1000
+#define MAX_SHADOW_MAPS 30
 
 enum class LightType {
     Point,

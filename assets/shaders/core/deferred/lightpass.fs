@@ -17,19 +17,23 @@ uniform vec3 u_CameraPosition;
 struct Light {
     vec3 position; float radius;                      // 16 bytes
     vec3 color; float intensity;                      // 16 bytes
-    int isPointLight; int castShadow; int pad_2; int pad_3; // 16 bytes
-    mat4 lightSpaceMatrices[6];                      // 96 bytes (used for point lights)
+    int isPointLight; int castShadow; int lightMatrixIndex; int shadowMapIndex; // 16 bytes
 };
 
 layout(std430, binding = 0) buffer LightBuffer {
     Light lights[];
 };
 
+// SSBO for light matrices
+layout(std430, binding = 1) buffer LightMatrixBuffer {
+    mat4 lightMatrices[];
+};
+
 uniform int numLights;
 uniform int shadowWidth;
 
 // Shadow maps (array of samplers)
-uniform sampler2D shadowMaps[30];  // Up to 6 shadow maps for point lights
+uniform sampler2D shadowMaps[30];
 
 // Material properties
 const float AMBIENT_STRENGTH = 0.7;
@@ -38,7 +42,7 @@ const float SPECULAR_STRENGTH = 0.8;
 const float SPECULAR_SHININESS = 16.0;
 
 // Function to calculate shadow by sampling all 6 faces for point lights
-float calculateShadow(vec3 fragPos, Light light, int shadowMapIndex) {
+float calculateShadow(vec3 fragPos, Light light) {
     if (light.castShadow == 0) return 0.0; // No shadow
 
     vec3 lightToFrag = fragPos - light.position;
@@ -49,12 +53,13 @@ float calculateShadow(vec3 fragPos, Light light, int shadowMapIndex) {
     float bias = clamp(0.005 * tan(acos(dot(normal, lightDir))), 0.001, 0.03);
 
     if (light.isPointLight == 1) {
+        // For point lights, we need to calculate which face of the cubemap we are on
         vec3 absVec = abs(lightToFrag);
         float maxComponent = max(max(absVec.x, absVec.y), absVec.z);
 
         int faceIndex;
-        mat4 lightMatrix;
 
+        // Select the cubemap face based on the dominant axis of the light-to-fragment vector
         if (absVec.x == maxComponent) {
             faceIndex = (lightToFrag.x > 0.0) ? 0 : 1; // +X or -X
         } else if (absVec.y == maxComponent) {
@@ -63,7 +68,8 @@ float calculateShadow(vec3 fragPos, Light light, int shadowMapIndex) {
             faceIndex = (lightToFrag.z > 0.0) ? 4 : 5; // +Z or -Z
         }
 
-        lightMatrix = light.lightSpaceMatrices[faceIndex];
+        // Use the correct matrix for the selected face
+        mat4 lightMatrix = lightMatrices[light.lightMatrixIndex + faceIndex];
 
         // Transform to light space
         vec4 fragPosLightSpace = lightMatrix * vec4(fragPos, 1.0);
@@ -95,7 +101,7 @@ float calculateShadow(vec3 fragPos, Light light, int shadowMapIndex) {
         float shadowFactor = 0.0;
         int kernelSize = 3;
         float samples = float(kernelSize * kernelSize);
-        vec2 texelSize = 1.0 / vec2(textureSize(shadowMaps[shadowMapIndex], 0));
+        vec2 texelSize = 1.0 / vec2(textureSize(shadowMaps[light.shadowMapIndex], 0));
 
         // Calculate the maximum allowed offset to stay within face boundaries
         float maxOffsetX = faceWidth * 0.5 - inset * 2.0;
@@ -106,7 +112,7 @@ float calculateShadow(vec3 fragPos, Light light, int shadowMapIndex) {
                 float limitedOffsetX = clamp(float(x) * texelSize.x, -maxOffsetX, maxOffsetX);
                 vec2 offset = vec2(limitedOffsetX, float(y) * texelSize.y);
 
-                float depthSample = texture(shadowMaps[shadowMapIndex], atlasCoords + offset).r;
+                float depthSample = texture(shadowMaps[light.shadowMapIndex], atlasCoords + offset).r;
                 shadowFactor += (projCoords.z - bias > depthSample) ? 1.0 : 0.0;
             }
         }
@@ -114,8 +120,9 @@ float calculateShadow(vec3 fragPos, Light light, int shadowMapIndex) {
         shadowFactor /= samples;
         return shadowFactor;
     } else {
-        // Directional/spot lights (unchanged)
-        vec4 fragPosLightSpace = light.lightSpaceMatrices[0] * vec4(fragPos, 1.0);
+        // Directional/spot lights - use the correct matrix index
+        mat4 lightMatrix = lightMatrices[light.lightMatrixIndex];
+        vec4 fragPosLightSpace = lightMatrix * vec4(fragPos, 1.0);
         vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
         projCoords = projCoords * 0.5 + 0.5;
 
@@ -124,12 +131,12 @@ float calculateShadow(vec3 fragPos, Light light, int shadowMapIndex) {
         float shadowFactor = 0.0;
         int kernelSize = 3;
         float samples = float(kernelSize * kernelSize);
-        vec2 texelSize = 1.0 / vec2(textureSize(shadowMaps[shadowMapIndex], 0));
+        vec2 texelSize = 1.0 / vec2(textureSize(shadowMaps[light.shadowMapIndex], 0));
 
         for (int x = -1; x <= 1; ++x) {
             for (int y = -1; y <= 1; ++y) {
                 vec2 offset = vec2(x, y) * texelSize;
-                float depthSample = texture(shadowMaps[shadowMapIndex], projCoords.xy + offset).r;
+                float depthSample = texture(shadowMaps[light.shadowMapIndex], projCoords.xy + offset).r;
                 shadowFactor += (projCoords.z - bias > depthSample) ? 1.0 : 0.0;
             }
         }
@@ -173,7 +180,7 @@ void main() {
         vec3 specular = light.color * specularFactor * light.intensity * SPECULAR_STRENGTH;
 
         // Calculate shadow for this light
-        float shadow = calculateShadow(worldPos, light, i);
+        float shadow = calculateShadow(worldPos, light);
 
         // Apply shadow to lighting
         vec3 lightContribution = attenuation * (diffuse + specular) * (1.0 - shadow);

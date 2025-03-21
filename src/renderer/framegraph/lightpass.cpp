@@ -10,11 +10,17 @@ void LightPass::setup() {
         std::cerr << "[Error] LightPass::setup: Failed to create lightPassShader!\n";
     }
 
-    // Generate and bind SSBO
+    // Generate and bind SSBOs
     glGenBuffers(1, &m_lightSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_lightSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_LIGHTS * sizeof(LightSSBO), nullptr, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_lightSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    glGenBuffers(1, &m_lightMatrixSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_lightMatrixSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_SHADOW_MAPS * sizeof(glm::mat4), nullptr, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_lightMatrixSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
@@ -34,34 +40,44 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
 
     // Collect lights data from the registry
     std::vector<LightSSBO> lightData;
-    std::vector<GLuint> shadowMapHandles;  // Store shadow maps handles
+    std::vector<glm::mat4> lightMatrixData;
+    std::vector<GLuint> shadowMapHandles;
 
+    int currentMatrixIndex = 0;
+    int currentMapIndex = 0;
     registry.view<Light, Position>().each([&](entt::entity entity, const Light& lightComponent, const Position& positionComponent) {
         LightSSBO lightSSBO{};
         lightSSBO.position = positionComponent.position;
         lightSSBO.radius = lightComponent.radius;
         lightSSBO.color = lightComponent.color;
         lightSSBO.intensity = lightComponent.intensity;
-        lightSSBO.castShadow = lightComponent.castsShadows;
         lightSSBO.isPointLight = (lightComponent.type == LightType::Point) ? 1 : 0;
+        lightSSBO.castShadow = lightComponent.castsShadows ? 1 : 0;
+        lightSSBO.lightMatrixIndex = currentMatrixIndex;
+        lightSSBO.shadowMapIndex = currentMapIndex;
 
         // Retrieve the shadow map handle
-        GLuint shadowMapHandle = lightComponent.depthHandle;
-        if (shadowMapHandle != 0) {
-            shadowMapHandles.push_back(shadowMapHandle);
+        if (lightComponent.depthHandle == 0 || !lightComponent.castsShadows) {
+            lightData.push_back(lightSSBO);
+            return;
         }
+
+        shadowMapHandles.push_back(lightComponent.depthHandle);
+        currentMapIndex += 1;
 
         // Check if the entity has LightSpaceMatrix (single shadow matrix)
         if (registry.all_of<LightSpaceMatrix>(entity)) {
-            const auto& matrixComponent = registry.get<LightSpaceMatrix>(entity);
-            lightSSBO.lightSpaceMatrices[0] = matrixComponent.matrix;
+            const auto& singleMatrix = registry.get<LightSpaceMatrix>(entity);
+            lightMatrixData.push_back(singleMatrix.matrix);
+            currentMatrixIndex += 1;
         }
         // Check if the entity has LightSpaceMatrixCube (6 matrices for cubemap shadows)
         else if (registry.all_of<LightSpaceMatrixCube>(entity)) {
             const auto& cubeMatrices = registry.get<LightSpaceMatrixCube>(entity);
             for (int i = 0; i < 6; i++) {
-                lightSSBO.lightSpaceMatrices[i] = cubeMatrices.matrices[i];
+                lightMatrixData.push_back(cubeMatrices.matrices[i]);
             }
+            currentMatrixIndex += 6;
         }
 
         lightData.push_back(lightSSBO);
@@ -70,6 +86,12 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     // Set shader parameters
     int numLights = std::min(static_cast<int>(lightData.size()), MAX_LIGHTS);
     m_lightPassShader.setInt("numLights", numLights);
+    if (lightData.size() > MAX_LIGHTS || lightMatrixData.size() > MAX_SHADOW_MAPS) {
+        std::cerr << "[Warning] LightPass::execute: Light SSBO overflow! "
+        << "Lights: " << lightData.size() << "/" << MAX_LIGHTS
+        << ", Shadow maps: " << lightMatrixData.size() << "/" << MAX_SHADOW_MAPS
+        << ". Ensure you stay within engine constraints.\n";
+    }
 
     // Bind the SSBO and upload light data
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_lightSSBO);
@@ -77,11 +99,16 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_lightSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_lightMatrixSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, lightMatrixData.size() * sizeof(glm::mat4), lightMatrixData.data(), GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_lightMatrixSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
     // Set the shadow maps array in the shader
-    for (int i = 0; i < numLights; ++i) {
+    for (int i = 0; i < shadowMapHandles.size() && i < MAX_SHADOW_MAPS; ++i) {
         glActiveTexture(GL_TEXTURE3 + i); // Start binding from texture slot 3
         glBindTexture(GL_TEXTURE_2D, shadowMapHandles[i]);
-        m_lightPassShader.setInt("shadowMaps[" + std::to_string(i) + "]", 3 + i);  // Set the texture slot for each light's shadow map
+        m_lightPassShader.setInt("shadowMaps[" + std::to_string(i) + "]", 3 + i);
     }
 
     // Set the G-buffer textures in the shader
