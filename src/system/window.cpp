@@ -38,12 +38,12 @@ bool Window::init() {
 #ifdef __APPLE__
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
-    std::cerr << "[Warning] MacOS only supports up to OpenGL 4.1\n";
-    std::cerr << "[Warning] defaulting to OpenGL 4.1, errors may occur.\n";
+
+    std::cerr << "[Warning] macOS only supports up to OpenGL 4.1 due to OpenGL deprecation.\n";
+    std::cerr << "[Warning] Defaulting to OpenGL 4.1. Some OpenGL features may cause errors or not function properly.\n";
 #else
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    std::cout << "Running on OpenGL 4.3\n";
 #endif
 
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -104,6 +104,10 @@ bool Window::init() {
     ImGui_ImplGlfw_InitForOpenGL(m_window, true);
     ImGui_ImplOpenGL3_Init("#version 430");
 
+    int major, minor;
+    glGetIntegerv(GL_MAJOR_VERSION, &major);
+    glGetIntegerv(GL_MINOR_VERSION, &minor);
+    std::cerr << "[Success] Running OpenGL " << major << "." << minor << " Core Profile\n";
     return true;
 }
 

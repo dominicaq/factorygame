@@ -31,7 +31,7 @@ layout(std430, binding = 1) buffer LightMatrixBuffer {
 
 // Light data uniforms
 uniform int numLights;
-uniform sampler2D shadowMaps[30];
+uniform sampler2D shadowMaps[20];
 
 // Material properties
 const float AMBIENT_STRENGTH = 0.7;
