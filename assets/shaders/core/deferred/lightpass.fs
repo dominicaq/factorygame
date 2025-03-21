@@ -29,10 +29,8 @@ layout(std430, binding = 1) buffer LightMatrixBuffer {
     mat4 lightMatrices[];
 };
 
+// Light data uniforms
 uniform int numLights;
-uniform int shadowWidth;
-
-// Shadow maps (array of samplers)
 uniform sampler2D shadowMaps[30];
 
 // Material properties
