@@ -1,8 +1,10 @@
 #version 330 core
 
+// G-buffer outputs with packed PBR parameters
 layout (location = 0) out vec3 gPosition;
 layout (location = 1) out vec3 gNormal;
 layout (location = 2) out vec4 gAlbedo;
+layout (location = 3) out vec4 gPBRParams;
 
 in vec3 FragPos;
 in vec2 TexCoords;
@@ -10,13 +12,20 @@ in vec3 Normal;
 in vec3 Tangent;
 in vec3 Bitangent;
 
+// Required
 uniform vec4 u_AlbedoColor;
 uniform sampler2D u_AlbedoMap;
 
+// Optional PBR textures
 uniform bool u_HasNormalMap;
-uniform sampler2D u_NormalMap;
+uniform bool u_HasMetallicMap;
+uniform bool u_HasRoughnessMap;
+uniform bool u_HasAOMap;
 
-// NOTE: Shader should only store data
+uniform sampler2D u_NormalMap;
+uniform sampler2D u_MetallicMap;
+uniform sampler2D u_RoughnessMap;
+uniform sampler2D u_AOMap;
 
 void main() {
     // Store the fragment position in gPosition
@@ -39,4 +48,12 @@ void main() {
     vec3 albedo = texture(u_AlbedoMap, TexCoords).rgb * u_AlbedoColor.xyz;
     gAlbedo.rgb = albedo;
     gAlbedo.a = 1.0;
+
+    // Fetch metallic, roughness, and AO from their respective textures if they are available
+    float metallic = u_HasMetallicMap ? texture(u_MetallicMap, TexCoords).r : 0.0;
+    float roughness = u_HasRoughnessMap ? texture(u_RoughnessMap, TexCoords).r : 1.0;
+    float ao = u_HasAOMap ? texture(u_AOMap, TexCoords).r : 1.0;
+
+    // Pack PBR parameters into a single vec4 output
+    gPBRParams = vec4(metallic, roughness, ao, 1.0);
 }

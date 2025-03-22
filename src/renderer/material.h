@@ -13,7 +13,6 @@ struct Material {
 
     // Texture ptr(s)
     Texture* albedoMap = nullptr;
-    Texture* specularMap = nullptr;
     Texture* normalMap = nullptr;
 
     // PBR Textures
@@ -57,6 +56,11 @@ struct Material {
             shaderOverride->setFloat("u_Time", time);
         }
 
+        // Set tile amount
+        if (shaderOverride->hasUniform("u_TileScale")) {
+            shaderOverride->setVec2("u_TileScale", tileScale);
+        }
+
         // Bind albedo map if it exists, otherwise set default color
         if (albedoMap) {
             if (shaderOverride->hasUniform("u_AlbedoMap")) {
@@ -81,33 +85,51 @@ struct Material {
             }
         }
 
-        // Bind specular map if it exists
-        if (specularMap) {
-            if (shaderOverride->hasUniform("u_SpecularMap")) {
-                shaderOverride->setInt("u_SpecularMap", 2);
-                specularMap->bind(2);
+        // Bind metallic map if it exists
+        if (metallicMap) {
+            if (shaderOverride->hasUniform("u_MetallicMap")) {
+                shaderOverride->setInt("u_MetallicMap", 2);
+                metallicMap->bind(2);
+            }
+
+            if (shaderOverride->hasUniform("u_HasMetallicMap")) {
+                shaderOverride->setBool("u_HasMetallicMap", true);
+            }
+        } else {
+            if (shaderOverride->hasUniform("u_HasMetallicMap")) {
+                shaderOverride->setBool("u_HasMetallicMap", false);
             }
         }
 
-        // Bind PBR maps if they exist
+        // Bind roughness map if it exists
         if (roughnessMap) {
             if (shaderOverride->hasUniform("u_RoughnessMap")) {
                 shaderOverride->setInt("u_RoughnessMap", 3);
                 roughnessMap->bind(3);
             }
-        }
 
-        if (metallicMap) {
-            if (shaderOverride->hasUniform("u_MetallicMap")) {
-                shaderOverride->setInt("u_MetallicMap", 4);
-                metallicMap->bind(4);
+            if (shaderOverride->hasUniform("u_HasRoughnessMap")) {
+                shaderOverride->setBool("u_HasRoughnessMap", true);
+            }
+        } else {
+            if (shaderOverride->hasUniform("u_HasRoughnessMap")) {
+                shaderOverride->setBool("u_HasRoughnessMap", false);
             }
         }
 
+        // Bind AO map if it exists
         if (aoMap) {
-            if (shaderOverride->hasUniform("u_AmbientOcclusionMap")) {
-                shaderOverride->setInt("u_AmbientOcclusionMap", 5);
-                aoMap->bind(5);
+            if (shaderOverride->hasUniform("u_AOMap")) {
+                shaderOverride->setInt("u_AOMap", 4);
+                aoMap->bind(4);
+            }
+
+            if (shaderOverride->hasUniform("u_HasAOMap")) {
+                shaderOverride->setBool("u_HasAOMap", true);
+            }
+        } else {
+            if (shaderOverride->hasUniform("u_HasAOMap")) {
+                shaderOverride->setBool("u_HasAOMap", false);
             }
         }
     }

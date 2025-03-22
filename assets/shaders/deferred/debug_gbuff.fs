@@ -7,6 +7,7 @@ in vec2 TexCoord;
 uniform sampler2D gPosition;
 uniform sampler2D gNormal;
 uniform sampler2D gAlbedo;
+uniform sampler2D gPBRParams;
 uniform sampler2D gDepth;
 
 // Debug mode
@@ -43,6 +44,18 @@ void main()
         // Show albedo buffer
         FragColor = texture(gAlbedo, TexCoord);
     } else if (debugMode == 3) {
+        // Show metallic buffer - extract from the R channel of gPBRParams
+        float metallic = texture(gPBRParams, TexCoord).r;
+        FragColor = vec4(vec3(metallic), 1.0);
+    } else if (debugMode == 4) {
+        // Show roughness buffer - extract from the G channel of gPBRParams
+        float roughness = texture(gPBRParams, TexCoord).g;
+        FragColor = vec4(vec3(roughness), 1.0);
+    } else if (debugMode == 5) {
+        // Show ambient occlusion buffer - extract from the B channel of gPBRParams
+        float ao = texture(gPBRParams, TexCoord).b;
+        FragColor = vec4(vec3(ao), 1.0);
+    } else if (debugMode == 6) {
         // Visualize the depth buffer directly
         float depth = texture(gDepth, TexCoord).r;
         float linearDepth = LinearizeDepth(depth);
@@ -53,7 +66,7 @@ void main()
 
         // Output as grayscale
         FragColor = vec4(vec3(normalizedDepth), 1.0);
-    } else if (debugMode == 4) {
+    } else if (debugMode == 7) {
         // Depth slice visualization
         float depth = texture(gDepth, TexCoord).r;
         float linearDepth = LinearizeDepth(depth);

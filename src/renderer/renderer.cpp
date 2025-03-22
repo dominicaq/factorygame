@@ -4,7 +4,7 @@
 #include <memory>
 
 // Define the number of G-buffer attachments
-#define NUM_ATTACHMENTS 4
+#define NUM_GATTACHMENTS 4
 
 Renderer::Renderer(config::GraphicsSettings settings, Camera* camera) {
     config = settings;
@@ -18,7 +18,7 @@ Renderer::Renderer(config::GraphicsSettings settings, Camera* camera) {
     initScreenQuad();
 
     // Initialize G-Buffer
-    m_gBuffer = std::make_unique<Framebuffer>(m_width, m_height, NUM_ATTACHMENTS, true);
+    m_gBuffer = std::make_unique<Framebuffer>(m_width, m_height, NUM_GATTACHMENTS, true);
 
     // Make the first mesh instance blank
     m_instanceMeshData.push_back(MeshData{0});
@@ -437,7 +437,7 @@ void Renderer::resizeGBuffer(int width, int height) {
 /*
 * Misc
 */
-int Renderer::getNumAttachments()  { return NUM_ATTACHMENTS; }
+int Renderer::getNumAttachments()  { return NUM_GATTACHMENTS; }
 
 bool Renderer::applySettings(const config::GraphicsSettings& settings) {
     bool requiresRestart = false;

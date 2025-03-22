@@ -85,10 +85,10 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     // Set shader parameters
     int numLights = std::min(static_cast<int>(m_lightData.size()), MAX_LIGHTS);
     m_lightPassShader.setInt("numLights", numLights);
-    if (m_lightData.size() > MAX_LIGHTS || m_lightMatrixData.size() > MAX_SHADOW_MAPS) {
+    if (m_lightData.size() > MAX_LIGHTS || m_lightMatrixData.size() > MAX_SHADOW_MAPS * 6) {
         std::cerr << "[Warning] LightPass::execute: Light SSBO overflow! "
         << "Lights: " << m_lightData.size() << "/" << MAX_LIGHTS
-        << ", Shadow maps: " << m_lightMatrixData.size() << "/" << MAX_SHADOW_MAPS
+        << ", Shadow maps: " << m_lightMatrixData.size() << "/" << MAX_SHADOW_MAPS * 6
         << ". Ensure you stay within engine constraints.\n";
     }
 
@@ -103,26 +103,30 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_lightMatrixSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-    // Set the shadow maps array in the shader
-    for (int i = 0; i < m_shadowMapHandles.size() && i < MAX_SHADOW_MAPS; ++i) {
-        glActiveTexture(GL_TEXTURE3 + i); // Start binding from texture slot 3
-        glBindTexture(GL_TEXTURE_2D, m_shadowMapHandles[i]);
-        m_lightPassShader.setInt("shadowMaps[" + std::to_string(i) + "]", 3 + i);
-    }
-
     // Set the G-buffer textures in the shader
-    Framebuffer* gbuffer = renderer.getFramebuffer();
+    Framebuffer* gBuffer = renderer.getFramebuffer();
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, gbuffer->getColorAttachment(0));
+    glBindTexture(GL_TEXTURE_2D, gBuffer->getColorAttachment(0));
     m_lightPassShader.setInt("gPosition", 0);
 
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, gbuffer->getColorAttachment(1));
+    glBindTexture(GL_TEXTURE_2D, gBuffer->getColorAttachment(1));
     m_lightPassShader.setInt("gNormal", 1);
 
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, gbuffer->getColorAttachment(2));
+    glBindTexture(GL_TEXTURE_2D, gBuffer->getColorAttachment(2));
     m_lightPassShader.setInt("gAlbedo", 2);
+
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, gBuffer->getColorAttachment(3));
+    m_lightPassShader.setInt("gPBRParams", 3);
+
+    // Set the shadow maps array in the shader
+    for (int i = 0; i < m_shadowMapHandles.size() && i < MAX_SHADOW_MAPS; ++i) {
+        glActiveTexture(GL_TEXTURE4 + i); // Start binding from texture slot 4
+        glBindTexture(GL_TEXTURE_2D, m_shadowMapHandles[i]);
+        m_lightPassShader.setInt("shadowMaps[" + std::to_string(i) + "]", 4 + i);
+    }
 
     // Draw the screen quad to apply the lighting pass
     renderer.drawScreenQuad();

@@ -42,7 +42,8 @@ public:
         m_debugShader.setInt("gPosition", 0);
         m_debugShader.setInt("gNormal", 1);
         m_debugShader.setInt("gAlbedo", 2);
-        m_debugShader.setInt("gDepth", 3);
+        m_debugShader.setInt("gPBRParams", 3);
+        m_debugShader.setInt("gDepth", 4);
 
         // Set debug mode (defines what to visualize)
         m_debugShader.setInt("debugMode", DEBUG_CTX.mode);
@@ -60,14 +61,10 @@ public:
         glBindTexture(GL_TEXTURE_2D, gBuffer->getColorAttachment(2)); // Albedo
 
         glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, gBuffer->getDepthAttachment()); // Depth
+        glBindTexture(GL_TEXTURE_2D, gBuffer->getColorAttachment(3)); // PBR Params
 
-        // Bind additional G-buffer textures if any (NUM_ATTACHMENTS > 4)
-        for (int i = 4; i < renderer.getNumAttachments(); ++i) {
-            glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, gBuffer->getColorAttachment(i));
-            m_debugShader.setInt("gExtraTexture" + std::to_string(i - 3), i);
-        }
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, gBuffer->getDepthAttachment()); // Depth
 
         // Draw the screen-aligned quad to visualize the debug information
         renderer.drawScreenQuad();
