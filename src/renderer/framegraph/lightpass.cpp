@@ -26,6 +26,21 @@ void LightPass::setup() {
     // Reserve the shadow vectors
     m_lightMatrixData.reserve(MAX_SHADOW_MAPS * 6);
     m_shadowMapHandles.reserve(MAX_SHADOW_MAPS);
+
+    // Load the skybox
+    std::string skyboxVertexPath = ASSET_DIR "shaders/core/skybox.vs";
+    std::string skyboxFragmentPath = ASSET_DIR "shaders/core/skybox.fs";
+    std::vector<std::string> faces = {
+        ASSET_DIR "textures/skyboxes/bspace/1.png",
+        ASSET_DIR "textures/skyboxes/bspace/3.png",
+        ASSET_DIR "textures/skyboxes/bspace/5.png",
+        ASSET_DIR "textures/skyboxes/bspace/6.png",
+        ASSET_DIR "textures/skyboxes/bspace/2.png",
+        ASSET_DIR "textures/skyboxes/bspace/4.png"
+    };
+
+    // Load the cubemap textures from image files
+    m_skyboxTexture = CubeMap::createFromImages(faces);
 }
 
 void LightPass::execute(Renderer& renderer, entt::registry& registry) {
@@ -127,6 +142,13 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
         glBindTexture(GL_TEXTURE_2D, m_shadowMapHandles[i]);
         m_lightPassShader.setInt("shadowMaps[" + std::to_string(i) + "]", 4 + i);
     }
+
+    int skyboxTextureUnit = 4 + MAX_SHADOW_MAPS;
+
+    // Set the skybox texture
+    glActiveTexture(GL_TEXTURE0 + skyboxTextureUnit);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, m_skyboxTexture);
+    m_lightPassShader.setInt("skybox", skyboxTextureUnit);
 
     // Draw the screen quad to apply the lighting pass
     renderer.drawScreenQuad();

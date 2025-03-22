@@ -74,7 +74,6 @@ Texture::Texture(const std::string& filePath) : m_textureID(0), width(0), height
     ResourceLoader::freeImage(data);
 }
 
-
 Texture::~Texture() {
     glDeleteTextures(1, &m_textureID);
 }

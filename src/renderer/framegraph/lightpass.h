@@ -27,6 +27,8 @@ private:
 
     // Light pass frame shader
     Shader m_lightPassShader;
+
+    unsigned int m_skyboxTexture;
 };
 
 #endif // LIGHTPASS_H

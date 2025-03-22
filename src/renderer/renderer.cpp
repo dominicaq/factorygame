@@ -463,6 +463,12 @@ void Renderer::applyHeightMapCompute(Mesh* mesh) {
         return; // No mesh or height map, nothing to do
     }
 
+    // Make sure we have normals
+    if (mesh->normals.size() != mesh->vertices.size()) {
+        std::cerr << "[Error] Cannot apply height map: mesh is missing normals\n";
+        return;
+    }
+
     // Define sensible defaults if not set
     if (mesh->material->heightScale <= 0.0f) {
         mesh->material->heightScale = 1.0f; // Default to 1.0 if not set or negative
@@ -496,6 +502,8 @@ void Renderer::applyHeightMapCompute(Mesh* mesh) {
     // Bind height map texture
     mesh->material->heightMap->bind(0);
     m_heightCompute.setInt("heightMap", 0);
+    mesh->material->normalMap->bind(1);
+    m_heightCompute.setInt("normalMap", 1);
 
     // Send uniforms to shader
     m_heightCompute.setFloat("heightScale", mesh->material->heightScale);
@@ -516,15 +524,12 @@ void Renderer::applyHeightMapCompute(Mesh* mesh) {
     // Now read back the data
     glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, mesh->vertices.size() * sizeof(glm::vec3), mesh->vertices.data());
 
-    // Update normals to reflect the new terrain shape
-    if (mesh->normals.size() == mesh->vertices.size()) {
-        // Recalculate normals based on the displaced vertices
-        // recalculateNormals(mesh);
-    }
-
     // Clean up
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glDeleteBuffers(1, &ssboVertexData);
     glDeleteBuffers(1, &ssboUVData);
     glUseProgram(0);
+
+    // If you want to recalculate normals after displacement
+    // recalculateNormals(mesh);
 }

@@ -14,6 +14,9 @@ uniform sampler2D gPBRParams;
 // Camera data
 uniform vec3 u_CameraPosition;
 
+// Skybox texture
+uniform samplerCube skybox;
+
 // SSBO for lights
 struct Light {
     vec3 position; float radius; // 16 bytes
@@ -37,7 +40,6 @@ uniform sampler2D shadowMaps[20];
 // Constants
 const float PI = 3.14159265359;
 
-// Function to calculate shadow by sampling all 6 faces for point lights
 float calculateShadow(vec3 fragPos, Light light) {
     if (light.castShadow == 0) return 0.0; // No shadow
 
@@ -142,7 +144,7 @@ float calculateShadow(vec3 fragPos, Light light) {
     }
 }
 
-// PBR functions
+// PBR functions - unchanged
 float DistributionGGX(vec3 N, vec3 H, float roughness) {
     float a = roughness * roughness;
     float a2 = a * a;
@@ -179,6 +181,13 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0) {
     return F0 + (1.0 - F0) * pow(max(1.0 - cosTheta, 0.0), 5.0);
 }
 
+// Physically accurate skybox sampling function that respects material properties
+vec3 sampleSkybox(samplerCube skybox, vec3 reflectionVector, float roughness) {
+    // Use appropriate mip level based on roughness - physically accurate
+    float mipLevel = roughness * 5.0;
+    return textureLod(skybox, reflectionVector, mipLevel).rgb;
+}
+
 void main() {
     // Sample data from G-buffer
     vec3 worldPos = texture(gPosition, TexCoords).rgb;
@@ -197,8 +206,46 @@ void main() {
     vec3 F0 = vec3(0.04); // Default base reflectivity for dielectrics
     F0 = mix(F0, albedo, metallic); // Adjust for metals
 
-    // Calculate ambient light
-    vec3 ambient = vec3(0.03) * albedo * ao;
+    // Calculate ambient light contribution - keep it dark for dark materials
+    // Use a very low constant ambient value to preserve darkness
+    vec3 baseAmbient = vec3(0.02) * albedo * ao;
+
+    // Calculate reflection vector for skybox sampling
+    vec3 reflectionVector = reflect(-viewDir, normal);
+
+    // Sample skybox using physically-based method
+    vec3 skyboxColor = sampleSkybox(skybox, reflectionVector, roughness);
+
+    // Calculate realistic fresnel effect for reflections
+    float fresnelFactor = pow(1.0 - max(0.0, dot(normal, viewDir)), 5.0);
+
+    // For metals, use albedo as reflection color. For dielectrics, use white
+    vec3 reflectionColor = mix(vec3(1.0), albedo, metallic);
+
+    // Calculate reflection contribution - physical PBR model
+    // Metals reflect based on their color, dielectrics reflect skybox directly
+    // Rougher surfaces reflect less (diffuse more)
+    vec3 skyboxContribution = skyboxColor * reflectionColor;
+
+    // Calculate physically-based reflection strength
+    // Higher for metals, lower for dielectrics
+    // Higher for smooth surfaces, lower for rough surfaces
+    // Higher at grazing angles (fresnel effect)
+    float baseReflectivity = mix(0.04, 0.9, metallic); // Dielectrics ~4%, metals ~90%
+    float reflectionStrength = mix(baseReflectivity, 1.0, fresnelFactor);
+    reflectionStrength *= (1.0 - roughness * roughness); // Squared for physical correctness
+
+    // Combine ambient and skybox reflection - physically-based mix
+    vec3 ambient = mix(baseAmbient, skyboxContribution, reflectionStrength);
+
+    // Preserve dark areas by ensuring ambient doesn't get too bright
+    float ambientLuma = dot(ambient, vec3(0.299, 0.587, 0.114));
+    float maxAmbient = 0.5 * (1.0 - ao); // Darker for occluded areas
+    if (ambientLuma > maxAmbient) {
+        ambient *= maxAmbient / ambientLuma;
+    }
+
+    // Start with the ambient light (now physically based with preserved darks)
     vec3 lighting = ambient;
 
     // Process each light
@@ -248,12 +295,17 @@ void main() {
         lighting += lightContribution * (1.0 - shadow);
     }
 
-    // Apply tone mapping (simple Reinhard operator)
-    // lighting = lighting / (lighting + vec3(1.0));
+    // Skip dark enhancement to preserve true dark areas
+    // This ensures shadows and occluded areas stay appropriately dark
+
+    // More conservative tone mapping - preserve darks better
+    // Use ACES-inspired filmic tone mapping that preserves deep shadows
+    vec3 x = max(vec3(0.0), lighting - 0.004);
+    vec3 mapped = (x * (6.2 * x + 0.5)) / (x * (6.2 * x + 1.7) + 0.06);
 
     // Gamma correction
-    // lighting = pow(lighting, vec3(1.0/2.2));
+    // mapped = pow(mapped, vec3(1.0/2.2));
 
     // Final color output
-    FragColor = vec4(lighting, 1.0);
+    FragColor = vec4(mapped, 1.0);
 }

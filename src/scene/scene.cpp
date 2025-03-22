@@ -107,15 +107,15 @@ void Scene::loadScene() {
             // Create and configure the material
             Material* goldMaterial = new Material(basicShader);
             goldMaterial->albedoColor = glm::vec4(1.0f);
-            goldMaterial->albedoMap = new Texture(TEXTURE_DIR + "grime/grime.png");
-            goldMaterial->normalMap = new Texture(TEXTURE_DIR + "grime/grime-n.png");
-            goldMaterial->metallicMap = new Texture(TEXTURE_DIR + "grime/grime-m.png");
-            goldMaterial->roughnessMap = new Texture(TEXTURE_DIR + "grime/grime-r.png");
-            goldMaterial->aoMap = new Texture(TEXTURE_DIR + "grime/grime-ao.png");
-            // goldMaterial->heightMap = new Texture(TEXTURE_DIR + "grime/grime-h.png");
-            // goldMaterial->heightScale = 1.0f;
+            goldMaterial->albedoMap = new Texture(TEXTURE_DIR + "gold/gold.png");
+            goldMaterial->normalMap = new Texture(TEXTURE_DIR + "gold/gold-n.png");
+            goldMaterial->metallicMap = new Texture(TEXTURE_DIR + "gold/gold-m.png");
+            goldMaterial->roughnessMap = new Texture(TEXTURE_DIR + "gold/gold-r.png");
+            goldMaterial->aoMap = new Texture(TEXTURE_DIR + "gold/gold-ao.png");
+            // goldMaterial->heightMap = new Texture(TEXTURE_DIR + "gold/gold-h.png");
+            // goldMaterial->heightScale = 0.3f;
             goldMaterial->isDeferred = true;
-            goldMaterial->uvScale = glm::vec2(2.0f);
+            goldMaterial->uvScale = glm::vec2(1.0f);
             wallMesh->material = goldMaterial;
 
             // Attach the mesh to the entity
@@ -131,7 +131,7 @@ void Scene::loadScene() {
     save_planeData.scale = glm::vec3(1.0f, 1.0f, 1.0f);
     GameObject* planeObject = SceneUtils::addGameObjectComponent(registry, planeEntity, save_planeData);
 
-    Mesh* planeMesh = MeshGen::createPlane(5,5,100,100);
+    Mesh* planeMesh = MeshGen::createPlane(2,2,100,100);
     if (planeMesh != nullptr) {
         Material* planeMaterial = new Material(basicShader);
         planeMaterial->albedoColor = glm::vec4(1.0f);
@@ -143,7 +143,7 @@ void Scene::loadScene() {
         // planeMaterial->heightMap = new Texture(TEXTURE_DIR + "grime/grime-h.png");
         // planeMaterial->heightScale = 1.0f;
         planeMaterial->isDeferred = true;
-        planeMaterial->uvScale = glm::vec2(2.0f);
+        planeMaterial->uvScale = glm::vec2(5.0f);
         planeMesh->material = planeMaterial;
         registry.emplace<Mesh*>(planeEntity, planeMesh);
     }
@@ -183,9 +183,9 @@ void Scene::loadScene() {
     // --------------------- Light Circle ---------------------
     int n = 8;
     float circleRadius = 10.0f;
-    float yPosition = 3.0f;
-    createLights(3, circleRadius, yPosition, basicShader);
-    // createAsteroids(n, circleRadius * 10.0f, 0, 1.0f, basicShader);
+    float yPosition = 10.0f;
+    createLights(1, circleRadius, yPosition, basicShader);
+    createAsteroids(n, circleRadius * 10.0f, 0, 1.0f, basicShader);
 
     // Gizmo Cube
     // Box dimensions
@@ -221,7 +221,7 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
         // Light meta data
         SceneData save_lightData;
         save_lightData.name = "Light(" + std::to_string(i) + ")";
-        save_lightData.scale = glm::vec3(0.1f);
+        save_lightData.scale = glm::vec3(0.5f);
         save_lightData.position = glm::vec3(x, yPosition, z);
 
         // Light game object
@@ -262,7 +262,7 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
         SceneUtils::addPointLightComponents(registry, lightEntity, lightData);
 
         // Cube mesh
-        Mesh* lightCube = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
+        Mesh* lightCube = MeshGen::createSphere(25, 25);
         if (lightCube != nullptr) {
             Material* cubeMaterial = new Material(basicShader);
             cubeMaterial->albedoColor = color;
@@ -276,17 +276,20 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
 }
 
 void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHeight, Shader* basicShader) {
-    Mesh* asteroidMesh = ResourceLoader::loadMesh(MODEL_DIR + "cube.obj");
+    Mesh* asteroidMesh = MeshGen::createSphere(25, 25);
     if (!asteroidMesh) {
         return;
     }
 
     Material* asteroidMaterial = new Material(basicShader);
-    asteroidMaterial->albedoColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-    asteroidMaterial->albedoMap = nullptr;
-    asteroidMaterial->normalMap = nullptr;
-    asteroidMaterial->isDeferred = true;
+    asteroidMaterial->albedoColor = glm::vec4(1.0f);
+    asteroidMaterial->albedoMap = new Texture(TEXTURE_DIR + "gold/gold.png");
+    asteroidMaterial->normalMap = new Texture(TEXTURE_DIR + "gold/gold-n.png");
+    asteroidMaterial->metallicMap = new Texture(TEXTURE_DIR + "gold/gold-m.png");
+    asteroidMaterial->roughnessMap = new Texture(TEXTURE_DIR + "gold/gold-r.png");
+    asteroidMaterial->aoMap = new Texture(TEXTURE_DIR + "gold/gold-ao.png");
     asteroidMesh->material = asteroidMaterial;
+    asteroidMaterial->isDeferred = true;
     MeshInstance meshInstance = addMeshInstance(asteroidMesh);
 
     // Randomization setup
@@ -294,7 +297,7 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
     std::mt19937 gen(rd());
     std::uniform_real_distribution<float> posDist(-fieldSize, fieldSize);
     std::uniform_real_distribution<float> heightDist(minHeight, maxHeight);
-    std::uniform_real_distribution<float> scaleDist(0.05f, 0.2f);
+    std::uniform_real_distribution<float> scaleDist(0.25f, 0.25f);
     std::uniform_real_distribution<float> angleDist(0.0f, 360.0f);
     std::uniform_real_distribution<float> colorDist(0.0f, 1.0f);  // For color
     std::uniform_real_distribution<float> intensityDist(1.0f, 4.0f);  // For intensity
@@ -329,7 +332,7 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
         Light asteroidLight;
         asteroidLight.color = glm::vec3(colorDist(gen), colorDist(gen), colorDist(gen));
         asteroidLight.intensity = 25.0f;
-        asteroidLight.radius = 50.0f;
+        asteroidLight.radius = 15.0f;
         asteroidLight.type = LightType::Point;
         asteroidLight.castsShadows = true;
         asteroidLight.isActive = true;
