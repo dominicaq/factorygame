@@ -108,6 +108,11 @@ bool Window::init() {
     glGetIntegerv(GL_MAJOR_VERSION, &major);
     glGetIntegerv(GL_MINOR_VERSION, &minor);
     std::cerr << "[Success] Running OpenGL " << major << "." << minor << " Core Profile\n";
+    if (GLAD_GL_ARB_compute_shader) {
+        std::cerr << "[Success] Compute Shaders are supported!" << std::endl;
+    } else {
+        std::cerr << "[Warning] Compute Shaders are NOT supported." << std::endl;
+    }
     return true;
 }
 

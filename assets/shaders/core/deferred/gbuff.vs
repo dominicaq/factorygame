@@ -20,7 +20,7 @@ out vec3 Bitangent;
 uniform mat4 u_Model;
 uniform mat4 u_View;
 uniform mat4 u_Projection;
-uniform vec2 u_TextureScale;
+uniform vec2 u_uvScale;
 
 void main() {
     // Reconstruct the instance matrix
@@ -38,7 +38,7 @@ void main() {
     FragPos = vec3(modelMatrix * vec4(aPos, 1.0));
 
     // Pass texture coordinates to fragment shader
-    TexCoords = aTexCoords * u_TextureScale;
+    TexCoords = aTexCoords * u_uvScale;
 
     // Calculate the normal matrix (inverse transpose of the model matrix)
     mat3 normalMatrix = transpose(inverse(mat3(modelMatrix)));

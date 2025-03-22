@@ -20,6 +20,9 @@ Renderer::Renderer(config::GraphicsSettings settings, Camera* camera) {
     // Initialize G-Buffer
     m_gBuffer = std::make_unique<Framebuffer>(m_width, m_height, NUM_GATTACHMENTS, true);
 
+    // Init the mesh compute shader
+    m_heightCompute.load(ASSET_DIR "shaders/core/heightmap.comp");
+
     // Make the first mesh instance blank
     m_instanceMeshData.push_back(MeshData{0});
 }
@@ -166,6 +169,11 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic, size_t instanceID) {
     // Assign an ID if not already assigned
     if (mesh->id == SIZE_MAX) {
         mesh->id = isInstance ? instanceID : m_meshData.size();
+    }
+
+    // Modify the mesh by applying its height map
+    if (mesh->material) {
+        applyHeightMapCompute(mesh);
     }
 
     MeshData data = {};
@@ -445,4 +453,78 @@ bool Renderer::applySettings(const config::GraphicsSettings& settings) {
     config = settings;
 
     return requiresRestart;
+}
+
+/*
+* Mesh Pre Processing
+*/
+void Renderer::applyHeightMapCompute(Mesh* mesh) {
+    if (!mesh->material || !mesh->material->heightMap) {
+        return; // No mesh or height map, nothing to do
+    }
+
+    // Define sensible defaults if not set
+    if (mesh->material->heightScale <= 0.0f) {
+        mesh->material->heightScale = 1.0f; // Default to 1.0 if not set or negative
+    }
+
+    if (mesh->material->uvScale.x <= 0.0f || mesh->material->uvScale.y <= 0.0f) {
+        mesh->material->uvScale = glm::vec2(1.0f, 1.0f); // Default to (1,1) if not set properly
+    }
+
+    // Activate compute shader
+    m_heightCompute.use();
+
+    // Create SSBOs
+    GLuint ssboVertexData, ssboUVData;
+    glGenBuffers(1, &ssboVertexData);
+    glGenBuffers(1, &ssboUVData);
+
+    // Set up vertex data SSBO
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssboVertexData);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, mesh->vertices.size() * sizeof(glm::vec3), mesh->vertices.data(), GL_DYNAMIC_COPY);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssboVertexData);
+
+    // Set up UV data SSBO
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssboUVData);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, mesh->uvs.size() * sizeof(glm::vec2), mesh->uvs.data(), GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssboUVData);
+
+    // Unbind the current SSBO to avoid confusion
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    // Bind height map texture
+    mesh->material->heightMap->bind(0);
+    m_heightCompute.setInt("heightMap", 0);
+
+    // Send uniforms to shader
+    m_heightCompute.setFloat("heightScale", mesh->material->heightScale);
+    m_heightCompute.setVec2("uvScale", mesh->material->uvScale);
+
+    // Dispatch compute shader
+    int workGroupSize = 32;
+    GLuint numVertices = static_cast<GLuint>(mesh->vertices.size());
+    GLuint numWorkGroups = (numVertices + workGroupSize - 1) / workGroupSize;
+    glDispatchCompute(numWorkGroups, 1, 1);
+
+    // Ensure execution is complete before reading back data
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+    // Explicitly rebind the vertex buffer before reading from it
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssboVertexData);
+
+    // Now read back the data
+    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, mesh->vertices.size() * sizeof(glm::vec3), mesh->vertices.data());
+
+    // Update normals to reflect the new terrain shape
+    if (mesh->normals.size() == mesh->vertices.size()) {
+        // Recalculate normals based on the displaced vertices
+        // recalculateNormals(mesh);
+    }
+
+    // Clean up
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    glDeleteBuffers(1, &ssboVertexData);
+    glDeleteBuffers(1, &ssboUVData);
+    glUseProgram(0);
 }

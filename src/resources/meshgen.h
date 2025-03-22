@@ -7,9 +7,10 @@
 namespace MeshGen {
     Mesh* createCube();
     Mesh* createQuad(float scale);
-    Mesh* createSphere(float radius, int sectors, int stacks);
+    Mesh* createSphere(unsigned int sectorCount, unsigned int stackCount);
+    Mesh* createPlane(unsigned int resolutionX, unsigned int resolutionY, float width, float height);
     Mesh* createCapsule(float radius, float height, int sectors, int stacks);
-
+    void computeTangentBasis(Mesh* mesh);
     const float* createCubeMapVerts();
 }
 

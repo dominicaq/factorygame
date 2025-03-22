@@ -27,6 +27,7 @@
 
 // Renderer
 #include "renderer/shader.h"
+#include "renderer/computeshader.h"
 #include "renderer/texture.h"
 #include "renderer/renderer.h"
 

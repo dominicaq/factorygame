@@ -18,14 +18,15 @@ struct Material {
     // PBR Textures
     Texture* roughnessMap = nullptr;
     Texture* metallicMap = nullptr;
-    Texture* aoMap = nullptr;  // Ambient Occlusion Map
+    Texture* aoMap = nullptr;
+    Texture* heightMap = nullptr;
+    float heightScale = 1.0f;
 
     // RGB Material properties
     glm::vec4 albedoColor = glm::vec4(1.0f);
-    glm::vec3 specularColor = glm::vec3(1.0f);
 
     // Scale for texture tiling
-    glm::vec2 tileScale = glm::vec2(1.0f, 1.0f);
+    glm::vec2 uvScale = glm::vec2(1.0f, 1.0f);
 
     float shininess = 32.0f;
     float time;
@@ -37,7 +38,6 @@ struct Material {
     Material(Shader* shader)
         : shader(shader),
           albedoColor(glm::vec4(1.0f)),
-          specularColor(glm::vec3(1.0f)),
           shininess(32.0f),
           isDeferred(false)
     {}
@@ -57,8 +57,8 @@ struct Material {
         }
 
         // Set tile amount
-        if (shaderOverride->hasUniform("u_TileScale")) {
-            shaderOverride->setVec2("u_TileScale", tileScale);
+        if (shaderOverride->hasUniform("u_uvScale")) {
+            shaderOverride->setVec2("u_uvScale", uvScale);
         }
 
         // Bind albedo map if it exists, otherwise set default color

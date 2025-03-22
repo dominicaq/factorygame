@@ -1,0 +1,38 @@
+#version 430 core
+
+layout (local_size_x = 32) in;
+
+layout(std430, binding = 0) buffer VertexData {
+    vec3 vertices[];
+};
+
+layout(std430, binding = 1) buffer UVData {
+    vec2 uvs[];
+};
+
+uniform sampler2D heightMap;
+uniform float heightScale;
+uniform vec2 uvScale;
+
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+
+    // Ensure we don't go out of bounds
+    if (index >= vertices.length()) {
+        return;
+    }
+
+    // Get the UV coordinates for this vertex
+    vec2 uv = uvs[index];
+
+    // Apply UV scaling if needed
+    if (uvScale.x != 0.0 && uvScale.y != 0.0) {
+        uv *= uvScale;
+    }
+
+    // Sample the height map using the UV coordinates
+    float height = texture(heightMap, uv).r;
+
+    // Displace only the Y component while preserving X and Z
+    vertices[index].y = height * heightScale;
+}

@@ -8,6 +8,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <filesystem>
 
 /*
 * System
@@ -15,7 +16,10 @@
 std::string ResourceLoader::readFile(const std::string& filePath) {
     std::ifstream file(filePath);
     if (!file.is_open()) {
-        std::cerr << "[Error] ResourceLoader::readFile: Failed to open file: " << filePath << "\n";
+        std::filesystem::path absolutePath = std::filesystem::absolute(filePath);
+        std::cerr << "[Error] ResourceLoader::readFile: Failed to open file: "
+                 << filePath << "\n";
+        std::cerr << "[Error] Absolute path was: " << absolutePath.string() << "\n";
         return "";
     }
 

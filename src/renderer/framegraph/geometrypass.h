@@ -38,7 +38,7 @@ public:
             }
 
             m_gBufferShader.setMat4("u_Model", modelMatrix.matrix);
-            m_gBufferShader.setVec2("u_TextureScale", mesh->material->tileScale);
+            m_gBufferShader.setVec2("u_uvScale", mesh->material->uvScale);
             mesh->material->bind(&m_gBufferShader);
             renderer.draw(mesh);
         });
@@ -57,7 +57,7 @@ public:
 
             // Set the first matrix as the model uniform (for gl_InstanceID == 0)
             m_gBufferShader.setMat4("u_Model", matrices[0]);
-            m_gBufferShader.setVec2("u_TextureScale", meshInstances[meshId]->material->tileScale);
+            m_gBufferShader.setVec2("u_uvScale", meshInstances[meshId]->material->uvScale);
             meshInstances[meshId]->material->bind(&m_gBufferShader);
             renderer.drawInstanced(meshId);
         }

@@ -83,6 +83,13 @@ private:
     std::unique_ptr<Framebuffer> m_shadowAtlas;
 
     /*
+    * Mesh preprocessing
+    */
+    ComputeShader m_heightCompute;
+    // ComputeShader m_meshCompute;
+    void applyHeightMapCompute(Mesh* mesh);
+
+    /*
      * Mesh buffer storage
      */
     struct MeshData {
