@@ -105,18 +105,18 @@ void Scene::loadScene() {
         Mesh* wallMesh = MeshGen::createSphere(25, 25);
         if (wallMesh != nullptr) {
             // Create and configure the material
-            Material* goldMaterial = new Material(basicShader);
-            goldMaterial->albedoColor = glm::vec4(1.0f);
-            goldMaterial->albedoMap = new Texture(TEXTURE_DIR + "gold/gold.png");
-            goldMaterial->normalMap = new Texture(TEXTURE_DIR + "gold/gold-n.png");
-            goldMaterial->metallicMap = new Texture(TEXTURE_DIR + "gold/gold-m.png");
-            goldMaterial->roughnessMap = new Texture(TEXTURE_DIR + "gold/gold-r.png");
-            goldMaterial->aoMap = new Texture(TEXTURE_DIR + "gold/gold-ao.png");
-            // goldMaterial->heightMap = new Texture(TEXTURE_DIR + "gold/gold-h.png");
-            // goldMaterial->heightScale = 0.3f;
-            goldMaterial->isDeferred = true;
-            goldMaterial->uvScale = glm::vec2(1.0f);
-            wallMesh->material = goldMaterial;
+            Material* ballMat = new Material(basicShader);
+            ballMat->albedoColor = glm::vec4(1.0f);
+            ballMat->albedoMap = new Texture(TEXTURE_DIR + "grime/grime.png");
+            ballMat->normalMap = new Texture(TEXTURE_DIR + "grime/grime-n.png");
+            ballMat->metallicMap = new Texture(TEXTURE_DIR + "grime/grime-m.png");
+            ballMat->roughnessMap = new Texture(TEXTURE_DIR + "grime/grime-r.png");
+            ballMat->aoMap = new Texture(TEXTURE_DIR + "grime/grime-ao.png");
+            ballMat->heightMap = new Texture(TEXTURE_DIR + "grime/grime-h.png");
+            ballMat->heightScale = 0.25f;
+            ballMat->isDeferred = true;
+            ballMat->uvScale = glm::vec2(1.0f);
+            wallMesh->material = ballMat;
 
             // Attach the mesh to the entity
             registry.emplace<Mesh*>(ballEntity, wallMesh);
@@ -135,13 +135,13 @@ void Scene::loadScene() {
     if (planeMesh != nullptr) {
         Material* planeMaterial = new Material(basicShader);
         planeMaterial->albedoColor = glm::vec4(1.0f);
-        planeMaterial->albedoMap = new Texture(TEXTURE_DIR + "grime/grime.png");
-        planeMaterial->normalMap = new Texture(TEXTURE_DIR + "grime/grime-n.png");
-        planeMaterial->metallicMap = new Texture(TEXTURE_DIR + "grime/grime-m.png");
-        planeMaterial->roughnessMap = new Texture(TEXTURE_DIR + "grime/grime-r.png");
-        planeMaterial->aoMap = new Texture(TEXTURE_DIR + "grime/grime-ao.png");
-        // planeMaterial->heightMap = new Texture(TEXTURE_DIR + "grime/grime-h.png");
-        // planeMaterial->heightScale = 1.0f;
+        planeMaterial->albedoMap = new Texture(TEXTURE_DIR + "wood/wood.png");
+        planeMaterial->normalMap = new Texture(TEXTURE_DIR + "wood/wood-n.png");
+        planeMaterial->metallicMap = new Texture(TEXTURE_DIR + "wood/wood-m.png");
+        planeMaterial->roughnessMap = new Texture(TEXTURE_DIR + "wood/wood-r.png");
+        planeMaterial->aoMap = new Texture(TEXTURE_DIR + "wood/wood-ao.png");
+        planeMaterial->heightMap = new Texture(TEXTURE_DIR + "wood/wood-h.png");
+        planeMaterial->heightScale = 25.0f;
         planeMaterial->isDeferred = true;
         planeMaterial->uvScale = glm::vec2(5.0f);
         planeMesh->material = planeMaterial;

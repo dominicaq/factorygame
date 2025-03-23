@@ -56,7 +56,11 @@ struct Material {
             shaderOverride->setFloat("u_Time", time);
         }
 
-        // Set tile amount
+        if (shaderOverride->hasUniform("u_HeightScale")) {
+            shaderOverride->setFloat("u_HeightScale", heightScale);
+        }
+
+        // Set uv scale for tiling
         if (shaderOverride->hasUniform("u_uvScale")) {
             shaderOverride->setVec2("u_uvScale", uvScale);
         }
@@ -130,6 +134,21 @@ struct Material {
         } else {
             if (shaderOverride->hasUniform("u_HasAOMap")) {
                 shaderOverride->setBool("u_HasAOMap", false);
+            }
+        }
+
+        if (heightMap) {
+            if (shaderOverride->hasUniform("u_HeightMap")) {
+                shaderOverride->setInt("u_HeightMap", 4);
+                aoMap->bind(5);
+            }
+
+            if (shaderOverride->hasUniform("u_HasHeightMap")) {
+                shaderOverride->setBool("u_HasHeightMap", true);
+            }
+        } else {
+            if (shaderOverride->hasUniform("u_HasHeightMap")) {
+                shaderOverride->setBool("u_HasHeightMap", false);
             }
         }
     }

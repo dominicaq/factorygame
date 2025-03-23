@@ -171,10 +171,10 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic, size_t instanceID) {
         mesh->id = isInstance ? instanceID : m_meshData.size();
     }
 
-    // Modify the mesh by applying its height map
-    if (mesh->material) {
-        applyHeightMapCompute(mesh);
-    }
+    // // Modify the mesh by applying its height map
+    // if (mesh->material) {
+    //     applyHeightMapCompute(mesh);
+    // }
 
     MeshData data = {};
     glGenVertexArrays(1, &data.VAO);
