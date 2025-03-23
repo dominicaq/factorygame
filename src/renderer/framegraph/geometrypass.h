@@ -28,6 +28,7 @@ public:
 
         // Use Geometry Pass Shader
         m_gBufferShader.use();
+        m_gBufferShader.setVec3("u_ViewPos", camera->getPosition());
         m_gBufferShader.setMat4("u_View", viewMatrix);
         m_gBufferShader.setMat4("u_Projection", camera->getProjectionMatrix());
 

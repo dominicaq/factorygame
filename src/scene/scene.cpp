@@ -96,24 +96,24 @@ void Scene::loadScene() {
         // Set up the game object data
         SceneData save_goldWall;
         save_goldWall.name = "Gold Ball";
-        save_goldWall.position = glm::vec3(-10.0f + i * ballSpace, 1.0f, -10.0f); // Adjust position for each ball
+        save_goldWall.position = glm::vec3(-10.0f + i * ballSpace, 1.0f, -10.0f);
         save_goldWall.eulerAngles = glm::vec3(90, 0, 0);
-        save_goldWall.scale = glm::vec3(1.0f); // Adjust size if necessary
+        save_goldWall.scale = glm::vec3(2.0f);
         GameObject* goldWallObject = SceneUtils::addGameObjectComponent(registry, ballEntity, save_goldWall);
 
         // Generate the sphere mesh
-        Mesh* wallMesh = MeshGen::createSphere(25, 25);
+        Mesh* wallMesh = MeshGen::createSphere(50, 50);
         if (wallMesh != nullptr) {
             // Create and configure the material
             Material* ballMat = new Material(basicShader);
             ballMat->albedoColor = glm::vec4(1.0f);
-            ballMat->albedoMap = new Texture(TEXTURE_DIR + "grime/grime.png");
-            ballMat->normalMap = new Texture(TEXTURE_DIR + "grime/grime-n.png");
-            ballMat->metallicMap = new Texture(TEXTURE_DIR + "grime/grime-m.png");
-            ballMat->roughnessMap = new Texture(TEXTURE_DIR + "grime/grime-r.png");
-            ballMat->aoMap = new Texture(TEXTURE_DIR + "grime/grime-ao.png");
-            ballMat->heightMap = new Texture(TEXTURE_DIR + "grime/grime-h.png");
-            ballMat->heightScale = 0.25f;
+            ballMat->albedoMap = new Texture(TEXTURE_DIR + "tiles/tiles.tga");
+            ballMat->normalMap = new Texture(TEXTURE_DIR + "tiles/tiles-n.tga");
+            ballMat->metallicMap = new Texture(TEXTURE_DIR + "tiles/tiles-m.tga");
+            // ballMat->roughnessMap = new Texture(TEXTURE_DIR + "tiles/tiles-r.tga");
+            ballMat->aoMap = new Texture(TEXTURE_DIR + "tiles/tiles-ao.tga");
+            // ballMat->heightMap = new Texture(TEXTURE_DIR + "tiles/tiles-h.tga");
+            ballMat->heightScale = 0.01f;
             ballMat->isDeferred = true;
             ballMat->uvScale = glm::vec2(1.0f);
             wallMesh->material = ballMat;
@@ -128,6 +128,7 @@ void Scene::loadScene() {
     SceneData save_planeData;
     save_planeData.name = "Ground Plane";
     save_planeData.position = glm::vec3(0.0f, -1.1f, 0.0f);
+    save_planeData.eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
     save_planeData.scale = glm::vec3(1.0f, 1.0f, 1.0f);
     GameObject* planeObject = SceneUtils::addGameObjectComponent(registry, planeEntity, save_planeData);
 
@@ -135,15 +136,15 @@ void Scene::loadScene() {
     if (planeMesh != nullptr) {
         Material* planeMaterial = new Material(basicShader);
         planeMaterial->albedoColor = glm::vec4(1.0f);
-        planeMaterial->albedoMap = new Texture(TEXTURE_DIR + "wood/wood.png");
-        planeMaterial->normalMap = new Texture(TEXTURE_DIR + "wood/wood-n.png");
-        planeMaterial->metallicMap = new Texture(TEXTURE_DIR + "wood/wood-m.png");
-        planeMaterial->roughnessMap = new Texture(TEXTURE_DIR + "wood/wood-r.png");
-        planeMaterial->aoMap = new Texture(TEXTURE_DIR + "wood/wood-ao.png");
-        planeMaterial->heightMap = new Texture(TEXTURE_DIR + "wood/wood-h.png");
-        planeMaterial->heightScale = 25.0f;
+        planeMaterial->albedoMap = new Texture(TEXTURE_DIR + "tiles/tiles.tga");
+        planeMaterial->normalMap = new Texture(TEXTURE_DIR + "tiles/tiles-n.tga");
+        planeMaterial->metallicMap = new Texture(TEXTURE_DIR + "tiles/tiles-m.tga");
+        // planeMaterial->roughnessMap = new Texture(TEXTURE_DIR + "tiles/tiles-r.tga");
+        planeMaterial->aoMap = new Texture(TEXTURE_DIR + "tiles/tiles-ao.tga");
+        planeMaterial->heightMap = new Texture(TEXTURE_DIR + "tiles/tiles-h.tga");
+        planeMaterial->heightScale = 0.05f;
         planeMaterial->isDeferred = true;
-        planeMaterial->uvScale = glm::vec2(5.0f);
+        planeMaterial->uvScale = glm::vec2(4.0f);
         planeMesh->material = planeMaterial;
         registry.emplace<Mesh*>(planeEntity, planeMesh);
     }

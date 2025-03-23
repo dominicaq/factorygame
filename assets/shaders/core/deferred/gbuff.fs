@@ -11,9 +11,11 @@ in vec2 TexCoords;
 in vec3 Normal;
 in vec3 Tangent;
 in vec3 Bitangent;
-in vec3 ViewPos;   // View position passed from vertex shader
+// Parallax Mapping
+in vec3 TangentViewPos;
 in vec3 TangentFragPos;
 
+// PBR Materials
 uniform vec4 u_AlbedoColor;
 uniform sampler2D u_AlbedoMap;
 
@@ -38,8 +40,12 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir)
     const float maxLayers = 32;
     float numLayers = mix(maxLayers, minLayers, abs(dot(vec3(0.0, 0.0, 1.0), viewDir)));
     float layerDepth = 1.0 / numLayers;
+
+    float curvatureFactor = clamp(dot(Normal, vec3(0.0, 0.0, 1.0)), 0.5, 1.0);
+    float adjustedHeightScale = u_HeightScale * curvatureFactor;
+
     float currentLayerDepth = 0.0;
-    vec2 P = viewDir.xy / viewDir.z * u_HeightScale;
+    vec2 P = viewDir.xy / viewDir.z * adjustedHeightScale;
     vec2 deltaTexCoords = P / numLayers;
 
     vec2 currentTexCoords = texCoords;
@@ -61,13 +67,20 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir)
     return finalTexCoords;
 }
 
-void main() {
-    vec2 texCoords = TexCoords;
+// Apply tiling to texture coordinates
+vec2 applyTiling(vec2 texCoords) {
+    vec2 scaledCoords = texCoords * u_uvScale;
+    return fract(scaledCoords);
+}
 
-    // Use the passed view position from the vertex shader
+void main() {
+    // Apply scaling and tiling to base texture coordinates
+    vec2 texCoords = applyTiling(TexCoords);
+
     if (u_HasHeightMap) {
-        vec3 viewDir = normalize(ViewPos - FragPos);  // Calculate view direction
-        texCoords = ParallaxMapping(TexCoords, viewDir);
+        vec3 viewDir = normalize(TangentViewPos - TangentFragPos);
+        texCoords = ParallaxMapping(texCoords, viewDir);
+        texCoords = fract(texCoords);
     }
 
     gPosition = FragPos;
@@ -82,14 +95,13 @@ void main() {
 
     gNormal = mappedNormal;
 
-    vec3 albedo = texture(u_AlbedoMap, texCoords).rgb * u_AlbedoColor.xyz;
+    vec3 albedo = texture(u_AlbedoMap, texCoords).rgb * u_AlbedoColor.rgb;
     gAlbedo.rgb = albedo;
     gAlbedo.a = 1.0;
 
     float metallic = u_HasMetallicMap ? texture(u_MetallicMap, texCoords).r : 0.0;
     float roughness = u_HasRoughnessMap ? texture(u_RoughnessMap, texCoords).r : 1.0;
     float ao = u_HasAOMap ? texture(u_AOMap, texCoords).r : 1.0;
-    float height = u_HasHeightMap ? texture(u_HeightMap, texCoords).r : 1.0;
 
-    gPBRParams = vec4(metallic, roughness, ao, height);
+    gPBRParams = vec4(metallic, roughness, ao, 1.0);
 }

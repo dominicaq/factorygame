@@ -14,9 +14,10 @@ out vec2 TexCoords;
 out vec3 Normal;
 out vec3 Tangent;
 out vec3 Bitangent;
-out vec3 ViewPos;   // View position to pass to fragment shader
 out vec3 TangentFragPos;
+out vec3 TangentViewPos;
 
+uniform vec3 u_ViewPos;
 uniform mat4 u_Model;
 uniform mat4 u_View;
 uniform mat4 u_Projection;
@@ -35,17 +36,13 @@ void main() {
     FragPos = vec3(modelMatrix * vec4(aPos, 1.0));
     TexCoords = aTexCoords * u_uvScale;
 
-    mat3 normalMatrix = transpose(inverse(mat3(modelMatrix)));
-
-    Normal = normalize(normalMatrix * aNormal);
-    Tangent = normalize(normalMatrix * aTangent);
+    Normal = normalize(mat3(modelMatrix) * aNormal);
+    Tangent = normalize(mat3(modelMatrix) * aTangent);
     Bitangent = normalize(cross(Normal, Tangent));
-    mat3 TBN = transpose(mat3(Tangent, Bitangent, Normal));
+    mat3 TBN = mat3(Tangent, Bitangent, Normal);
 
     // Compute the view position in world space
-    vec3 viewPos = inverse(u_View)[3].xyz;
-    ViewPos = viewPos;  // Pass the camera position in world space
-
+    TangentViewPos = TBN * u_ViewPos;
     TangentFragPos = TBN * FragPos;
 
     gl_Position = u_Projection * u_View * vec4(FragPos, 1.0);
