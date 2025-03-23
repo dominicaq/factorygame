@@ -107,12 +107,12 @@ void Scene::loadScene() {
             // Create and configure the material
             Material* ballMat = new Material(basicShader);
             ballMat->albedoColor = glm::vec4(1.0f);
-            ballMat->albedoMap = new Texture(TEXTURE_DIR + "tiles/tiles.tga");
-            ballMat->normalMap = new Texture(TEXTURE_DIR + "tiles/tiles-n.tga");
-            ballMat->metallicMap = new Texture(TEXTURE_DIR + "tiles/tiles-m.tga");
-            // ballMat->roughnessMap = new Texture(TEXTURE_DIR + "tiles/tiles-r.tga");
-            ballMat->aoMap = new Texture(TEXTURE_DIR + "tiles/tiles-ao.tga");
-            // ballMat->heightMap = new Texture(TEXTURE_DIR + "tiles/tiles-h.tga");
+            ballMat->albedoMap = new Texture(TEXTURE_DIR + "gold/gold.png");
+            ballMat->normalMap = new Texture(TEXTURE_DIR + "gold/gold-n.png");
+            ballMat->metallicMap = new Texture(TEXTURE_DIR + "gold/gold-m.png");
+            ballMat->roughnessMap = new Texture(TEXTURE_DIR + "gold/gold-r.png");
+            // ballMat->aoMap = new Texture(TEXTURE_DIR + "gold/gold-ao.png");
+            // ballMat->heightMap = new Texture(TEXTURE_DIR + "gold/gold-h.ong");
             ballMat->heightScale = 0.01f;
             ballMat->isDeferred = true;
             ballMat->uvScale = glm::vec2(1.0f);
@@ -183,10 +183,15 @@ void Scene::loadScene() {
 
     // --------------------- Light Circle ---------------------
     int n = 8;
-    float circleRadius = 10.0f;
+    float circleRadius = 20.0f;
     float yPosition = 10.0f;
-    createLights(1, circleRadius, yPosition, basicShader);
-    createAsteroids(n, circleRadius * 10.0f, 0, 1.0f, basicShader);
+    createLights(3, circleRadius, yPosition, basicShader);
+
+    // Light balls
+    createAsteroids(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
+
+    // Normal balls
+    createAsteroids(100, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
 
     // Gizmo Cube
     // Box dimensions
@@ -255,7 +260,7 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
 
         lightData.color = color;
         lightData.intensity = 5.0f; // Lower intensity for softer lighting
-        lightData.radius = 100.0f;  // Radius of the light
+        lightData.point.radius = 35.0f;  // Radius of the light
         lightData.type = LightType::Point; // Point light
         lightData.castsShadows = true;   // Enable shadows if necessary
         lightData.isActive = true;       // Ensure the light is active
@@ -276,7 +281,7 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
     }
 }
 
-void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHeight, Shader* basicShader) {
+void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHeight, Shader* basicShader, bool castShadows) {
     Mesh* asteroidMesh = MeshGen::createSphere(25, 25);
     if (!asteroidMesh) {
         return;
@@ -330,14 +335,16 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
         asteroidObject->addScript<BouncingMotion>();
 
         // Add a point light to each asteroid
-        Light asteroidLight;
-        asteroidLight.color = glm::vec3(colorDist(gen), colorDist(gen), colorDist(gen));
-        asteroidLight.intensity = 25.0f;
-        asteroidLight.radius = 15.0f;
-        asteroidLight.type = LightType::Point;
-        asteroidLight.castsShadows = true;
-        asteroidLight.isActive = true;
-        SceneUtils::addPointLightComponents(registry, asteroidEntity, asteroidLight);
+        if (castShadows) {
+            Light asteroidLight;
+            asteroidLight.color = glm::vec3(colorDist(gen), colorDist(gen), colorDist(gen));
+            asteroidLight.intensity = 25.0f;
+            asteroidLight.point.radius = 15.0f;
+            asteroidLight.type = LightType::Point;
+            asteroidLight.castsShadows = true;
+            asteroidLight.isActive = true;
+            SceneUtils::addPointLightComponents(registry, asteroidEntity, asteroidLight);
+        }
 
         registry.emplace<MeshInstance>(asteroidEntity, meshInstance);
     }

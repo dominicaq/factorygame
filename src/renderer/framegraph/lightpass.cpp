@@ -11,10 +11,10 @@ void LightPass::setup() {
     }
 
     // Generate and bind SSBOs
-    glGenBuffers(1, &m_lightSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_lightSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_LIGHTS * sizeof(LightSSBO), nullptr, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_lightSSBO);
+    glGenBuffers(1, &m_pointSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_pointSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_LIGHTS * sizeof(PointLightSSBO), nullptr, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_pointSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     glGenBuffers(1, &m_lightMatrixSSBO);
@@ -57,60 +57,73 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     Camera* camera = renderer.getCamera();
     m_lightPassShader.setVec3("u_CameraPosition", camera->getPosition());
 
+    int lightCount = 0;
     int currentMatrixIndex = 0;
     int currentMapIndex = 0;
     registry.view<Light, Position>().each([&](entt::entity entity, const Light& lightComponent, const Position& positionComponent) {
-        LightSSBO lightSSBO{};
-        lightSSBO.position = positionComponent.position;
-        lightSSBO.radius = lightComponent.radius;
-        lightSSBO.color = lightComponent.color;
-        lightSSBO.intensity = lightComponent.intensity;
-        lightSSBO.isPointLight = (lightComponent.type == LightType::Point) ? 1 : 0;
-        lightSSBO.castShadow = lightComponent.castsShadows ? 1 : 0;
-        lightSSBO.lightMatrixIndex = currentMatrixIndex;
-        lightSSBO.shadowMapIndex = currentMapIndex;
+        lightCount += 1;
 
-        // Retrieve the shadow map handle
-        if (lightComponent.depthHandle == 0 || !lightComponent.castsShadows) {
-            m_lightData.push_back(lightSSBO);
-            return;
+        switch (lightComponent.type) {
+            case LightType::Spot:
+                // Handle spot light
+                break;
+
+            case LightType::Directional:
+                // Handle directional light
+                break;
+
+            case LightType::Point:
+                PointLightSSBO pointSSBO{};
+                pointSSBO.position = positionComponent.position;
+                pointSSBO.radius = lightComponent.point.radius;
+                pointSSBO.color = lightComponent.color;
+                pointSSBO.intensity = lightComponent.intensity;
+                pointSSBO.castShadow = lightComponent.castsShadows ? 1 : 0;
+                pointSSBO.lightMatrixIndex = currentMatrixIndex;
+                pointSSBO.shadowMapIndex = currentMapIndex;
+
+                // Retrieve the shadow map handle
+                if (lightComponent.depthHandle == 0 || !lightComponent.castsShadows) {
+                    m_pointData.push_back(pointSSBO);
+                    return;
+                }
+
+                m_shadowMapHandles.push_back(lightComponent.depthHandle);
+                currentMapIndex += 1;
+
+                if (registry.all_of<LightSpaceMatrixCube>(entity)) {
+                    const auto& cubeMatrices = registry.get<LightSpaceMatrixCube>(entity);
+                    for (int i = 0; i < 6; i++) {
+                        m_lightMatrixData.push_back(cubeMatrices.matrices[i]);
+                    }
+                    currentMatrixIndex += 6;
+                }
+                m_pointData.push_back(pointSSBO);
+                break;
         }
 
-        m_shadowMapHandles.push_back(lightComponent.depthHandle);
-        currentMapIndex += 1;
-
-        // Check if the entity has LightSpaceMatrix (single shadow matrix)
-        if (registry.all_of<LightSpaceMatrix>(entity)) {
-            const auto& singleMatrix = registry.get<LightSpaceMatrix>(entity);
-            m_lightMatrixData.push_back(singleMatrix.matrix);
-            currentMatrixIndex += 1;
-        }
-        // Check if the entity has LightSpaceMatrixCube (6 matrices for cubemap shadows)
-        else if (registry.all_of<LightSpaceMatrixCube>(entity)) {
-            const auto& cubeMatrices = registry.get<LightSpaceMatrixCube>(entity);
-            for (int i = 0; i < 6; i++) {
-                m_lightMatrixData.push_back(cubeMatrices.matrices[i]);
-            }
-            currentMatrixIndex += 6;
-        }
-
-        m_lightData.push_back(lightSSBO);
+        // // Check if the entity has LightSpaceMatrix (single shadow matrix)
+        // if (registry.all_of<LightSpaceMatrix>(entity)) {
+        //     const auto& singleMatrix = registry.get<LightSpaceMatrix>(entity);
+        //     m_lightMatrixData.push_back(singleMatrix.matrix);
+        //     currentMatrixIndex += 1;
+        // }
     });
 
     // Set shader parameters
-    int numLights = std::min(static_cast<int>(m_lightData.size()), MAX_LIGHTS);
+    int numLights = std::min(lightCount, MAX_LIGHTS);
     m_lightPassShader.setInt("numLights", numLights);
-    if (m_lightData.size() > MAX_LIGHTS || m_lightMatrixData.size() > MAX_SHADOW_MAPS * 6) {
+    if (m_pointData.size() > MAX_LIGHTS || m_lightMatrixData.size() > MAX_SHADOW_MAPS * 6) {
         std::cerr << "[Warning] LightPass::execute: Light SSBO overflow! "
-        << "Lights: " << m_lightData.size() << "/" << MAX_LIGHTS
+        << "Lights: " << m_pointData.size() << "/" << MAX_LIGHTS
         << ", Shadow maps: " << m_lightMatrixData.size() << "/" << MAX_SHADOW_MAPS * 6
         << ". Ensure you stay within engine constraints.\n";
     }
 
     // Bind the SSBO and upload light data
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_lightSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, m_lightData.size() * sizeof(LightSSBO), m_lightData.data(), GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_lightSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_pointSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, m_pointData.size() * sizeof(PointLightSSBO), m_pointData.data(), GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_pointSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_lightMatrixSSBO);
@@ -156,7 +169,7 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     // Clear the vectors but keep reserved memory for next frame
     m_lightMatrixData.resize(0);
     m_shadowMapHandles.resize(0);
-    m_lightData.resize(0);
+    m_pointData.resize(0);
 
     // Restore OpenGL states
     glDisable(GL_BLEND);

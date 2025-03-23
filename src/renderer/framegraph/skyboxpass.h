@@ -11,12 +11,12 @@ public:
         std::string skyboxVertexPath = ASSET_DIR "shaders/core/skybox.vs";
         std::string skyboxFragmentPath = ASSET_DIR "shaders/core/skybox.fs";
         std::vector<std::string> faces = {
-            ASSET_DIR "textures/skyboxes/bspace/1.png",
-            ASSET_DIR "textures/skyboxes/bspace/3.png",
-            ASSET_DIR "textures/skyboxes/bspace/5.png",
-            ASSET_DIR "textures/skyboxes/bspace/6.png",
-            ASSET_DIR "textures/skyboxes/bspace/2.png",
-            ASSET_DIR "textures/skyboxes/bspace/4.png"
+            ASSET_DIR "textures/skyboxes/bspace/1.png", // Left (-X)
+            ASSET_DIR "textures/skyboxes/bspace/3.png", // Back (-Z)
+            ASSET_DIR "textures/skyboxes/bspace/5.png", // Bottom (-Y)
+            ASSET_DIR "textures/skyboxes/bspace/6.png", // Top (+Y)
+            ASSET_DIR "textures/skyboxes/bspace/2.png", // Front (+Z)
+            ASSET_DIR "textures/skyboxes/bspace/4.png"  // Right (+X)
         };
 
         if (!m_skyboxShader.load(skyboxVertexPath, skyboxFragmentPath)) {

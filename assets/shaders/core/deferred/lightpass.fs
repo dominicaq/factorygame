@@ -18,14 +18,14 @@ uniform vec3 u_CameraPosition;
 uniform samplerCube skybox;
 
 // SSBO for lights
-struct Light {
+struct PointLight {
     vec3 position; float radius; // 16 bytes
     vec3 color; float intensity; // 16 bytes
-    int isPointLight; int castShadow; int lightMatrixIndex; int shadowMapIndex; // 16 bytes
+    int castShadow;  int shadowMapIndex; int lightMatrixIndex; int _padding; // 16 bytes
 };
 
 layout(std430, binding = 0) buffer LightBuffer {
-    Light lights[];
+    PointLight lights[];
 };
 
 // SSBO for light matrices
@@ -40,7 +40,7 @@ uniform sampler2D shadowMaps[20];
 // Constants
 const float PI = 3.14159265359;
 
-float calculateShadow(vec3 fragPos, Light light) {
+float calculatePointShadow(vec3 fragPos, PointLight light) {
     if (light.castShadow == 0) return 0.0; // No shadow
 
     vec3 lightToFrag = fragPos - light.position;
@@ -50,98 +50,72 @@ float calculateShadow(vec3 fragPos, Light light) {
     // Dynamically adjusted bias to reduce shadow acne and peter-panning
     float bias = clamp(0.005 * tan(acos(dot(normal, lightDir))), 0.001, 0.03);
 
-    if (light.isPointLight == 1) {
-        // For point lights, we need to calculate which face of the cubemap we are on
-        vec3 absVec = abs(lightToFrag);
-        float maxComponent = max(max(absVec.x, absVec.y), absVec.z);
+    // For point lights, we need to calculate which face of the cubemap we are on
+    vec3 absVec = abs(lightToFrag);
+    float maxComponent = max(max(absVec.x, absVec.y), absVec.z);
 
-        int faceIndex;
+    int faceIndex;
 
-        // Select the cubemap face based on the dominant axis of the light-to-fragment vector
-        if (absVec.x == maxComponent) {
-            faceIndex = (lightToFrag.x > 0.0) ? 0 : 1; // +X or -X
-        } else if (absVec.y == maxComponent) {
-            faceIndex = (lightToFrag.y > 0.0) ? 2 : 3; // +Y or -Y
-        } else {
-            faceIndex = (lightToFrag.z > 0.0) ? 4 : 5; // +Z or -Z
-        }
-
-        // Use the correct matrix for the selected face
-        mat4 lightMatrix = lightMatrices[light.lightMatrixIndex + faceIndex];
-
-        // Transform to light space
-        vec4 fragPosLightSpace = lightMatrix * vec4(fragPos, 1.0);
-        vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-        projCoords = projCoords * 0.5 + 0.5; // Convert to [0,1] range
-
-        if (projCoords.x < 0.0 || projCoords.x > 1.0 ||
-            projCoords.y < 0.0 || projCoords.y > 1.0 ||
-            projCoords.z < 0.0 || projCoords.z > 1.0) {
-            return 0.0;
-        }
-
-        // Calculate face width with inset padding to avoid bleeding
-        float faceWidth = 1.0 / 6.0;
-
-        // Add a small inset to avoid sampling across face boundaries
-        float inset = 0.001; // Small value to move sampling away from edges
-
-        // Scale down the UV coordinates within each face to avoid edge sampling
-        float scaledX = projCoords.x * (1.0 - 2.0 * inset) + inset;
-
-        // Calculate atlas coordinates with padding between faces
-        vec2 atlasCoords = vec2(
-            scaledX * faceWidth + faceIndex * faceWidth,
-            projCoords.y
-        );
-
-        // PCF Sampling - ensure we don't sample across face boundaries
-        float shadowFactor = 0.0;
-        int kernelSize = 3;
-        float samples = float(kernelSize * kernelSize);
-        vec2 texelSize = 1.0 / vec2(textureSize(shadowMaps[light.shadowMapIndex], 0));
-
-        // Calculate the maximum allowed offset to stay within face boundaries
-        float maxOffsetX = faceWidth * 0.5 - inset * 2.0;
-
-        for (int x = -1; x <= 1; ++x) {
-            for (int y = -1; y <= 1; ++y) {
-                // Limit the X offset to stay within current face
-                float limitedOffsetX = clamp(float(x) * texelSize.x, -maxOffsetX, maxOffsetX);
-                vec2 offset = vec2(limitedOffsetX, float(y) * texelSize.y);
-
-                float depthSample = texture(shadowMaps[light.shadowMapIndex], atlasCoords + offset).r;
-                shadowFactor += (projCoords.z - bias > depthSample) ? 1.0 : 0.0;
-            }
-        }
-
-        shadowFactor /= samples;
-        return shadowFactor;
+    // Select the cubemap face based on the dominant axis of the light-to-fragment vector
+    if (absVec.x == maxComponent) {
+        faceIndex = (lightToFrag.x > 0.0) ? 0 : 1; // +X or -X
+    } else if (absVec.y == maxComponent) {
+        faceIndex = (lightToFrag.y > 0.0) ? 2 : 3; // +Y or -Y
     } else {
-        // Directional/spot lights - use the correct matrix index
-        mat4 lightMatrix = lightMatrices[light.lightMatrixIndex];
-        vec4 fragPosLightSpace = lightMatrix * vec4(fragPos, 1.0);
-        vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-        projCoords = projCoords * 0.5 + 0.5;
-
-        if (projCoords.z < 0.0 || projCoords.z > 1.0) return 0.0;
-
-        float shadowFactor = 0.0;
-        int kernelSize = 3;
-        float samples = float(kernelSize * kernelSize);
-        vec2 texelSize = 1.0 / vec2(textureSize(shadowMaps[light.shadowMapIndex], 0));
-
-        for (int x = -1; x <= 1; ++x) {
-            for (int y = -1; y <= 1; ++y) {
-                vec2 offset = vec2(x, y) * texelSize;
-                float depthSample = texture(shadowMaps[light.shadowMapIndex], projCoords.xy + offset).r;
-                shadowFactor += (projCoords.z - bias > depthSample) ? 1.0 : 0.0;
-            }
-        }
-
-        shadowFactor /= samples;
-        return shadowFactor;
+        faceIndex = (lightToFrag.z > 0.0) ? 4 : 5; // +Z or -Z
     }
+
+    // Use the correct matrix for the selected face
+    mat4 lightMatrix = lightMatrices[light.lightMatrixIndex + faceIndex];
+
+    // Transform to light space
+    vec4 fragPosLightSpace = lightMatrix * vec4(fragPos, 1.0);
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    projCoords = projCoords * 0.5 + 0.5; // Convert to [0,1] range
+
+    if (projCoords.x < 0.0 || projCoords.x > 1.0 ||
+        projCoords.y < 0.0 || projCoords.y > 1.0 ||
+        projCoords.z < 0.0 || projCoords.z > 1.0) {
+        return 0.0;
+    }
+
+    // Calculate face width with inset padding to avoid bleeding
+    float faceWidth = 1.0 / 6.0;
+
+    // Add a small inset to avoid sampling across face boundaries
+    float inset = 0.001; // Small value to move sampling away from edges
+
+    // Scale down the UV coordinates within each face to avoid edge sampling
+    float scaledX = projCoords.x * (1.0 - 2.0 * inset) + inset;
+
+    // Calculate atlas coordinates with padding between faces
+    vec2 atlasCoords = vec2(
+        scaledX * faceWidth + faceIndex * faceWidth,
+        projCoords.y
+    );
+
+    // PCF Sampling - ensure we don't sample across face boundaries
+    float shadowFactor = 0.0;
+    int kernelSize = 3;
+    float samples = float(kernelSize * kernelSize);
+    vec2 texelSize = 1.0 / vec2(textureSize(shadowMaps[light.shadowMapIndex], 0));
+
+    // Calculate the maximum allowed offset to stay within face boundaries
+    float maxOffsetX = faceWidth * 0.5 - inset * 2.0;
+
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            // Limit the X offset to stay within current face
+            float limitedOffsetX = clamp(float(x) * texelSize.x, -maxOffsetX, maxOffsetX);
+            vec2 offset = vec2(limitedOffsetX, float(y) * texelSize.y);
+
+            float depthSample = texture(shadowMaps[light.shadowMapIndex], atlasCoords + offset).r;
+            shadowFactor += (projCoords.z - bias > depthSample) ? 1.0 : 0.0;
+        }
+    }
+
+    shadowFactor /= samples;
+    return shadowFactor;
 }
 
 // PBR functions - unchanged
@@ -250,7 +224,7 @@ void main() {
 
     // Process each light
     for (int i = 0; i < numLights; ++i) {
-        Light light = lights[i];
+        PointLight light = lights[i];
         vec3 lightVec = light.position - worldPos;
         float distance = length(lightVec);
         vec3 lightDir = normalize(lightVec);
@@ -262,7 +236,7 @@ void main() {
         if (attenuation <= 0.0) continue;
 
         // Calculate shadow for this light
-        float shadow = calculateShadow(worldPos, light);
+        float shadow = calculatePointShadow(worldPos, light);
 
         // Skip further calculations if fully in shadow
         if (shadow >= 1.0) continue;

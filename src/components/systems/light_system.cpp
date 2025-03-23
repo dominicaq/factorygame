@@ -11,7 +11,7 @@ void LightSystem::updateShadowMatrices() {
         if (light.type == LightType::Point) {
             // Get the LightSpaceMatrixCube component
             auto* lightSpaceCube = m_registry.try_get<LightSpaceMatrixCube>(entity);
-            updatePointLightMatrices(*lightSpaceCube, position.position, light.radius);
+            updatePointLightMatrices(*lightSpaceCube, position.position, light.point.radius);
         } else {
             // Get the LightSpaceMatrix and EulerAngles components
             auto* lightSpaceMatrixComponent = m_registry.try_get<LightSpaceMatrix>(entity);
@@ -31,7 +31,7 @@ void LightSystem::updateShadowMatrices() {
             lightSpaceMatrixComponent->matrix = calculateLightSpaceMatrix(
                 position.position,
                 lightDirection,
-                light.type, light.radius);
+                light.type, light.point.radius);
         }
     });
 }
@@ -59,7 +59,7 @@ glm::mat4 LightSystem::calculateLightSpaceMatrix(const glm::vec3& position, cons
             view = glm::lookAt(position - direction * 50.0f, position, glm::vec3(0.0f, 1.0f, 0.0f));
             break;
         }
-        case LightType::Spotlight: {
+        case LightType::Spot: {
             projection = glm::perspective(glm::radians(45.0f), 1.0f, 1.0f, radius);
             view = glm::lookAt(position, position + direction, glm::vec3(0.0f, 1.0f, 0.0f));
             break;

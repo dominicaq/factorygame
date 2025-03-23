@@ -9,21 +9,43 @@
 #define MAX_LIGHTS 1000
 #define MAX_SHADOW_MAPS 20
 
-enum class LightType {
+enum class LightType : uint8_t {
     Point,
-    Spotlight,
+    Spot,
     Directional
 };
 
 struct Light {
-    glm::vec3 color = glm::vec3(1.0f);
-    float intensity = 1.0f;
-    unsigned int depthHandle = 0;
-    float radius = 1.0f;
-    LightType type = LightType::Point;
-    bool castsShadows = false;
-    bool isActive = true;
+    glm::vec3 color;
+    float intensity;
+
+    glm::vec3 position;
+    uint32_t depthHandle;
+
+    glm::vec3 direction;
+    LightType type;
+    bool castsShadows;
+    bool isActive;
+    uint8_t _padding;
+
+    union {
+        struct {
+            float radius;
+            float _pointPadding;
+        } point;
+
+        struct {
+            float innerCutoff;
+            float outerCutoff;
+        } spot;
+
+        struct {
+            float shadowOrthoSize;
+            float _dirPadding;
+        } directional;
+    };
 };
+
 
 struct LightSpaceMatrix {
     glm::mat4 matrix = glm::mat4(1.0f);

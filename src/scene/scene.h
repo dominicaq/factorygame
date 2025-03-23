@@ -74,7 +74,7 @@ public:
     // =========================================================================
     // TODO: TEMP, PENDING REMOVAL
     // =========================================================================
-    void createAsteroids(int n, float fieldSize, float minHeight, float maxHeight, Shader* basicShader);
+    void createAsteroids(int n, float fieldSize, float minHeight, float maxHeight, Shader* basicShader, bool castShadows);
     void createLights(int n, float circleRadius, float yPosition, Shader* basicShader);
 
 private:
