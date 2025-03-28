@@ -60,19 +60,48 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     int lightCount = 0;
     int currentMatrixIndex = 0;
     int currentMapIndex = 0;
-    registry.view<Light, Position>().each([&](entt::entity entity, const Light& lightComponent, const Position& positionComponent) {
+    registry.view<Light, Position, EulerAngles>().each([&](entt::entity entity, const Light& lightComponent, const Position& positionComponent, const EulerAngles& rotationComponent) {
         lightCount += 1;
 
         switch (lightComponent.type) {
-            case LightType::Spot:
-                // Handle spot light
-                break;
+            case LightType::Spot: {
+                SpotLightSSBO spotSSBO{};
+                spotSSBO.position = positionComponent.position;
+                spotSSBO.innerCutoff = lightComponent.spot.innerCutoff;
+                spotSSBO.direction = rotationComponent.euler;
+                spotSSBO.outerCutoff = lightComponent.spot.outerCutoff;
+                spotSSBO.color = lightComponent.color;
+                spotSSBO.intensity = lightComponent.intensity;
 
+                // Shadow data
+                spotSSBO.castShadow = lightComponent.castsShadows ? 1 : 0;
+                spotSSBO.shadowMapIndex = currentMapIndex;
+                spotSSBO.lightMatrixIndex = currentMatrixIndex;
+
+                // No shadow casting, dont need to do anything else
+                if (lightComponent.depthHandle == 0 || !lightComponent.castsShadows) {
+                    m_spotData.push_back(spotSSBO);
+                    return;
+                }
+
+                // Get the shadow map this light created
+                m_shadowMapHandles.push_back(lightComponent.depthHandle);
+                currentMapIndex += 1;
+
+                // Get matrix associated with this light
+                if (registry.all_of<LightSpaceMatrix>(entity)) {
+                    const auto& lightComponent = registry.get<LightSpaceMatrix>(entity);
+                    m_lightMatrixData.push_back(lightComponent.matrix);
+                    currentMatrixIndex += 1;
+                }
+                m_spotData.push_back(spotSSBO);
+                break;
+            }
             case LightType::Directional:
                 // Handle directional light
                 break;
 
-            case LightType::Point:
+            case LightType::Point: {
                 PointLightSSBO pointSSBO{};
                 pointSSBO.position = positionComponent.position;
                 pointSSBO.radius = lightComponent.point.radius;
@@ -88,18 +117,21 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
                     return;
                 }
 
+                // Get the shadow map this light created
                 m_shadowMapHandles.push_back(lightComponent.depthHandle);
                 currentMapIndex += 1;
 
+                // Get matrices associated with this light (6 faces)
                 if (registry.all_of<LightSpaceMatrixCube>(entity)) {
-                    const auto& cubeMatrices = registry.get<LightSpaceMatrixCube>(entity);
+                    const auto& cubeMatrixComponent = registry.get<LightSpaceMatrixCube>(entity);
                     for (int i = 0; i < 6; i++) {
-                        m_lightMatrixData.push_back(cubeMatrices.matrices[i]);
+                        m_lightMatrixData.push_back(cubeMatrixComponent.matrices[i]);
                     }
                     currentMatrixIndex += 6;
                 }
                 m_pointData.push_back(pointSSBO);
                 break;
+            }
         }
 
         // // Check if the entity has LightSpaceMatrix (single shadow matrix)
@@ -170,6 +202,7 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     m_lightMatrixData.resize(0);
     m_shadowMapHandles.resize(0);
     m_pointData.resize(0);
+    m_spotData.resize(0);
 
     // Restore OpenGL states
     glDisable(GL_BLEND);

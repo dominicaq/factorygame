@@ -3,23 +3,21 @@
 LightSystem::LightSystem(entt::registry& registry) : m_registry(registry) {}
 
 void LightSystem::updateShadowMatrices() {
-    m_registry.view<Light, Position>().each([&](auto entity, Light& light, Position& position) {
-        if (!light.castsShadows) {
+    m_registry.view<Light, Position>().each([this](auto entity, Light& light, Position& position) {
+        if (!light.castsShadows || !light.isActive) {
             return; // Skip lights that don't cast shadows
         }
 
-        if (light.type == LightType::Point) {
-            // Get the LightSpaceMatrixCube component
-            auto* lightSpaceCube = m_registry.try_get<LightSpaceMatrixCube>(entity);
-            updatePointLightMatrices(*lightSpaceCube, position.position, light.point.radius);
-        } else {
-            // Get the LightSpaceMatrix and EulerAngles components
-            auto* lightSpaceMatrixComponent = m_registry.try_get<LightSpaceMatrix>(entity);
-            auto* eulerAnglesComponent = m_registry.try_get<EulerAngles>(entity);
+        if (light.type == LightType::Point && m_registry.all_of<LightSpaceMatrixCube>(entity)) {
+            LightSpaceMatrixCube& lightSpaceCube = m_registry.get<LightSpaceMatrixCube>(entity);
+            updatePointLightMatrices(lightSpaceCube, position.position, light.point.radius);
+        } else if (m_registry.all_of<LightSpaceMatrix, EulerAngles>(entity)) {
+            LightSpaceMatrix& lightSpaceMatrix = m_registry.get<LightSpaceMatrix>(entity);
+            EulerAngles& eulerAngles = m_registry.get<EulerAngles>(entity);
 
             glm::vec3 lightDirection;
-            float pitch = glm::radians(eulerAnglesComponent->euler.x);
-            float yaw = glm::radians(eulerAnglesComponent->euler.y);
+            float pitch = glm::radians(eulerAngles.euler.x);
+            float yaw = glm::radians(eulerAngles.euler.y);
 
             // Calculate the forward direction
             lightDirection.x = cos(pitch) * sin(yaw);
@@ -28,10 +26,11 @@ void LightSystem::updateShadowMatrices() {
             lightDirection = glm::normalize(lightDirection);
 
             // Update the light space matrix
-            lightSpaceMatrixComponent->matrix = calculateLightSpaceMatrix(
+            lightSpaceMatrix.matrix = calculateLightSpaceMatrix(
                 position.position,
                 lightDirection,
-                light.type, light.point.radius);
+                light
+            );
         }
     });
 }
@@ -48,23 +47,35 @@ void LightSystem::updatePointLightMatrices(LightSpaceMatrixCube& lightSpaceCube,
     lightSpaceCube.matrices[5] = projection * glm::lookAt(position, position + glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f)); // Back face (-Z)
 }
 
-glm::mat4 LightSystem::calculateLightSpaceMatrix(const glm::vec3& position, const glm::vec3& direction, LightType type, float radius) {
+glm::mat4 LightSystem::calculateLightSpaceMatrix(const glm::vec3& position, const glm::vec3& direction, const Light& light) {
     glm::mat4 projection(1.0f);
     glm::mat4 view(1.0f);
 
-    switch (type) {
+    // Compute an appropriate up vector
+    glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), direction));
+    glm::vec3 up = glm::normalize(glm::cross(direction, right));
+
+    switch (light.type) {
         case LightType::Directional: {
-            float orthoSize = 20.0f;
+            float orthoSize = light.directional.shadowOrthoSize; // Configurable shadow size
             projection = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, 1.0f, 100.0f);
-            view = glm::lookAt(position - direction * 50.0f, position, glm::vec3(0.0f, 1.0f, 0.0f));
+
+            // Position the light far away in the opposite direction
+            glm::vec3 lightPos = position - direction * 50.0f;
+            view = glm::lookAt(lightPos, position, up);
             break;
         }
         case LightType::Spot: {
-            projection = glm::perspective(glm::radians(45.0f), 1.0f, 1.0f, radius);
-            view = glm::lookAt(position, position + direction, glm::vec3(0.0f, 1.0f, 0.0f));
+            float range = light.spot.range; // Use range
+            // Add clamping to prevent acos from receiving invalid values
+            float outerCutoff = glm::clamp(light.spot.outerCutoff, -1.0f, 1.0f);
+            float fov = glm::acos(outerCutoff) * 2.0f; // Compute actual angle with clamped value
+            projection = glm::perspective(fov, 1.0f, 0.1f, range); // Adjusted near plane
+            view = glm::lookAt(position, position + direction, up);
             break;
         }
         default:
+            // Point lights are handled differently
             break;
     }
 

@@ -16,36 +16,37 @@ enum class LightType : uint8_t {
 };
 
 struct Light {
-    glm::vec3 color;
-    float intensity;
-
-    glm::vec3 position;
+    // 16-byte alignment (vec3 + uint32)
     uint32_t depthHandle;
 
-    glm::vec3 direction;
+    // 16-byte alignment (vec3 + enum)
+    glm::vec3 color;
     LightType type;
+
+    // 4-byte alignment
+    float intensity;
+
+    // 4-byte alignment (bool + bool + padding)
     bool castsShadows;
     bool isActive;
-    uint8_t _padding;
+    uint16_t _padding;
 
     union {
         struct {
             float radius;
-            float _pointPadding;
         } point;
 
         struct {
             float innerCutoff;
             float outerCutoff;
+            float range;
         } spot;
 
         struct {
             float shadowOrthoSize;
-            float _dirPadding;
         } directional;
     };
 };
-
 
 struct LightSpaceMatrix {
     glm::mat4 matrix = glm::mat4(1.0f);

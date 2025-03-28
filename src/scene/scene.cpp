@@ -259,13 +259,24 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
         }
 
         lightData.color = color;
-        lightData.intensity = 5.0f; // Lower intensity for softer lighting
-        lightData.point.radius = 35.0f;  // Radius of the light
-        lightData.type = LightType::Point; // Point light
-        lightData.castsShadows = true;   // Enable shadows if necessary
-        lightData.isActive = true;       // Ensure the light is active
+        lightData.intensity = 5.0f;
+        lightData.castsShadows = true;
+        lightData.isActive = true;
 
-        SceneUtils::addPointLightComponents(registry, lightEntity, lightData);
+        // Light type properties
+        lightData.type = LightType::Spot;
+        // lightData.point.radius = 35.0f;
+        lightData.spot.innerCutoff = 0.8f;
+        lightData.spot.outerCutoff = 1.0f;
+        lightData.spot.range = 3.0f;
+
+        if (lightData.castsShadows) {
+            if (lightData.type == LightType::Point) {
+                SceneUtils::addPointLightComponents(registry, lightEntity, lightData);
+            } else {
+                SceneUtils::addLightComponents(registry, lightEntity, lightData);
+            }
+        }
 
         // Cube mesh
         Mesh* lightCube = MeshGen::createSphere(25, 25);

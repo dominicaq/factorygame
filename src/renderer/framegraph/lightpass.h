@@ -23,15 +23,15 @@ private:
     };
 
     struct SpotLightSSBO {
-        glm::vec3 position; float _padding1;  // 16 bytes
-        glm::vec3 direction; float _padding2; // 16 bytes
-        glm::vec3 color; float intensity;  // 16 bytes
-        float innerCutoff; float outerCutoff; int castShadow; int shadowMapIndex; // 16 bytes
-        int lightMatrixIndex; int _padding3; int _padding4; int _padding5; // 16 bytes
+        glm::vec3 position; float innerCutoff;  // 16 bytes
+        glm::vec3 direction; float outerCutoff; // 16 bytes
+        glm::vec3 color; float intensity;       // 16 bytes
+        float range; int castShadow; int shadowMapIndex; int lightMatrixIndex; // 16 bytes
     };
 
     // Light data
     std::vector<PointLightSSBO> m_pointData;
+    std::vector<SpotLightSSBO> m_spotData;
     std::vector<glm::mat4> m_lightMatrixData;
     std::vector<GLuint> m_shadowMapHandles;
 

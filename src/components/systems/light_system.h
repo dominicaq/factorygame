@@ -16,7 +16,7 @@ public:
 private:
     entt::registry& m_registry;
 
-    glm::mat4 calculateLightSpaceMatrix(const glm::vec3& position, const glm::vec3& direction, LightType type, float radius);
+    glm::mat4 calculateLightSpaceMatrix(const glm::vec3& position, const glm::vec3& direction, const Light& light);
     void updatePointLightMatrices(LightSpaceMatrixCube& lightSpaceCube, const glm::vec3& position, float radius);
 };
 
