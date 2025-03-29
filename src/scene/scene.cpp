@@ -197,15 +197,15 @@ void Scene::loadScene() {
 
     // --------------------- Light Circle ---------------------
     int n = 8;
-    float circleRadius = 20.0f;
+    float circleRadius = 10.0f;
     float yPosition = 10.0f;
     createLights(1, circleRadius, yPosition, basicShader);
 
     // Light balls
-    // createAsteroids(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
+    createAsteroids(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
 
     // Normal balls
-    createAsteroids(100, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
+    createAsteroids(10000, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
 
     // Gizmo Cube
     // Box dimensions
@@ -241,7 +241,7 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
         // Light meta data
         SceneData save_lightData;
         save_lightData.name = "Light(" + std::to_string(i) + ")";
-        save_lightData.scale = glm::vec3(0.5f);
+        save_lightData.scale = glm::vec3(0.25f);
         save_lightData.position = glm::vec3(x, yPosition, z);
 
         // Light game object
@@ -280,8 +280,8 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
         // Light type properties
         lightData.type = LightType::Spot;
         // lightData.point.radius = 35.0f;
-        lightData.spot.innerCutoff = cos(glm::radians(5.0f));
-        lightData.spot.outerCutoff = cos(glm::radians(15.0f));
+        lightData.spot.innerCutoff = cos(glm::radians(3.0f));
+        lightData.spot.outerCutoff = cos(glm::radians(30.0f));
         lightData.spot.range = 50.0f;
 
         if (lightData.castsShadows) {
@@ -293,7 +293,7 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
         }
 
         // Cube mesh
-        Mesh* lightCube = ResourceLoader::loadMesh(MODEL_DIR + "/diablo3_pose.obj");
+        Mesh* lightCube = ResourceLoader::loadMesh(MODEL_DIR + "/spotlight.obj");
         if (lightCube != nullptr) {
             Material* cubeMaterial = new Material(basicShader);
             cubeMaterial->albedoColor = color;
@@ -355,10 +355,6 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
         save_asteroid.position = glm::vec3(x, y, z);
         save_asteroid.eulerAngles = randomRotation;
 
-        // Game object
-        GameObject* asteroidObject = SceneUtils::addGameObjectComponent(registry, asteroidEntity, save_asteroid);
-        asteroidObject->addScript<BouncingMotion>();
-
         // Add a point light to each asteroid
         if (castShadows) {
             Light asteroidLight;
@@ -366,11 +362,14 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
             asteroidLight.intensity = 25.0f;
             asteroidLight.point.radius = 15.0f;
             asteroidLight.type = LightType::Point;
-            asteroidLight.castsShadows = true;
+            asteroidLight.castsShadows = false;
             asteroidLight.isActive = true;
             SceneUtils::addPointLightComponents(registry, asteroidEntity, asteroidLight);
         }
 
+        // Game object
+        GameObject* asteroidObject = SceneUtils::addGameObjectComponent(registry, asteroidEntity, save_asteroid);
+        asteroidObject->addScript<BouncingMotion>();
         registry.emplace<MeshInstance>(asteroidEntity, meshInstance);
     }
 }
