@@ -28,6 +28,20 @@ void Scene::loadScene() {
     GameObject* cameraObject = SceneUtils::addGameObjectComponent(registry, cameraEntity, save_cameraData);
     cameraObject->addScript<FreeCamera>();
 
+    Light flastLight;
+    flastLight.color = glm::vec3(1.0f);
+    flastLight.intensity = 25.0f;
+    flastLight.point.radius = 15.0f;
+    flastLight.type = LightType::Spot;
+    flastLight.castsShadows = true;
+    flastLight.isActive = true;
+
+    flastLight.type = LightType::Spot;
+    flastLight.spot.innerCutoff = 0.8f;
+    flastLight.spot.outerCutoff = 1.0f;
+    flastLight.spot.range = 3.0f;
+    SceneUtils::addLightComponents(registry, cameraEntity, flastLight);
+
     Camera cameraComponent(cameraEntity, registry);
     registry.emplace<Camera>(cameraEntity, cameraComponent);
     setPrimaryCamera(cameraEntity);
@@ -279,7 +293,7 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
         }
 
         // Cube mesh
-        Mesh* lightCube = MeshGen::createSphere(25, 25);
+        Mesh* lightCube = ResourceLoader::loadMesh(MODEL_DIR + "/diablo3_pose.obj");
         if (lightCube != nullptr) {
             Material* cubeMaterial = new Material(basicShader);
             cubeMaterial->albedoColor = color;

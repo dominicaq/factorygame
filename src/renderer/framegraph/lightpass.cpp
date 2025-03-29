@@ -17,10 +17,16 @@ void LightPass::setup() {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_pointSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
+    glGenBuffers(1, &m_spotSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_spotSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_LIGHTS * sizeof(SpotLightSSBO), nullptr, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_spotSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
     glGenBuffers(1, &m_lightMatrixSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_lightMatrixSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_SHADOW_MAPS * sizeof(glm::mat4), nullptr, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_lightMatrixSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, m_lightMatrixSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     // Reserve the shadow vectors
@@ -133,13 +139,6 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
                 break;
             }
         }
-
-        // // Check if the entity has LightSpaceMatrix (single shadow matrix)
-        // if (registry.all_of<LightSpaceMatrix>(entity)) {
-        //     const auto& singleMatrix = registry.get<LightSpaceMatrix>(entity);
-        //     m_lightMatrixData.push_back(singleMatrix.matrix);
-        //     currentMatrixIndex += 1;
-        // }
     });
 
     // Set shader parameters
@@ -152,15 +151,22 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
         << ". Ensure you stay within engine constraints.\n";
     }
 
-    // Bind the SSBO and upload light data
+    // Point light SSBO
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_pointSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER, m_pointData.size() * sizeof(PointLightSSBO), m_pointData.data(), GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_pointSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
+    // Spot light SSBO
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_spotSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, m_spotData.size() * sizeof(SpotLightSSBO), m_spotData.data(), GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_spotSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    // Matrix data for all lights
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_lightMatrixSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER, m_lightMatrixData.size() * sizeof(glm::mat4), m_lightMatrixData.data(), GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_lightMatrixSSBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, m_lightMatrixSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     // Set the G-buffer textures in the shader

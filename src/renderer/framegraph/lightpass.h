@@ -36,6 +36,7 @@ private:
     std::vector<GLuint> m_shadowMapHandles;
 
     // SSBO handles
+    GLuint m_spotSSBO;
     GLuint m_pointSSBO;
     GLuint m_lightMatrixSSBO;
 

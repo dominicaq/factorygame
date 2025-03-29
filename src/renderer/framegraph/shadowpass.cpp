@@ -65,18 +65,17 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
         // Bind framebuffer and attach this light's shadow map
         m_shadowFrameBuffer->bind();
         m_shadowFrameBuffer->resetDepthAttachment();
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                              GL_TEXTURE_2D, m_lightShadowMapMap[entity], 0);
-
+        unsigned int depthHandle = m_lightShadowMapMap[entity];
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthHandle, 0);
         glClear(GL_DEPTH_BUFFER_BIT);
-        glViewport(0, 0, shadowRes, shadowRes);
 
         // Set the view/projection matrix and render the scene
+        glViewport(0, 0, shadowRes, shadowRes);
         m_shadowShader.setMat4("u_LightSpaceMatrix", lightSpaceMatrix.matrix);
         renderSceneDepth(renderer, registry);
 
         // Store the handle in the light component
-        light.depthHandle = m_lightShadowMapMap[entity];
+        light.depthHandle = depthHandle;
     });
 
     // Render cubemaps for point lights

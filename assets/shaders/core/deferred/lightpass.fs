@@ -24,12 +24,16 @@ struct PointLight {
     int castShadow;  int shadowMapIndex; int lightMatrixIndex; int _padding; // 16 bytes
 };
 
-layout(std430, binding = 0) buffer LightBuffer {
-    PointLight lights[];
+layout(std430, binding = 0) buffer PointLightBuffer {
+    PointLight pointLights[];
+};
+
+layout(std430, binding = 1) buffer SpotLightBuffer {
+    PointLight spotLighted[];
 };
 
 // SSBO for light matrices
-layout(std430, binding = 1) buffer LightMatrixBuffer {
+layout(std430, binding = 2) buffer LightMatrixBuffer {
     mat4 lightMatrices[];
 };
 
@@ -224,7 +228,7 @@ void main() {
 
     // Process each light
     for (int i = 0; i < numLights; ++i) {
-        PointLight light = lights[i];
+        PointLight light = pointLights[i];
         vec3 lightVec = light.position - worldPos;
         float distance = length(lightVec);
         vec3 lightDir = normalize(lightVec);

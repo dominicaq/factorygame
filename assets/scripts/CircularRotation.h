@@ -31,5 +31,17 @@ private:
         newPosition.z = center.z + radius * sin(m_angle);
         newPosition.y = gameObject->getPosition().y;
         gameObject->setPosition(newPosition);
+
+        // Make the object look at the world origin
+        lookAt(glm::vec3(0.0f, 0.0f, 0.0f));
+    }
+
+    void lookAt(const glm::vec3& target) {
+        glm::vec3 position = gameObject->getPosition();
+        glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+        glm::mat4 viewMatrix = glm::lookAt(position, target, worldUp);
+        glm::mat4 rotationMatrix = glm::inverse(viewMatrix);
+        glm::quat rotationQuat = glm::quat_cast(rotationMatrix);
+        gameObject->setRotation(rotationQuat);
     }
 };
