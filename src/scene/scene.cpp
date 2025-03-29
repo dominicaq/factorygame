@@ -28,19 +28,19 @@ void Scene::loadScene() {
     GameObject* cameraObject = SceneUtils::addGameObjectComponent(registry, cameraEntity, save_cameraData);
     cameraObject->addScript<FreeCamera>();
 
-    Light flastLight;
-    flastLight.color = glm::vec3(1.0f);
-    flastLight.intensity = 25.0f;
-    flastLight.point.radius = 15.0f;
-    flastLight.type = LightType::Spot;
-    flastLight.castsShadows = true;
-    flastLight.isActive = true;
+    // TODO: Bug: turns out the camera is not using -Z axis for forward
+    // Light flashLight;
+    // flashLight.color = glm::vec3(1.0f);
+    // flashLight.intensity = 25.0f;
+    // flashLight.point.radius = 15.0f;
+    // flashLight.type = LightType::Spot;
+    // flashLight.castsShadows = true;
+    // flashLight.isActive = true;
 
-    flastLight.type = LightType::Spot;
-    flastLight.spot.innerCutoff = 0.8f;
-    flastLight.spot.outerCutoff = 1.0f;
-    flastLight.spot.range = 3.0f;
-    SceneUtils::addLightComponents(registry, cameraEntity, flastLight);
+    // flashLight.spot.innerCutoff = cos(glm::radians(15.0f));
+    // flashLight.spot.outerCutoff = cos(glm::radians(30.0f));
+    // flashLight.spot.range = 100.0f;
+    // SceneUtils::addLightComponents(registry, cameraEntity, flashLight);
 
     Camera cameraComponent(cameraEntity, registry);
     registry.emplace<Camera>(cameraEntity, cameraComponent);
@@ -199,10 +199,10 @@ void Scene::loadScene() {
     int n = 8;
     float circleRadius = 20.0f;
     float yPosition = 10.0f;
-    createLights(3, circleRadius, yPosition, basicShader);
+    createLights(1, circleRadius, yPosition, basicShader);
 
     // Light balls
-    createAsteroids(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
+    // createAsteroids(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
 
     // Normal balls
     createAsteroids(100, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
@@ -280,9 +280,9 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
         // Light type properties
         lightData.type = LightType::Spot;
         // lightData.point.radius = 35.0f;
-        lightData.spot.innerCutoff = 0.8f;
-        lightData.spot.outerCutoff = 1.0f;
-        lightData.spot.range = 3.0f;
+        lightData.spot.innerCutoff = cos(glm::radians(5.0f));
+        lightData.spot.outerCutoff = cos(glm::radians(15.0f));
+        lightData.spot.range = 50.0f;
 
         if (lightData.castsShadows) {
             if (lightData.type == LightType::Point) {

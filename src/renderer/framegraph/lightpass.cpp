@@ -63,21 +63,25 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     Camera* camera = renderer.getCamera();
     m_lightPassShader.setVec3("u_CameraPosition", camera->getPosition());
 
-    int lightCount = 0;
+    int pointCount, spotCount = 0;
     int currentMatrixIndex = 0;
     int currentMapIndex = 0;
-    registry.view<Light, Position, EulerAngles>().each([&](entt::entity entity, const Light& lightComponent, const Position& positionComponent, const EulerAngles& rotationComponent) {
-        lightCount += 1;
+    registry.view<Light, Position, Rotation>().each([&](entt::entity entity, const Light& lightComponent, const Position& positionComponent, const Rotation& rotationComponent) {
 
         switch (lightComponent.type) {
             case LightType::Spot: {
+                spotCount += 1;
+
                 SpotLightSSBO spotSSBO{};
-                spotSSBO.position = positionComponent.position;
-                spotSSBO.innerCutoff = lightComponent.spot.innerCutoff;
-                spotSSBO.direction = rotationComponent.euler;
-                spotSSBO.outerCutoff = lightComponent.spot.outerCutoff;
+                spotSSBO.position = positionComponent.position;\
+                glm::vec3 direction = rotationComponent.quaternion * glm::vec3(0.0f, 0.0f, -1.0f);
+                spotSSBO.direction = glm::normalize(direction);
                 spotSSBO.color = lightComponent.color;
                 spotSSBO.intensity = lightComponent.intensity;
+
+                spotSSBO.innerCutoff = lightComponent.spot.innerCutoff;
+                spotSSBO.outerCutoff = lightComponent.spot.outerCutoff;
+                spotSSBO.range = lightComponent.spot.range;
 
                 // Shadow data
                 spotSSBO.castShadow = lightComponent.castsShadows ? 1 : 0;
@@ -108,6 +112,8 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
                 break;
 
             case LightType::Point: {
+                pointCount += 1;
+
                 PointLightSSBO pointSSBO{};
                 pointSSBO.position = positionComponent.position;
                 pointSSBO.radius = lightComponent.point.radius;
@@ -141,32 +147,34 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
         }
     });
 
-    // Set shader parameters
-    int numLights = std::min(lightCount, MAX_LIGHTS);
-    m_lightPassShader.setInt("numLights", numLights);
-    if (m_pointData.size() > MAX_LIGHTS || m_lightMatrixData.size() > MAX_SHADOW_MAPS * 6) {
+    // Safety check
+    int numLights = std::min(pointCount + spotCount, MAX_LIGHTS);
+    if (numLights > MAX_LIGHTS || m_lightMatrixData.size() > MAX_SHADOW_MAPS * 6) {
         std::cerr << "[Warning] LightPass::execute: Light SSBO overflow! "
-        << "Lights: " << m_pointData.size() << "/" << MAX_LIGHTS
+        << "Lights: " << numLights << "/" << MAX_LIGHTS
         << ", Shadow maps: " << m_lightMatrixData.size() << "/" << MAX_SHADOW_MAPS * 6
         << ". Ensure you stay within engine constraints.\n";
     }
+
+    m_lightPassShader.setInt("numPointLights", pointCount);
+    m_lightPassShader.setInt("numSpotLights", spotCount);
 
     // Point light SSBO
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_pointSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER, m_pointData.size() * sizeof(PointLightSSBO), m_pointData.data(), GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_pointSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     // Spot light SSBO
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_spotSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER, m_spotData.size() * sizeof(SpotLightSSBO), m_spotData.data(), GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_spotSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     // Matrix data for all lights
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_lightMatrixSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER, m_lightMatrixData.size() * sizeof(glm::mat4), m_lightMatrixData.data(), GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, m_lightMatrixSSBO);
+
+    // Unbind
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     // Set the G-buffer textures in the shader

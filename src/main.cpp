@@ -108,9 +108,9 @@ int main() {
         profiler.start("Transform");
         transformSystem.updateTransformComponents();
         profiler.end("Transform");
-        profiler.start("Shadow Transforms");
+        profiler.start("Shadow");
         lightSystem.updateShadowMatrices();
-        profiler.start("Shadow Transforms");
+        profiler.end("Shadow");
         profiler.end("Systems");
 
         // ------------------------ Rendering ------------------------

@@ -19,9 +19,16 @@ uniform samplerCube skybox;
 
 // SSBO for lights
 struct PointLight {
-    vec3 position; float radius; // 16 bytes
-    vec3 color; float intensity; // 16 bytes
-    int castShadow;  int shadowMapIndex; int lightMatrixIndex; int _padding; // 16 bytes
+    vec3 position; float radius;
+    vec3 color; float intensity;
+    int castShadow;  int shadowMapIndex; int lightMatrixIndex; int _padding;
+};
+
+struct SpotLight {
+    vec3 position; float innerCutoff;
+    vec3 direction; float outerCutoff;
+    vec3 color; float intensity;
+    float range; int castShadow; int shadowMapIndex; int lightMatrixIndex;
 };
 
 layout(std430, binding = 0) buffer PointLightBuffer {
@@ -29,7 +36,7 @@ layout(std430, binding = 0) buffer PointLightBuffer {
 };
 
 layout(std430, binding = 1) buffer SpotLightBuffer {
-    PointLight spotLighted[];
+    SpotLight spotLights[];
 };
 
 // SSBO for light matrices
@@ -38,7 +45,8 @@ layout(std430, binding = 2) buffer LightMatrixBuffer {
 };
 
 // Light data uniforms
-uniform int numLights;
+uniform int numPointLights;
+uniform int numSpotLights;
 uniform sampler2D shadowMaps[20];
 
 // Constants
@@ -122,6 +130,82 @@ float calculatePointShadow(vec3 fragPos, PointLight light) {
     return shadowFactor;
 }
 
+float calculateSpotShadow(vec3 fragPos, SpotLight light) {
+    if (light.castShadow == 0) return 0.0; // No shadow
+
+    vec3 normal = normalize(texture(gNormal, TexCoords).rgb);
+    vec3 lightDir = normalize(light.position - fragPos);
+
+    // Calculate bias based on surface angle to light and distance
+    float NdotL = max(dot(normal, lightDir), 0.0);
+
+    // Use a smaller base bias to reduce peter panning
+    float baseBias = 0.0005;
+
+    // Scale bias based on the angle between surface normal and light direction
+    // This helps with surfaces at grazing angles where shadow acne is more visible
+    float angleFactor = 1.0 - NdotL;
+
+    // Calculate distance from fragment to light
+    float lightDistance = length(light.position - fragPos);
+
+    // Increase bias slightly with distance to compensate for shadow map resolution
+    float distanceFactor = lightDistance / light.range;
+
+    // Final bias calculation with much smaller range
+    float bias = baseBias * (1.0 + angleFactor * 5.0 + distanceFactor);
+
+    // Clamp to a much smaller maximum value to reduce peter panning
+    bias = clamp(bias, 0.0001, 0.005);
+
+    // Transform fragment position to light space using the light's view-projection matrix
+    mat4 lightMatrix = lightMatrices[light.lightMatrixIndex];
+    vec4 fragPosLightSpace = lightMatrix * vec4(fragPos, 1.0);
+
+    // Perspective division
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+
+    // Transform to [0,1] range
+    projCoords = projCoords * 0.5 + 0.5;
+
+    // Check if fragment is outside the light's view frustum
+    if (projCoords.x < 0.0 || projCoords.x > 1.0 ||
+        projCoords.y < 0.0 || projCoords.y > 1.0 ||
+        projCoords.z < 0.0 || projCoords.z > 1.0) {
+        return 0.0;
+    }
+
+    // PCF Sampling with optimizations
+    float shadowFactor = 0.0;
+    int kernelSize = 3;
+    vec2 texelSize = 1.0 / vec2(textureSize(shadowMaps[light.shadowMapIndex], 0));
+
+    // Get depth from shadow map once to avoid redundant texture fetches
+    float currentDepth = projCoords.z;
+
+    // Use hardware PCF if available (gives better performance)
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            vec2 offset = vec2(float(x), float(y)) * texelSize;
+            float depthSample = texture(shadowMaps[light.shadowMapIndex], projCoords.xy + offset).r;
+            shadowFactor += (currentDepth - bias > depthSample) ? 1.0 : 0.0;
+        }
+    }
+
+    shadowFactor /= 9.0;
+
+    // Add depth-based blending to gradually fade shadows at their edges
+    // This creates more natural shadow transitions
+    float shadowDistance = abs(currentDepth - texture(shadowMaps[light.shadowMapIndex], projCoords.xy).r);
+    float shadowEdgeFactor = smoothstep(0.0, bias * 2.0, shadowDistance);
+
+    // Apply subtle shadow strength adjustment based on distance
+    // Shadows become slightly weaker at distance for a more realistic look
+    float shadowStrength = mix(1.0, 0.85, distanceFactor);
+
+    return shadowFactor * shadowStrength;
+}
+
 // PBR functions - unchanged
 float DistributionGGX(vec3 N, vec3 H, float roughness) {
     float a = roughness * roughness;
@@ -164,6 +248,39 @@ vec3 sampleSkybox(samplerCube skybox, vec3 reflectionVector, float roughness) {
     // Use appropriate mip level based on roughness - physically accurate
     float mipLevel = roughness * 5.0;
     return textureLod(skybox, reflectionVector, mipLevel).rgb;
+}
+
+// Unified PBR lighting calculation function
+vec3 calculatePBRLighting(
+    vec3 worldPos, vec3 normal, vec3 viewDir, vec3 lightDir, vec3 lightColor,
+    float lightIntensity, float attenuation, vec3 albedo, float metallic, float roughness, vec3 F0, float shadow
+) {
+    // Skip if light is behind surface
+    float NdotL = max(dot(normal, lightDir), 0.0);
+    if (NdotL <= 0.0) return vec3(0.0);
+
+    // PBR calculations
+    vec3 halfwayDir = normalize(viewDir + lightDir);
+
+    // Cook-Torrance BRDF
+    float NDF = DistributionGGX(normal, halfwayDir, roughness);
+    float G = GeometrySmith(normal, viewDir, lightDir, roughness);
+    vec3 F = fresnelSchlick(max(dot(halfwayDir, viewDir), 0.0), F0);
+
+    vec3 kS = F; // Specular contribution
+    vec3 kD = vec3(1.0) - kS; // Diffuse contribution
+    kD *= 1.0 - metallic; // Metallic surfaces have no diffuse
+
+    vec3 numerator = NDF * G * F;
+    float denominator = 4.0 * max(dot(normal, viewDir), 0.0) * NdotL + 0.001;
+    vec3 specular = numerator / denominator;
+
+    // Calculate light contribution
+    vec3 radiance = lightColor * lightIntensity * attenuation;
+    vec3 lightContribution = (kD * albedo / PI + specular) * radiance * NdotL;
+
+    // Apply shadow
+    return lightContribution * (1.0 - shadow);
 }
 
 void main() {
@@ -226,8 +343,8 @@ void main() {
     // Start with the ambient light (now physically based with preserved darks)
     vec3 lighting = ambient;
 
-    // Process each light
-    for (int i = 0; i < numLights; ++i) {
+    // Process each point light
+    for (int i = 0; i < numPointLights; ++i) {
         PointLight light = pointLights[i];
         vec3 lightVec = light.position - worldPos;
         float distance = length(lightVec);
@@ -245,36 +362,49 @@ void main() {
         // Skip further calculations if fully in shadow
         if (shadow >= 1.0) continue;
 
-        // PBR calculations
-        vec3 halfwayDir = normalize(viewDir + lightDir);
-        float NdotL = max(dot(normal, lightDir), 0.0);
-
-        // Skip if light is behind surface
-        if (NdotL <= 0.0) continue;
-
-        // Cook-Torrance BRDF
-        float NDF = DistributionGGX(normal, halfwayDir, roughness);
-        float G = GeometrySmith(normal, viewDir, lightDir, roughness);
-        vec3 F = fresnelSchlick(max(dot(halfwayDir, viewDir), 0.0), F0);
-
-        vec3 kS = F; // Specular contribution
-        vec3 kD = vec3(1.0) - kS; // Diffuse contribution
-        kD *= 1.0 - metallic; // Metallic surfaces have no diffuse
-
-        vec3 numerator = NDF * G * F;
-        float denominator = 4.0 * max(dot(normal, viewDir), 0.0) * NdotL + 0.001;
-        vec3 specular = numerator / denominator;
-
-        // Add light contribution
-        vec3 radiance = light.color * light.intensity * attenuation;
-        vec3 lightContribution = (kD * albedo / PI + specular) * radiance * NdotL;
-
-        // Apply shadow
-        lighting += lightContribution * (1.0 - shadow);
+        // Calculate and add point light contribution using the unified function
+        lighting += calculatePBRLighting(
+            worldPos, normal, viewDir, lightDir, light.color,
+            light.intensity, attenuation, albedo, metallic, roughness, F0, shadow
+        );
     }
 
-    // Skip dark enhancement to preserve true dark areas
-    // This ensures shadows and occluded areas stay appropriately dark
+    // Process each spotlight
+    for (int i = 0; i < numSpotLights; ++i) {
+        SpotLight light = spotLights[i];
+        vec3 lightVec = light.position - worldPos;
+        float distance = length(lightVec);
+        vec3 lightDir = normalize(lightVec);
+
+        // Skip if outside of range
+        if (distance > light.range) continue;
+
+        // Calculate spotlight cone effect
+        float theta = dot(lightDir, normalize(-light.direction));
+
+        // Skip if outside the outer cone
+        if (theta < light.outerCutoff) continue;
+
+        // Calculate spotlight intensity with smooth transition between inner and outer cone
+        float epsilon = light.innerCutoff - light.outerCutoff;
+        float spotIntensity = clamp((theta - light.outerCutoff) / epsilon, 0.0, 1.0);
+
+        // Calculate distance-based attenuation
+        float attenuation = max(0.0, 1.0 - distance / light.range);
+        attenuation = attenuation * attenuation;
+
+        // Combine spot intensity with attenuation
+        float finalAttenuation = attenuation * spotIntensity;
+
+        // No shadow calculation for spotlight for now
+        float shadow = calculateSpotShadow(worldPos, light);
+
+        // Calculate and add spotlight contribution using the unified function
+        lighting += calculatePBRLighting(
+            worldPos, normal, viewDir, lightDir, light.color,
+            light.intensity, finalAttenuation, albedo, metallic, roughness, F0, shadow
+        );
+    }
 
     // More conservative tone mapping - preserve darks better
     // Use ACES-inspired filmic tone mapping that preserves deep shadows

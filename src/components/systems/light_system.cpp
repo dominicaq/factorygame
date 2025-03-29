@@ -57,7 +57,7 @@ glm::mat4 LightSystem::calculateLightSpaceMatrix(const glm::vec3& position, cons
         case LightType::Spot: {
             float outerCutoff = glm::clamp(light.spot.outerCutoff, -1.0f, 1.0f);
             float fov = glm::acos(outerCutoff) * 2.0f;
-            projection = glm::perspective(90.0f, 1.0f, 1.0f, light.spot.range + 100.0f); // TODO: modify the fov later
+            projection = glm::perspective(fov, 1.0f, 1.0f, light.spot.range);
             view = glm::lookAt(position, position + direction, up);
             break;
         }
