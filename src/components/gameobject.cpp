@@ -1,8 +1,3 @@
-#ifndef __APPLE__
-    #define GLM_FORCE_INLINE
-    #define GLM_FORCE_SSE2
-#endif
-
 #include "gameobject.h"
 #include "mesh.h"
 
@@ -186,13 +181,8 @@ void GameObject::setScale(const glm::vec3& scale) {
 }
 
 glm::vec3 GameObject::getForward() {
-    glm::vec3 eulerAngles = m_registry.get<EulerAngles>(m_entity).euler;
-
-    glm::vec3 front;
-    front.x = cos(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
-    front.y = sin(glm::radians(eulerAngles.x));
-    front.z = sin(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
-    return glm::normalize(front);
+    const auto& rotation = m_registry.get<Rotation>(m_entity).quaternion;
+    return glm::normalize(rotation * glm::vec3(0.0f, 0.0f, -1.0f));
 }
 
 glm::vec3 GameObject::getUp() {

@@ -58,18 +58,20 @@ public:
     }
 
     glm::mat4 getViewMatrix() const {
-        const auto& eulerAngles = m_registry.get<EulerAngles>(m_cameraEntity).euler;
+        const auto& orientation = m_registry.get<Rotation>(m_cameraEntity).quaternion;
         const auto& position = m_registry.get<Position>(m_cameraEntity).position;
 
-        glm::vec3 front;
-        front.x = cos(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
-        front.y = sin(glm::radians(eulerAngles.x));
-        front.z = sin(glm::radians(eulerAngles.y)) * cos(glm::radians(eulerAngles.x));
-        front = glm::normalize(front);
+        // Convert quaternion to rotation matrix
+        glm::mat4 rotationMatrix = glm::mat4_cast(orientation);
 
-        glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-        glm::vec3 right = glm::normalize(glm::cross(front, up));
-        up = glm::normalize(glm::cross(right, front));
+        // Get the forward vector from the rotation matrix (typically the -z axis)
+        glm::vec3 front = glm::normalize(glm::vec3(rotationMatrix * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)));
+
+        // Get the up vector from the rotation matrix (typically the y axis)
+        glm::vec3 up = glm::normalize(glm::vec3(rotationMatrix * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f)));
+
+        // Right vector can be derived from cross product of front and up (optional, as lookAt might handle this)
+        // glm::vec3 right = glm::normalize(glm::cross(front, up));
 
         return glm::lookAt(position, position + front, up);
     }

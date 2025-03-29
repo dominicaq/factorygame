@@ -15,6 +15,7 @@ public:
 
 private:
     float cameraSpeed = defaultSpeed;
+    bool m_flashLightToggle = false;
 
 public:
     void start() override {
@@ -28,6 +29,7 @@ public:
 
         glm::vec3 front = gameObject->getForward();
         glm::vec3 right = gameObject->getRight();
+        glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
 
         float dt = cameraSpeed * deltaTime;
 
@@ -40,22 +42,37 @@ public:
         }
 
         // Handle movement based on input
-        if (inputManager.isKeyPressed(GLFW_KEY_W)) {
+        if (inputManager.isKeyDown(GLFW_KEY_W)) {
             position += dt * front;
         }
-        if (inputManager.isKeyPressed(GLFW_KEY_S)) {
+        if (inputManager.isKeyDown(GLFW_KEY_S)) {
             position -= dt * front;
         }
-        if (inputManager.isKeyPressed(GLFW_KEY_A)) {
+        if (inputManager.isKeyDown(GLFW_KEY_A)) {
             position -= right * dt;
         }
-        if (inputManager.isKeyPressed(GLFW_KEY_D)) {
+        if (inputManager.isKeyDown(GLFW_KEY_D)) {
             position += right * dt;
         }
-        if (inputManager.isKeyPressed(GLFW_KEY_LEFT_SHIFT)) {
+        if (inputManager.isKeyDown(GLFW_KEY_SPACE)) {
+            position += up * dt * 2.0f;
+        }
+        if (inputManager.isKeyDown(GLFW_KEY_LEFT_CONTROL)) {
+            position -= up * dt * 2.0f;
+        }
+
+        // Speed
+        if (inputManager.isKeyDown(GLFW_KEY_LEFT_SHIFT)) {
             cameraSpeed = boostSpeed;
         } else {
             cameraSpeed = defaultSpeed;
+        }
+
+        // Flash light
+        if (inputManager.isKeyPressed(GLFW_KEY_F)) {
+            m_flashLightToggle = !m_flashLightToggle;
+            auto& light = gameObject->getComponent<Light>();
+            light.isActive = m_flashLightToggle;
         }
 
         // Update the camera's position in the GameObject
@@ -63,7 +80,7 @@ public:
 
         // Mouse input for look rotation
         if (inputManager.isCursorDisabled()) {
-            float xOffset = inputManager.getMouseXOffset() * sensitivity;
+            float xOffset = -inputManager.getMouseXOffset() * sensitivity;
             float yOffset = inputManager.getMouseYOffset() * sensitivity;
 
             // Adjust camera angles

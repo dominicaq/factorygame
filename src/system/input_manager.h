@@ -1,4 +1,3 @@
-// InputManager.h
 #ifndef INPUTMANAGER_H
 #define INPUTMANAGER_H
 
@@ -16,6 +15,7 @@ public:
         m_window = window;
         for (int i = 0; i < MAX_KEYS; ++i) {
             m_keyStates[i] = false;
+            m_prevKeyStates[i] = false;
         }
         m_lastX = 0.0;
         m_lastY = 0.0;
@@ -23,7 +23,9 @@ public:
 
     // Update key states by checking GLFW for all keys
     void update() {
+        // Copy current key states to previous key states
         for (int key = 0; key < MAX_KEYS; ++key) {
+            m_prevKeyStates[key] = m_keyStates[key];
             m_keyStates[key] = glfwGetKey(m_window, key) == GLFW_PRESS;
         }
 
@@ -45,13 +47,31 @@ public:
         m_cursorMode = glfwGetInputMode(m_window, GLFW_CURSOR);
     }
 
-    // Check if a specific key is pressed
+    // Check if a specific key is currently held down
+    bool isKeyDown(int key) const {
+        if (key < 0 || key >= MAX_KEYS) {
+            std::cerr << "[Warning] InputManager::isKeyDown(): invalid key: " << key << "\n";
+            return false;
+        }
+        return m_keyStates[key];
+    }
+
+    // Check if a specific key was just pressed this frame
     bool isKeyPressed(int key) const {
         if (key < 0 || key >= MAX_KEYS) {
             std::cerr << "[Warning] InputManager::isKeyPressed(): invalid key: " << key << "\n";
             return false;
         }
-        return m_keyStates[key];
+        return m_keyStates[key] && !m_prevKeyStates[key];
+    }
+
+    // Check if a specific key was just released this frame
+    bool isKeyReleased(int key) const {
+        if (key < 0 || key >= MAX_KEYS) {
+            std::cerr << "[Warning] InputManager::isKeyReleased(): invalid key: " << key << "\n";
+            return false;
+        }
+        return !m_keyStates[key] && m_prevKeyStates[key];
     }
 
     // Set the cursor mode
@@ -80,7 +100,8 @@ public:
 
 private:
     GLFWwindow* m_window = nullptr;  // Store reference to the window
-    bool m_keyStates[MAX_KEYS];  // Track all key states
+    bool m_keyStates[MAX_KEYS];  // Track current key states
+    bool m_prevKeyStates[MAX_KEYS]; // Track previous key states
     bool m_firstMouse = true;
     double m_lastX, m_lastY, m_mouseX, m_mouseY;
     double m_xOffset, m_yOffset;

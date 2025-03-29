@@ -67,6 +67,9 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     int currentMatrixIndex = 0;
     int currentMapIndex = 0;
     registry.view<Light, Position, Rotation>().each([&](entt::entity entity, const Light& lightComponent, const Position& positionComponent, const Rotation& rotationComponent) {
+        if (!lightComponent.isActive) {
+            return;
+        }
 
         switch (lightComponent.type) {
             case LightType::Spot: {

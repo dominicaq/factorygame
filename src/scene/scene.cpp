@@ -24,23 +24,22 @@ void Scene::loadScene() {
     SceneData save_cameraData;
     save_cameraData.name = "Main Camera";
     save_cameraData.position = glm::vec3(4.0f, 0.21f, 4.04f);
-    save_cameraData.eulerAngles = glm::vec3(-2.38f, 239.0f, 0.0f);
+    save_cameraData.eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
     GameObject* cameraObject = SceneUtils::addGameObjectComponent(registry, cameraEntity, save_cameraData);
     cameraObject->addScript<FreeCamera>();
 
-    // TODO: Bug: turns out the camera is not using -Z axis for forward
-    // Light flashLight;
-    // flashLight.color = glm::vec3(1.0f);
-    // flashLight.intensity = 25.0f;
-    // flashLight.point.radius = 15.0f;
-    // flashLight.type = LightType::Spot;
-    // flashLight.castsShadows = true;
-    // flashLight.isActive = true;
+    // Toggle the flash light with F key
+    Light flashLight;
+    flashLight.color = glm::vec3(1.0f);
+    flashLight.intensity = 5.0f;
+    flashLight.type = LightType::Spot;
+    flashLight.castsShadows = true;
+    flashLight.isActive = false;
 
-    // flashLight.spot.innerCutoff = cos(glm::radians(15.0f));
-    // flashLight.spot.outerCutoff = cos(glm::radians(30.0f));
-    // flashLight.spot.range = 100.0f;
-    // SceneUtils::addLightComponents(registry, cameraEntity, flashLight);
+    flashLight.spot.innerCutoff = cos(glm::radians(3.0f));
+    flashLight.spot.outerCutoff = cos(glm::radians(30.0f));
+    flashLight.spot.range = 25.0f;
+    SceneUtils::addLightComponents(registry, cameraEntity, flashLight);
 
     Camera cameraComponent(cameraEntity, registry);
     registry.emplace<Camera>(cameraEntity, cameraComponent);
@@ -199,7 +198,7 @@ void Scene::loadScene() {
     int n = 8;
     float circleRadius = 10.0f;
     float yPosition = 10.0f;
-    createLights(1, circleRadius, yPosition, basicShader);
+    createLights(3, circleRadius, yPosition, basicShader);
 
     // Light balls
     createAsteroids(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
