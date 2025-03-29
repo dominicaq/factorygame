@@ -205,7 +205,7 @@ void Scene::loadScene() {
     createAsteroids(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
 
     // Normal balls
-    createAsteroids(10000, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
+    createAsteroids(1, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
 
     // Gizmo Cube
     // Box dimensions

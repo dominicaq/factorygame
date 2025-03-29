@@ -1,4 +1,4 @@
-#include "ComputeShader.h"
+#include "computeshader.h"
 #include "../resources/resource_loader.h"
 
 #include <iostream>
