@@ -16,6 +16,49 @@ This project is an OpenGL deferred renderer with plans to become a game engine, 
 - **GameObject Parent-Child Hierarchy** – Supports a parent-child structure for `GameObject` transformations, where child objects inherit transformations from their parent objects.
 - **Debug Gizmos** - Draw wireframe gizmos for visual debugging
 
+Okay, here's an example of an "Engine Specifics" section you can add to your README.md, based on the information you've provided and common engine details. Remember to fill in the actual values and details specific to your engine.
+
+Markdown
+
+## Engine Specifics
+
+This section outlines some key implementation details and limitations of the engine.
+
+### Components
+
+The engine utilizes an Entity-Component-System (ECS) architecture powered by the [EnTT](https://github.com/skypjack/entt) library. The following core components are currently supported:
+
+* **GameObject:** A thin abstraction layer over the ECS system, designed to simplify script development. Users can interact with "objects" similar to Unity, abstracting away direct entity management.
+* **Position:** Stores the 3D world position of an entity (`glm::vec3`).
+* **Rotation:** Stores the 3D rotation of an entity using a quaternion (`glm::quat`). Modifying this component directly updates the `EulerAngles` component and vice versa.
+* **Scale:** Stores the 3D scale of an entity (`glm::vec3`).
+* **EulerAngles:** Stores the 3D rotation of an entity using Euler angles (in degrees) (`glm::vec3`). *Note: While the engine primarily uses quaternions for internal calculations, Euler angles are maintained for potential use cases and editor integration.*
+* **Rotation:** Bypass euler angles and modify the quaternion directly. Modifying the `Rotation` component will also update `EulerAngles` component and vice versa.
+* **ModelMatrix:** A component that flags the entity's model matrix as dirty, triggering recalculation.
+* **MetaData:** Stores basic information about the entity, such as its name (`std::string`).
+* **Parent:** Indicates the parent entity in a hierarchical structure.
+* **Children:** Stores a list of child entities.
+* **Light:** Stores metadata of a light, which the engine processes into Shader Storage Buffer Objects (SSBOs) for rendering.
+* **Mesh:** Stores all required data for a single mesh, including vertices, indices, normals, tangents, and bitangents.
+
+### Rendering
+
+**Limitations:**
+
+* **Maximum Lights:** The engine currently supports up to 1000 lights to maintain performance. This limit can be adjusted in the codebase if needed.
+* **Maximum Shadow Casters:** The number of simultaneous shadow casters is limited to 20, primarily due to hardware constraints.
+
+**Features:**
+
+* **Physically Based Rendering (PBR) Lighting Model:** Implements a PBR lighting model for realistic material rendering.
+* **Point and Spot Lights:** Supports point, spot, and directional lights.
+* **Optional Shadow Casting:** Point, spot, and directional lights can be configured to cast shadows.
+* **Optional Parallax Occlusion Mapping:** If a `Mesh` `Material` has a `heightMap` texture, the engine will apply this feature.
+
+### Miscellaneous
+
+* **Forward Direction:** The local forward direction of entities is defined as the **negative Z-axis (-Z)**.
+
 ## Installation
 ```sh
 git clone git@github.com:dominicaq/factorygame.git
