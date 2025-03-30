@@ -31,6 +31,12 @@ struct SpotLight {
     float range; int castShadow; int shadowMapIndex; int lightMatrixIndex;
 };
 
+struct DirectionalLight {
+    vec3 dir; float shadowOrthoSize;
+    vec3 color; float intensity;
+    int castShadow; int shadowMapIndex; int lightMatrixIndex;
+};
+
 layout(std430, binding = 0) buffer PointLightBuffer {
     PointLight pointLights[];
 };
@@ -44,9 +50,11 @@ layout(std430, binding = 2) buffer LightMatrixBuffer {
     mat4 lightMatrices[];
 };
 
-// Light data uniforms
+// Light data
+uniform int numDirectionalLights;
 uniform int numPointLights;
 uniform int numSpotLights;
+uniform DirectionalLight directionalLights[3];
 uniform sampler2D shadowMaps[20];
 
 // Constants

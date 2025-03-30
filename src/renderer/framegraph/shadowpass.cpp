@@ -53,7 +53,7 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 
     // Render 2D shadow maps (directional/spotlights)
     registry.view<LightSpaceMatrix, Light>().each([&](auto entity, auto& lightSpaceMatrix, auto& light) {
-        if (!light.castsShadows) {
+        if (!light.castShadow) {
             return;
         }
 
@@ -80,7 +80,7 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 
     // Render cubemaps for point lights
     registry.view<LightSpaceMatrixCube, Light>().each([&](auto entity, auto& lightSpaceCube, auto& light) {
-        if (!light.castsShadows) {
+        if (!light.castShadow) {
             return;
         }
 

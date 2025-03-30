@@ -33,7 +33,7 @@ void Scene::loadScene() {
     flashLight.color = glm::vec3(1.0f);
     flashLight.intensity = 5.0f;
     flashLight.type = LightType::Spot;
-    flashLight.castsShadows = true;
+    flashLight.castShadow = true;
     flashLight.isActive = false;
 
     flashLight.spot.innerCutoff = cos(glm::radians(3.0f));
@@ -273,7 +273,7 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
 
         lightData.color = color;
         lightData.intensity = 5.0f;
-        lightData.castsShadows = true;
+        lightData.castShadow = true;
         lightData.isActive = true;
 
         // Light type properties
@@ -283,7 +283,7 @@ void Scene::createLights(int n, float circleRadius, float yPosition, Shader* bas
         lightData.spot.outerCutoff = cos(glm::radians(30.0f));
         lightData.spot.range = 50.0f;
 
-        if (lightData.castsShadows) {
+        if (lightData.castShadow) {
             if (lightData.type == LightType::Point) {
                 SceneUtils::addPointLightComponents(registry, lightEntity, lightData);
             } else {
@@ -361,7 +361,7 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
             asteroidLight.intensity = 25.0f;
             asteroidLight.point.radius = 15.0f;
             asteroidLight.type = LightType::Point;
-            asteroidLight.castsShadows = false;
+            asteroidLight.castShadow = false;
             asteroidLight.isActive = true;
             SceneUtils::addPointLightComponents(registry, asteroidEntity, asteroidLight);
         }

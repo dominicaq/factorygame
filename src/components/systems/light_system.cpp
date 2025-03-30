@@ -4,7 +4,7 @@ LightSystem::LightSystem(entt::registry& registry) : m_registry(registry) {}
 
 void LightSystem::updateShadowMatrices() {
     m_registry.view<Light, Position>().each([this](auto entity, Light& light, Position& position) {
-        if (!light.castsShadows || !light.isActive) {
+        if (!light.castShadow || !light.isActive) {
             return; // Skip lights that don't cast shadows
         }
 
@@ -16,7 +16,7 @@ void LightSystem::updateShadowMatrices() {
             LightSpaceMatrix& lightSpaceComponent = m_registry.get<LightSpaceMatrix>(entity);
             Rotation& rotationComponent = m_registry.get<Rotation>(entity);
 
-            // Forward is the +Z axis, so we need to reverse the dir
+            // Forward is the -Z axis
             glm::vec3 lightDirection = rotationComponent.quaternion * glm::vec3(0.0f, 0.0f, -1.0f);
             lightSpaceComponent.matrix = calculateLightSpaceMatrix(
                 position.position,
@@ -49,7 +49,7 @@ glm::mat4 LightSystem::calculateLightSpaceMatrix(const glm::vec3& position, cons
     switch (light.type) {
         case LightType::Directional: {
             float orthoSize = light.directional.shadowOrthoSize;
-            projection = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, 1.0f, 100.0f);
+            projection = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, 1.0f, 1000.0f);
             glm::vec3 lightPos = position - direction * 50.0f;
             view = glm::lookAt(lightPos, position, up);
             break;
@@ -61,9 +61,10 @@ glm::mat4 LightSystem::calculateLightSpaceMatrix(const glm::vec3& position, cons
             view = glm::lookAt(position, position + direction, up);
             break;
         }
-        default:
-            // Point lights are handled differently
+        default: {
+            std::cerr << "[Warning] Requesting undefinied light type to cast shadows.\n";
             break;
+        }
     }
 
     return projection * view;

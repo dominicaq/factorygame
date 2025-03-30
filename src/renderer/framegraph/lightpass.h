@@ -16,12 +16,6 @@ private:
         int castShadow; int shadowMapIndex; int lightMatrixIndex; int _padding; // 16 bytes
     };
 
-    struct DirectionalLightSSBO {
-        glm::vec3 direction; float shadowOrthoSize;  // 16 bytes
-        glm::vec3 color; float intensity;  // 16 bytes
-        int castShadow; int shadowMapIndex; int lightMatrixIndex; int _padding; // 16 bytes
-    };
-
     struct SpotLightSSBO {
         glm::vec3 position; float innerCutoff;  // 16 bytes
         glm::vec3 direction; float outerCutoff; // 16 bytes
@@ -40,9 +34,8 @@ private:
     GLuint m_pointSSBO;
     GLuint m_lightMatrixSSBO;
 
-    // Light pass frame shader
+    // Light shader specific
     Shader m_lightPassShader;
-
     unsigned int m_skyboxTexture;
 };
 

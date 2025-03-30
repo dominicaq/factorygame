@@ -63,7 +63,7 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     Camera* camera = renderer.getCamera();
     m_lightPassShader.setVec3("u_CameraPosition", camera->getPosition());
 
-    int pointCount, spotCount = 0;
+    int pointCount = 0, spotCount = 0, directionalCount = 0;
     int currentMatrixIndex = 0;
     int currentMapIndex = 0;
     registry.view<Light, Position, Rotation>().each([&](entt::entity entity, const Light& lightComponent, const Position& positionComponent, const Rotation& rotationComponent) {
@@ -72,48 +72,6 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
         }
 
         switch (lightComponent.type) {
-            case LightType::Spot: {
-                spotCount += 1;
-
-                SpotLightSSBO spotSSBO{};
-                spotSSBO.position = positionComponent.position;\
-                glm::vec3 direction = rotationComponent.quaternion * glm::vec3(0.0f, 0.0f, -1.0f);
-                spotSSBO.direction = glm::normalize(direction);
-                spotSSBO.color = lightComponent.color;
-                spotSSBO.intensity = lightComponent.intensity;
-
-                spotSSBO.innerCutoff = lightComponent.spot.innerCutoff;
-                spotSSBO.outerCutoff = lightComponent.spot.outerCutoff;
-                spotSSBO.range = lightComponent.spot.range;
-
-                // Shadow data
-                spotSSBO.castShadow = lightComponent.castsShadows ? 1 : 0;
-                spotSSBO.shadowMapIndex = currentMapIndex;
-                spotSSBO.lightMatrixIndex = currentMatrixIndex;
-
-                // No shadow casting, dont need to do anything else
-                if (lightComponent.depthHandle == 0 || !lightComponent.castsShadows) {
-                    m_spotData.push_back(spotSSBO);
-                    return;
-                }
-
-                // Get the shadow map this light created
-                m_shadowMapHandles.push_back(lightComponent.depthHandle);
-                currentMapIndex += 1;
-
-                // Get matrix associated with this light
-                if (registry.all_of<LightSpaceMatrix>(entity)) {
-                    const auto& lightComponent = registry.get<LightSpaceMatrix>(entity);
-                    m_lightMatrixData.push_back(lightComponent.matrix);
-                    currentMatrixIndex += 1;
-                }
-                m_spotData.push_back(spotSSBO);
-                break;
-            }
-            case LightType::Directional:
-                // Handle directional light
-                break;
-
             case LightType::Point: {
                 pointCount += 1;
 
@@ -122,12 +80,12 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
                 pointSSBO.radius = lightComponent.point.radius;
                 pointSSBO.color = lightComponent.color;
                 pointSSBO.intensity = lightComponent.intensity;
-                pointSSBO.castShadow = lightComponent.castsShadows ? 1 : 0;
+                pointSSBO.castShadow = lightComponent.castShadow ? 1 : 0;
                 pointSSBO.lightMatrixIndex = currentMatrixIndex;
                 pointSSBO.shadowMapIndex = currentMapIndex;
 
                 // Retrieve the shadow map handle
-                if (lightComponent.depthHandle == 0 || !lightComponent.castsShadows) {
+                if (lightComponent.depthHandle == 0 || !lightComponent.castShadow) {
                     m_pointData.push_back(pointSSBO);
                     return;
                 }
@@ -145,6 +103,79 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
                     currentMatrixIndex += 6;
                 }
                 m_pointData.push_back(pointSSBO);
+                break;
+            }
+            case LightType::Spot: {
+                spotCount += 1;
+
+                SpotLightSSBO spotSSBO{};
+                spotSSBO.position = positionComponent.position;
+                glm::vec3 direction = rotationComponent.quaternion * glm::vec3(0.0f, 0.0f, -1.0f);
+                spotSSBO.direction = glm::normalize(direction);
+                spotSSBO.color = lightComponent.color;
+                spotSSBO.intensity = lightComponent.intensity;
+
+                spotSSBO.innerCutoff = lightComponent.spot.innerCutoff;
+                spotSSBO.outerCutoff = lightComponent.spot.outerCutoff;
+                spotSSBO.range = lightComponent.spot.range;
+
+                // Shadow data
+                spotSSBO.castShadow = lightComponent.castShadow ? 1 : 0;
+                spotSSBO.shadowMapIndex = currentMapIndex;
+                spotSSBO.lightMatrixIndex = currentMatrixIndex;
+
+                // No shadow casting, dont need to do anything else
+                if (lightComponent.depthHandle == 0 || !lightComponent.castShadow) {
+                    m_spotData.push_back(spotSSBO);
+                    return;
+                }
+
+                // Get the shadow map this light created
+                m_shadowMapHandles.push_back(lightComponent.depthHandle);
+                currentMapIndex += 1;
+
+                // Get matrix associated with this light
+                if (registry.all_of<LightSpaceMatrix>(entity)) {
+                    const auto& lightComponent = registry.get<LightSpaceMatrix>(entity);
+                    m_lightMatrixData.push_back(lightComponent.matrix);
+                    currentMatrixIndex += 1;
+                }
+                m_spotData.push_back(spotSSBO);
+                break;
+            }
+            case LightType::Directional: {
+                std::string base = "directionalLights[" + std::to_string(directionalCount) + "].";
+                directionalCount += 1;
+
+                // Set light properties
+                glm::vec3 direction = rotationComponent.quaternion * glm::vec3(0.0f, 0.0f, -1.0f);
+                m_lightPassShader.setVec3(base + "dir", glm::normalize(direction));
+                m_lightPassShader.setFloat(base + "shadowOrthoSize", lightComponent.directional.shadowOrthoSize);
+
+                // Set color and intensity
+                m_lightPassShader.setVec3(base + "color", lightComponent.color);
+                m_lightPassShader.setFloat(base + "intensity", lightComponent.intensity);
+
+                // Set shadow properties
+                m_lightPassShader.setInt(base + "castShadow", lightComponent.castShadow ? 1 : 0);
+
+                // No shadow casting, dont need to do anything else
+                if (lightComponent.depthHandle == 0 || !lightComponent.castShadow) {
+                    return;
+                }
+
+                // Get the shadow map this light created
+                m_shadowMapHandles.push_back(lightComponent.depthHandle);
+                m_lightPassShader.setInt(base + "shadowMapIndex", currentMapIndex);
+                currentMapIndex += 1;
+
+                // Get matrix associated with this light
+                if (registry.all_of<LightSpaceMatrix>(entity)) {
+                    const auto& lightComponent = registry.get<LightSpaceMatrix>(entity);
+                    m_lightMatrixData.push_back(lightComponent.matrix);
+                    m_lightPassShader.setInt(base + "lightMatrixIndex", currentMatrixIndex);
+                    currentMatrixIndex += 1;
+                }
                 break;
             }
         }

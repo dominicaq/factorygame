@@ -8,6 +8,7 @@
 
 #define MAX_LIGHTS 1000
 #define MAX_SHADOW_MAPS 20
+#define MAX_DIRECTIONAL_LIGHTS 3
 
 enum class LightType : uint8_t {
     Point,
@@ -27,7 +28,7 @@ struct Light {
     float intensity;
 
     // 4-byte alignment (bool + bool + padding)
-    bool castsShadows;
+    bool castShadow;
     bool isActive;
     uint16_t _padding;
 
