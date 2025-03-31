@@ -151,7 +151,6 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
                 glm::vec3 direction = rotationComponent.quaternion * glm::vec3(0.0f, 0.0f, -1.0f);
                 m_lightPassShader.setVec3(base + "dir", glm::normalize(direction));
                 m_lightPassShader.setFloat(base + "shadowOrthoSize", lightComponent.directional.shadowOrthoSize);
-
                 // Set color and intensity
                 m_lightPassShader.setVec3(base + "color", lightComponent.color);
                 m_lightPassShader.setFloat(base + "intensity", lightComponent.intensity);
@@ -192,6 +191,7 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
 
     m_lightPassShader.setInt("numPointLights", pointCount);
     m_lightPassShader.setInt("numSpotLights", spotCount);
+    m_lightPassShader.setInt("numDirectionalLights", directionalCount);
 
     // Point light SSBO
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_pointSSBO);

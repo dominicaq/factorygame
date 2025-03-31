@@ -60,6 +60,79 @@ uniform sampler2D shadowMaps[20];
 // Constants
 const float PI = 3.14159265359;
 
+float calculateDirectionalShadow(vec3 fragPos, DirectionalLight light) {
+    if (light.castShadow == 0) return 0.0; // No shadow if shadow casting is disabled
+
+    // Get the normal from the G-buffer
+    vec3 normal = normalize(texture(gNormal, TexCoords).rgb);
+    vec3 lightDir = normalize(-light.dir);
+
+    // Calculate bias based on surface angle to light
+    float NdotL = max(dot(normal, lightDir), 0.0);
+
+    // Use a smaller base bias to reduce artifacts
+    float baseBias = 0.0005;
+
+    // Scale bias based on angle between surface normal and light direction
+    float angleFactor = 1.0 - NdotL;
+
+    // Final bias calculation
+    float bias = baseBias * (1.0 + angleFactor * 5.0);
+
+    // Clamp to a reasonable range
+    bias = clamp(bias, 0.0001, 0.005);
+
+    // Transform fragment position to light space
+    mat4 lightMatrix = lightMatrices[light.lightMatrixIndex];
+    vec4 fragPosLightSpace = lightMatrix * vec4(fragPos, 1.0);
+
+    // Perform perspective division for perspective light matrices
+    // For orthographic matrices, w should be 1.0, so this will not change the result
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+
+    // Transform to [0,1] range
+    projCoords = projCoords * 0.5 + 0.5;
+
+    // Check if fragment is outside the shadow map
+    if (projCoords.x < 0.0 || projCoords.x > 1.0 ||
+        projCoords.y < 0.0 || projCoords.y > 1.0 ||
+        projCoords.z < 0.0 || projCoords.z > 1.0) {
+        return 0.0;
+    }
+
+    // PCF Sampling
+    float shadowFactor = 0.0;
+    vec2 texelSize = 1.0 / vec2(textureSize(shadowMaps[light.shadowMapIndex], 0));
+    float currentDepth = projCoords.z;
+
+    // Use hardware PCF with larger kernel for higher quality shadows
+    int kernelSize = 3; // 3x3 kernel for balance between quality and performance
+
+    for (int x = -kernelSize/2; x <= kernelSize/2; ++x) {
+        for (int y = -kernelSize/2; y <= kernelSize/2; ++y) {
+            vec2 offset = vec2(float(x), float(y)) * texelSize;
+            float depthSample = texture(shadowMaps[light.shadowMapIndex], projCoords.xy + offset).r;
+            shadowFactor += (currentDepth - bias > depthSample) ? 1.0 : 0.0;
+        }
+    }
+
+    shadowFactor /= float(kernelSize * kernelSize);
+
+    // Implement cascaded shadow mapping transition (if implemented in your engine)
+    // This would require additional uniforms for cascade splits and blend factors
+
+    // Add soft shadow edges
+    float shadowDistance = abs(currentDepth - texture(shadowMaps[light.shadowMapIndex], projCoords.xy).r);
+    float shadowEdgeBlend = smoothstep(0.0, bias * 2.0, shadowDistance);
+
+    // Fade shadows at distance to reduce artifacts at shadow map boundaries
+    // Assuming shadowOrthoSize corresponds to the shadow map coverage
+    float distanceToCamera = length(u_CameraPosition - fragPos);
+    float shadowFade = 1.0 - smoothstep(light.shadowOrthoSize * 0.9, light.shadowOrthoSize, distanceToCamera);
+
+    return shadowFactor * shadowFade;
+}
+
 float calculatePointShadow(vec3 fragPos, PointLight light) {
     if (light.castShadow == 0) return 0.0; // No shadow
 
@@ -351,6 +424,20 @@ void main() {
     // Start with the ambient light (now physically based with preserved darks)
     vec3 lighting = ambient;
 
+    for (int i = 0; i < numDirectionalLights; ++i) {
+        DirectionalLight light = directionalLights[i];
+
+        // Calculate shadow
+        float shadow = calculateDirectionalShadow(worldPos, light);
+
+        // Use the same PBR function you use for other lights
+        // No attenuation for directional lights (attenuation = 1.0)
+        lighting += calculatePBRLighting(
+            worldPos, normal, viewDir, -light.dir, light.color,
+            light.intensity, 1.0, albedo, metallic, roughness, F0, shadow
+        );
+    }
+
     // Process each point light
     for (int i = 0; i < numPointLights; ++i) {
         PointLight light = pointLights[i];
@@ -388,7 +475,7 @@ void main() {
         if (distance > light.range) continue;
 
         // Calculate spotlight cone effect
-        float theta = dot(lightDir, normalize(-light.direction));
+        float theta = dot(lightDir, -light.direction);
 
         // Skip if outside the outer cone
         if (theta < light.outerCutoff) continue;

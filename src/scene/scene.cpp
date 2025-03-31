@@ -32,10 +32,10 @@ void Scene::loadScene() {
     Light flashLight;
     flashLight.color = glm::vec3(1.0f);
     flashLight.intensity = 5.0f;
-    flashLight.type = LightType::Spot;
     flashLight.castShadow = true;
     flashLight.isActive = false;
 
+    flashLight.type = LightType::Spot;
     flashLight.spot.innerCutoff = cos(glm::radians(3.0f));
     flashLight.spot.outerCutoff = cos(glm::radians(30.0f));
     flashLight.spot.range = 25.0f;
@@ -195,10 +195,12 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 8;
+    int n = 15;
     float circleRadius = 10.0f;
     float yPosition = 10.0f;
-    createLights(3, circleRadius, yPosition, basicShader);
+    createSuns(1, 50.0f, 50.0f, basicShader);
+
+    createSpotLights(3, circleRadius, yPosition, basicShader);
 
     // Light balls
     createAsteroids(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
@@ -228,7 +230,81 @@ void Scene::loadScene() {
     updateInstanceMap();
 }
 
-void Scene::createLights(int n, float circleRadius, float yPosition, Shader* basicShader) {
+void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basicShader) {
+    for (int i = 0; i < n; ++i) {
+        float angle = i * (360.0f / n);
+        float radians = glm::radians(angle);
+        float x = circleRadius * std::cos(radians);
+        float z = circleRadius * std::sin(radians);
+
+        entt::entity lightEntity = registry.create();
+
+        // Light meta data
+        SceneData save_lightData;
+        save_lightData.name = "sun(" + std::to_string(i) + ")";
+        save_lightData.scale = glm::vec3(1.0f);
+        save_lightData.position = glm::vec3(x, yPosition, z);
+
+        // Light game object
+        GameObject* lightObject = SceneUtils::addGameObjectComponent(registry, lightEntity, save_lightData);
+        lightObject->addScript<CircularRotation>();
+        CircularRotation* rotationScript = lightObject->getScript<CircularRotation>();
+        if (rotationScript != nullptr) {
+            rotationScript->radius = circleRadius;
+            rotationScript->center = glm::vec3(0.0f, yPosition, 0.0f);
+            rotationScript->rotationSpeed = 0.5f;
+        }
+
+        // Light component
+        Light lightData;
+        glm::vec4 color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        switch (i+2 % 3) {
+            case 0:
+                color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f); // Soft White
+                break;
+            case 1:
+                color = glm::vec4(1.0f, 0.8f, 0.4f, 1.0f); // Soft Orange
+                break;
+            case 2:
+                color = glm::vec4(0.2f, 0.2f, 0.4f, 1.0f); // Soft Dark Blue
+                break;
+            default:
+                color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f); // Soft White (default)
+                break;
+        }
+
+        lightData.color = color;
+        lightData.intensity = 5.0f;
+        lightData.castShadow = true;
+        lightData.isActive = true;
+
+        // Light type properties
+        lightData.type = LightType::Directional;
+        lightData.directional.shadowOrthoSize = 1.0f;
+
+        if (lightData.castShadow) {
+            if (lightData.type == LightType::Point) {
+                SceneUtils::addPointLightComponents(registry, lightEntity, lightData);
+            } else {
+                SceneUtils::addLightComponents(registry, lightEntity, lightData);
+            }
+        }
+
+        // Cube mesh
+        Mesh* lightCube = MeshGen::createSphere(30, 30);
+        if (lightCube != nullptr) {
+            Material* cubeMaterial = new Material(basicShader);
+            cubeMaterial->albedoColor = color;
+            cubeMaterial->albedoMap = nullptr;
+            cubeMaterial->normalMap = nullptr;
+            cubeMaterial->isDeferred = false;
+            lightCube->material = cubeMaterial;
+            registry.emplace<Mesh*>(lightEntity, lightCube);
+        }
+    }
+}
+
+void Scene::createSpotLights(int n, float circleRadius, float yPosition, Shader* basicShader) {
     for (int i = 0; i < n; ++i) {
         float angle = i * (360.0f / n);
         float radians = glm::radians(angle);

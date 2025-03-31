@@ -50,7 +50,7 @@ glm::mat4 LightSystem::calculateLightSpaceMatrix(const glm::vec3& position, cons
         case LightType::Directional: {
             float orthoSize = light.directional.shadowOrthoSize;
             projection = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, 1.0f, 1000.0f);
-            glm::vec3 lightPos = position - direction * 50.0f;
+            glm::vec3 lightPos = position - direction * 100.0f;
             view = glm::lookAt(lightPos, position, up);
             break;
         }
