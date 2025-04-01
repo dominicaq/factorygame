@@ -8,6 +8,7 @@ public:
     explicit LightPass() = default;
     void setup() override;
     void execute(Renderer& renderer, entt::registry& registry) override;
+    void setSkybox(unsigned int id) { m_skyboxTexture = id; }
 
 private:
     struct PointLightSSBO {

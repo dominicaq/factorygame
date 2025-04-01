@@ -32,28 +32,15 @@ void LightPass::setup() {
     // Reserve the shadow vectors
     m_lightMatrixData.reserve(MAX_SHADOW_MAPS * 6);
     m_shadowMapHandles.reserve(MAX_SHADOW_MAPS);
-
-    // Load the skybox
-    std::string skyboxVertexPath = ASSET_DIR "shaders/core/skybox.vs";
-    std::string skyboxFragmentPath = ASSET_DIR "shaders/core/skybox.fs";
-    std::vector<std::string> faces = {
-        ASSET_DIR "textures/skyboxes/bspace/1.png",
-        ASSET_DIR "textures/skyboxes/bspace/3.png",
-        ASSET_DIR "textures/skyboxes/bspace/5.png",
-        ASSET_DIR "textures/skyboxes/bspace/6.png",
-        ASSET_DIR "textures/skyboxes/bspace/2.png",
-        ASSET_DIR "textures/skyboxes/bspace/4.png"
-    };
-
-    // Load the cubemap textures from image files
-    m_skyboxTexture = CubeMap::createFromImages(faces);
 }
 
 void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glClear(GL_COLOR_BUFFER_BIT);
 
-    glDisable(GL_DEPTH_TEST);
+    // Enable depth test to only affect geometry pixels
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS); // Only light where geometry exists
+
     glEnable(GL_BLEND);
     glBlendEquation(GL_FUNC_ADD);
     glBlendFunc(GL_ONE, GL_ONE);
@@ -254,5 +241,5 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
 
     // Restore OpenGL states
     glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
 }

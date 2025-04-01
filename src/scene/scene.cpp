@@ -69,8 +69,7 @@ void Scene::loadScene() {
         bunnyMaterial->albedoColor = glm::vec4(1.0f, 0.5f, 0.31f, 1.0f);
         bunnyMaterial->isDeferred = true;
 
-        Texture* bunnyAlbedoMap = new Texture(TEXTURE_DIR + "uv_map.jpg");
-        bunnyMaterial->albedoMap = bunnyAlbedoMap;
+        bunnyMaterial->albedoMap = new Texture(TEXTURE_DIR + "uv_map.jpg");
 
         bunnyMesh->material = bunnyMaterial;
         registry.emplace<Mesh*>(bunnyEntity, bunnyMesh);
@@ -195,18 +194,18 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 15;
+    int n = 5;
     float circleRadius = 10.0f;
     float yPosition = 10.0f;
-    createSuns(1, 50.0f, 50.0f, basicShader);
+    // createSuns(1, 50.0f, 50.0f, basicShader);
 
     createSpotLights(3, circleRadius, yPosition, basicShader);
 
     // Light balls
-    createAsteroids(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
+    createSpheres(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
 
     // Normal balls
-    createAsteroids(1, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
+    createSpheres(1000, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
 
     // Gizmo Cube
     // Box dimensions
@@ -258,7 +257,7 @@ void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basic
         // Light component
         Light lightData;
         glm::vec4 color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-        switch (i+2 % 3) {
+        switch (i+1 % 3) {
             case 0:
                 color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f); // Soft White
                 break;
@@ -279,8 +278,9 @@ void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basic
         lightData.isActive = true;
 
         // Light type properties
+        // TODO: Bad shadow map quality. need to improve it
         lightData.type = LightType::Directional;
-        lightData.directional.shadowOrthoSize = 1.0f;
+        lightData.directional.shadowOrthoSize = 20.0f;
 
         if (lightData.castShadow) {
             if (lightData.type == LightType::Point) {
@@ -381,7 +381,7 @@ void Scene::createSpotLights(int n, float circleRadius, float yPosition, Shader*
     }
 }
 
-void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHeight, Shader* basicShader, bool castShadows) {
+void Scene::createSpheres(int n, float fieldSize, float minHeight, float maxHeight, Shader* basicShader, bool castShadows) {
     Mesh* asteroidMesh = MeshGen::createSphere(25, 25);
     if (!asteroidMesh) {
         return;
@@ -437,7 +437,7 @@ void Scene::createAsteroids(int n, float fieldSize, float minHeight, float maxHe
             asteroidLight.intensity = 25.0f;
             asteroidLight.point.radius = 15.0f;
             asteroidLight.type = LightType::Point;
-            asteroidLight.castShadow = false;
+            asteroidLight.castShadow = true;
             asteroidLight.isActive = true;
             SceneUtils::addPointLightComponents(registry, asteroidEntity, asteroidLight);
         }

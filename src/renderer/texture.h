@@ -13,9 +13,6 @@ public:
     void bind(unsigned int slot = 0) const;
     void unbind() const;
 
-    // Properties
-    int width, height, nrChannels;
-
 private:
     unsigned int m_textureID;
 };

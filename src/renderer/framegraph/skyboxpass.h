@@ -2,6 +2,7 @@
 #define SKYBOXPASS_H
 
 #include "renderpass.h"
+#include <iostream>
 
 class SkyboxPass : public RenderPass {
 public:
@@ -10,21 +11,10 @@ public:
     void setup() override {
         std::string skyboxVertexPath = ASSET_DIR "shaders/core/skybox.vs";
         std::string skyboxFragmentPath = ASSET_DIR "shaders/core/skybox.fs";
-        std::vector<std::string> faces = {
-            ASSET_DIR "textures/skyboxes/bspace/1.png", // Left (-X)
-            ASSET_DIR "textures/skyboxes/bspace/3.png", // Back (-Z)
-            ASSET_DIR "textures/skyboxes/bspace/5.png", // Bottom (-Y)
-            ASSET_DIR "textures/skyboxes/bspace/6.png", // Top (+Y)
-            ASSET_DIR "textures/skyboxes/bspace/2.png", // Front (+Z)
-            ASSET_DIR "textures/skyboxes/bspace/4.png"  // Right (+X)
-        };
 
         if (!m_skyboxShader.load(skyboxVertexPath, skyboxFragmentPath)) {
             std::cerr << "[Error] Renderer::loadSkyboxShader: Failed to create skyboxShader!\n";
         }
-
-        // Load the cubemap textures from image files
-        m_skyboxTexture = CubeMap::createFromImages(faces);
 
         // Get the cubemap vertices from MeshGen
         const float* cubeMapVerts = MeshGen::createCubeMapVerts();
@@ -90,6 +80,19 @@ public:
 
         glDepthFunc(originalDepthFunc);
         glDepthMask(depthMaskEnabled);
+    }
+
+    unsigned int getSkybox() { return m_skyboxTexture; }
+
+    void loadSkyBox(const std::vector<std::string>& skyboxFilePaths) {
+        // Ensure we have exactly 6 faces for the skybox
+        if (skyboxFilePaths.size() != 6) {
+            std::cerr << "Skybox requires exactly 6 texture paths\n";
+            return;
+        }
+
+        // Load the cubemap textures from the provided file paths
+        m_skyboxTexture = CubeMap::createFromImages(skyboxFilePaths);
     }
 
 private:

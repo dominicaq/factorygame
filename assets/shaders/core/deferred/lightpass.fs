@@ -60,6 +60,28 @@ uniform sampler2D shadowMaps[20];
 // Constants
 const float PI = 3.14159265359;
 
+#define SHADOW_PROCESSING
+float PCFSampling(vec3 projCoords, sampler2D shadowMap, int kernelSize, float bias) {
+    float shadowFactor = 0.0;
+    vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0));
+
+    // Get depth from shadow map once to avoid redundant texture fetches
+    float currentDepth = projCoords.z;
+
+    // Use hardware PCF if available (gives better performance)
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            vec2 offset = vec2(float(x), float(y)) * texelSize;
+            float depthSample = texture(shadowMap, projCoords.xy + offset).r;
+            shadowFactor += (currentDepth - bias > depthSample) ? 1.0 : 0.0;
+        }
+    }
+
+    float numSamples = float(kernelSize * kernelSize);
+    shadowFactor /= numSamples;
+    return shadowFactor;
+}
+
 float calculateDirectionalShadow(vec3 fragPos, DirectionalLight light) {
     if (light.castShadow == 0) return 0.0; // No shadow if shadow casting is disabled
 
@@ -86,51 +108,30 @@ float calculateDirectionalShadow(vec3 fragPos, DirectionalLight light) {
     mat4 lightMatrix = lightMatrices[light.lightMatrixIndex];
     vec4 fragPosLightSpace = lightMatrix * vec4(fragPos, 1.0);
 
-    // Perform perspective division for perspective light matrices
-    // For orthographic matrices, w should be 1.0, so this will not change the result
+    // Perspective division
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-
     // Transform to [0,1] range
     projCoords = projCoords * 0.5 + 0.5;
-
-    // Check if fragment is outside the shadow map
+    // Check if fragment is outside the light's view frustum
     if (projCoords.x < 0.0 || projCoords.x > 1.0 ||
         projCoords.y < 0.0 || projCoords.y > 1.0 ||
         projCoords.z < 0.0 || projCoords.z > 1.0) {
         return 0.0;
     }
 
-    // PCF Sampling
-    float shadowFactor = 0.0;
-    vec2 texelSize = 1.0 / vec2(textureSize(shadowMaps[light.shadowMapIndex], 0));
-    float currentDepth = projCoords.z;
-
-    // Use hardware PCF with larger kernel for higher quality shadows
-    int kernelSize = 3; // 3x3 kernel for balance between quality and performance
-
-    for (int x = -kernelSize/2; x <= kernelSize/2; ++x) {
-        for (int y = -kernelSize/2; y <= kernelSize/2; ++y) {
-            vec2 offset = vec2(float(x), float(y)) * texelSize;
-            float depthSample = texture(shadowMaps[light.shadowMapIndex], projCoords.xy + offset).r;
-            shadowFactor += (currentDepth - bias > depthSample) ? 1.0 : 0.0;
-        }
-    }
-
-    shadowFactor /= float(kernelSize * kernelSize);
-
-    // Implement cascaded shadow mapping transition (if implemented in your engine)
-    // This would require additional uniforms for cascade splits and blend factors
+    float shadowFactor = PCFSampling(projCoords, shadowMaps[light.shadowMapIndex], 3, bias);
 
     // Add soft shadow edges
-    float shadowDistance = abs(currentDepth - texture(shadowMaps[light.shadowMapIndex], projCoords.xy).r);
-    float shadowEdgeBlend = smoothstep(0.0, bias * 2.0, shadowDistance);
+    // float currentDepth = projCoords.z;
+    // float shadowDistance = abs(currentDepth - texture(shadowMaps[light.shadowMapIndex], projCoords.xy).r);
+    // float shadowEdgeBlend = smoothstep(0.0, bias * 2.0, shadowDistance);
 
-    // Fade shadows at distance to reduce artifacts at shadow map boundaries
-    // Assuming shadowOrthoSize corresponds to the shadow map coverage
-    float distanceToCamera = length(u_CameraPosition - fragPos);
-    float shadowFade = 1.0 - smoothstep(light.shadowOrthoSize * 0.9, light.shadowOrthoSize, distanceToCamera);
+    // // Fade shadows at distance to reduce artifacts at shadow map boundaries
+    // // Assuming shadowOrthoSize corresponds to the shadow map coverage
+    // float distanceToCamera = length(u_CameraPosition - fragPos);
+    // float shadowFade = 1.0 - smoothstep(light.shadowOrthoSize * 0.9, light.shadowOrthoSize, distanceToCamera);
 
-    return shadowFactor * shadowFade;
+    return shadowFactor;
 }
 
 float calculatePointShadow(vec3 fragPos, PointLight light) {
@@ -243,40 +244,19 @@ float calculateSpotShadow(vec3 fragPos, SpotLight light) {
     mat4 lightMatrix = lightMatrices[light.lightMatrixIndex];
     vec4 fragPosLightSpace = lightMatrix * vec4(fragPos, 1.0);
 
-    // Perspective division
+    // Check if frag is in light view frustum
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-
-    // Transform to [0,1] range
     projCoords = projCoords * 0.5 + 0.5;
-
-    // Check if fragment is outside the light's view frustum
     if (projCoords.x < 0.0 || projCoords.x > 1.0 ||
         projCoords.y < 0.0 || projCoords.y > 1.0 ||
         projCoords.z < 0.0 || projCoords.z > 1.0) {
         return 0.0;
     }
 
-    // PCF Sampling with optimizations
-    float shadowFactor = 0.0;
-    int kernelSize = 3;
-    vec2 texelSize = 1.0 / vec2(textureSize(shadowMaps[light.shadowMapIndex], 0));
+    float shadowFactor = PCFSampling(projCoords, shadowMaps[light.shadowMapIndex], 3, bias);
 
-    // Get depth from shadow map once to avoid redundant texture fetches
-    float currentDepth = projCoords.z;
-
-    // Use hardware PCF if available (gives better performance)
-    for (int x = -1; x <= 1; ++x) {
-        for (int y = -1; y <= 1; ++y) {
-            vec2 offset = vec2(float(x), float(y)) * texelSize;
-            float depthSample = texture(shadowMaps[light.shadowMapIndex], projCoords.xy + offset).r;
-            shadowFactor += (currentDepth - bias > depthSample) ? 1.0 : 0.0;
-        }
-    }
-
-    shadowFactor /= 9.0;
-
-    // Add depth-based blending to gradually fade shadows at their edges
     // This creates more natural shadow transitions
+    float currentDepth = projCoords.z;
     float shadowDistance = abs(currentDepth - texture(shadowMaps[light.shadowMapIndex], projCoords.xy).r);
     float shadowEdgeFactor = smoothstep(0.0, bias * 2.0, shadowDistance);
 
@@ -286,8 +266,9 @@ float calculateSpotShadow(vec3 fragPos, SpotLight light) {
 
     return shadowFactor * shadowStrength;
 }
+#define END_SHADOW_PROCESSING
 
-// PBR functions - unchanged
+// PBR functions
 float DistributionGGX(vec3 N, vec3 H, float roughness) {
     float a = roughness * roughness;
     float a2 = a * a;

@@ -11,6 +11,7 @@ struct Material {
     // Shader ptr
     Shader* shader = nullptr;
 
+    // TODO: Maybe in the future I can reduce Texture* (8 bytes on 64bit) to just Texture (4 bytes).
     // Texture ptr(s)
     Texture* albedoMap = nullptr;
     Texture* normalMap = nullptr;

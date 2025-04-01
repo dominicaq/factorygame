@@ -31,6 +31,10 @@ public:
 
     // Execute all render passes, passing in the renderer and registry
     void executePasses(Renderer& renderer, entt::registry& registry) {
+        // Clear the default framebuffer at the start of each frame
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         m_activeScene.updateInstanceMap();
         for (auto& pass : m_renderPasses) {
             pass->execute(renderer, registry);

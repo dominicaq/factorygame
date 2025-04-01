@@ -49,12 +49,38 @@ int main() {
     Renderer renderer(settings, &camera);
     window.setRenderer(&renderer);
 
+    // Create the skybox file paths (this should be handled by scene)
+    std::vector<std::string> skyboxPaths = {
+        ASSET_DIR "textures/skyboxes/bspace/1.png",
+        ASSET_DIR "textures/skyboxes/bspace/3.png",
+        ASSET_DIR "textures/skyboxes/bspace/5.png",
+        ASSET_DIR "textures/skyboxes/bspace/6.png",
+        ASSET_DIR "textures/skyboxes/bspace/2.png",
+        ASSET_DIR "textures/skyboxes/bspace/4.png"
+    };
+
+    // Create the frame graph with scene
     FrameGraph frameGraph(scene);
     frameGraph.addRenderPass(std::make_unique<ShadowPass>());
     frameGraph.addRenderPass(std::make_unique<GeometryPass>());
-    frameGraph.addRenderPass(std::make_unique<LightPass>());
-    frameGraph.addRenderPass(std::make_unique<SkyboxPass>());
+
+    // This is kind of messy and a one time solution. Maybe have a shared resoure map in the framegraph.
+    // Create and initialize skybox pass with the paths
+    auto skyboxPass = std::make_unique<SkyboxPass>();
+    skyboxPass->loadSkyBox(skyboxPaths);
+    // Keep a reference to the skybox pass for later use
+    SkyboxPass* skyboxPassPtr = skyboxPass.get();
+    frameGraph.addRenderPass(std::move(skyboxPass));
+
+    // Draw the forward objects on top of the skybox
     frameGraph.addRenderPass(std::make_unique<ForwardPass>());
+
+    // Light pass is to be the final pass
+    auto lightPass = std::make_unique<LightPass>();
+    lightPass->setSkybox(skyboxPassPtr->getSkybox());
+    frameGraph.addRenderPass(std::move(lightPass));
+
+    // Post processing passes. Debug pass is like a post process.
     frameGraph.addRenderPass(std::make_unique<DebugPass>(&camera));
 
     // Init all meshses
@@ -117,6 +143,7 @@ int main() {
         profiler.start("Rendering");
         // TODO: currently each pass calculates the view matrix.
         // later update a single resource per frame (the view matrix) to each pass
+        // TODO: maybe also do this for skybox?
         frameGraph.executePasses(renderer, scene.registry);
         profiler.end("Rendering");
 
@@ -131,6 +158,7 @@ int main() {
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();
         lastFrame = currentFrame;
+        // while(true){}
     }
 
     scene.registry.clear();

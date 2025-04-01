@@ -3,7 +3,8 @@
 
 #include <iostream>
 
-Texture::Texture(const std::string& filePath) : m_textureID(0), width(0), height(0), nrChannels(0) {
+Texture::Texture(const std::string& filePath) : m_textureID(0) {
+    int width = 0, height = 0, nrChannels = 0;
     // Use ResourceLoader to load image data
     unsigned char* data = ResourceLoader::loadImage(filePath, &width, &height, &nrChannels);
 
