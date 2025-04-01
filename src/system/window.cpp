@@ -151,7 +151,7 @@ void Window::resize(int newWidth, int newHeight) {
     // Notify the renderer about the framebuffer resize to adjust the G-buffer
     if (m_renderer) {
         Renderer* renderer = static_cast<Renderer*>(m_renderer);
-        renderer->resizeGBuffer(framebufferWidth, framebufferHeight);
+        renderer->resize(framebufferWidth, framebufferHeight);
     }
 }
 
@@ -279,7 +279,7 @@ void Window::framebufferSizeCallback(GLFWwindow* window, int width, int height) 
     Window* windowPtr = static_cast<Window*>(glfwGetWindowUserPointer(window));
     if (windowPtr && windowPtr->m_renderer) {
         Renderer* renderer = static_cast<Renderer*>(windowPtr->m_renderer);
-        renderer->resizeGBuffer(width, height);
+        renderer->resize(width, height);
     }
 }
 

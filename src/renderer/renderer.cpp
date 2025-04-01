@@ -431,7 +431,7 @@ void Renderer::drawScreenQuad() {
     glBindVertexArray(0);
 }
 
-void Renderer::resizeGBuffer(int width, int height) {
+void Renderer::resize(int width, int height) {
     m_width = width;
     m_height = height;
 

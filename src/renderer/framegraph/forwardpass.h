@@ -12,10 +12,6 @@ public:
         Camera* camera = renderer.getCamera();
         const glm::mat4& viewMatrix = camera->getViewMatrix();
 
-        // broken
-        // auto& viewMatrixResource = registry.ctx().get<ViewMatrixResource>();
-        // const glm::mat4& viewMatrix = viewMatrixResource.viewMatrix;
-
         // Enable depth testing for forward pass
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);

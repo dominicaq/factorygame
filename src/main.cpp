@@ -11,9 +11,9 @@
 #include "renderer/framegraph/framegraph.h"
 #include "renderer/framegraph/debugpass.h"
 
-#include "debugging/profiler.h"
-#include "debugging/pcinfo.h"
-#include "imgui/imgui.h"
+#include "editor/editor.h"
+#include "editor/profiler.h"
+#include "editor/pcinfo.h"
 
 #include <string>
 #include <vector>
@@ -114,6 +114,9 @@ int main() {
     float lastFrame = 0.0f;
 
     Profiler profiler;
+    Editor editor(settings.width, settings.height);
+    editor.setRenderer(&renderer);
+
     // -------------------- Game Loop -------------------
     while (!window.shouldClose()) {
         float currentFrame = (float)glfwGetTime();
@@ -146,19 +149,19 @@ int main() {
         // TODO: maybe also do this for skybox?
         frameGraph.executePasses(renderer, scene.registry);
         profiler.end("Rendering");
-
         profiler.end("Frame");
 
         // ------------------ ImGui Rendering ------------------
         window.beginImGuiFrame();
-        profiler.record(1.0f / deltaTime);
-        profiler.display();
+        editor.drawEditorLayout(scene, renderer);
+        // Draw the screen quad to apply the lighting pass
+        // profiler.record(1.0f / deltaTime);
+        // profiler.display();
         window.endImGuiFrame();
 
         // Swap buffers and poll events
         window.swapBuffersAndPollEvents();
         lastFrame = currentFrame;
-        // while(true){}
     }
 
     scene.registry.clear();

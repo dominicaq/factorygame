@@ -55,7 +55,7 @@ public:
     /*
      * Recreate G-buffer with new dimensions
      */
-    void resizeGBuffer(int width, int height);
+    void resize(int width, int height);
 
     int getNumAttachments();
 
