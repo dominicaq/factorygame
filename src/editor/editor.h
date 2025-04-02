@@ -3,6 +3,7 @@
 #include "../engine.h"
 #include "../scene/scene.h"
 #include "imgui/imgui.h"
+#include "terminal.h"
 
 class Editor {
 public:
@@ -15,6 +16,14 @@ public:
         m_leftPanelRatio = 0.2f;      // Left panel width ratio
         m_rightPanelRatio = 0.2f;     // Right panel width ratio
         m_renderer = nullptr;         // Initialize renderer pointer
+
+        Terminal& terminal = Terminal::getInstance();
+        terminal.registerStdCapture();
+    }
+
+    ~Editor() {
+        Terminal& terminal = Terminal::getInstance();
+        terminal.restoreStdCapture();
     }
 
     // Set renderer reference
@@ -35,11 +44,11 @@ public:
 
         // Check if window size has changed
         if (m_width != viewport->Size.x || m_height != viewport->Size.y) {
-            m_width = viewport->Size.x;
-            m_height = viewport->Size.y;
+            m_width = (int)viewport->Size.x;
+            m_height = (int)viewport->Size.y;
 
             // Resize framebuffer and renderer
-            resizeFramebuffer();
+            m_saveFrameBuffer.resize(m_width, m_height);
             if (m_renderer != nullptr) {
                 m_renderer->resize(m_width, m_height);
             }
@@ -194,7 +203,7 @@ public:
 
         // Bottom panel - Terminal
         ImGui::BeginChild("BottomPanel", ImVec2(0, 0), true);
-        drawTerminal();
+        Terminal::getInstance().drawTerminal();
         ImGui::EndChild();
 
         ImGui::EndChild(); // End MainLayout
@@ -242,7 +251,7 @@ private:
     float m_verticalSplitRatio;
     float m_leftPanelRatio;
     float m_rightPanelRatio;
-    Renderer* m_renderer;  // Store a reference to the renderer
+    Renderer* m_renderer;
 
     // Property view variables
     static float m_entityProperty;
@@ -282,7 +291,11 @@ private:
         ImGui::Text("Game View");
         ImGui::Separator();
 
-        // Add toolbar for game controls
+        // Calculate available width to position the 16:9 button at the far right
+        float windowWidth = ImGui::GetContentRegionAvail().x;
+        float rightSideWidth = 120.0f; // Width for the 16:9 button and text
+
+        // Toolbar for game controls
         if (ImGui::Button("Play")) {}
         ImGui::SameLine();
         if (ImGui::Button("Pause")) {}
@@ -293,33 +306,52 @@ private:
         static float gameSpeed = 1.0f;
         ImGui::SliderFloat("Speed", &gameSpeed, 0.1f, 2.0f);
 
-        // Get content region for rendering the scene
-        ImVec2 contentSize = ImGui::GetContentRegionAvail();
+        // Push the 16:9 toggle to the far right
+        ImGui::SameLine();
+        float spacing = windowWidth - ImGui::GetCursorPosX() - rightSideWidth;
+        if (spacing > 0)
+            ImGui::Dummy(ImVec2(spacing, 0.0f));
 
-        // Center the game view if it's smaller than available space
-        float aspectRatio = 16.0f / 9.0f; // Assuming 16:9 aspect ratio
-        ImVec2 renderSize = contentSize;
-
-        // Maintain aspect ratio
-        if (contentSize.x / contentSize.y > aspectRatio) {
-            renderSize.x = contentSize.y * aspectRatio;
-            float offset = (contentSize.x - renderSize.x) * 0.5f;
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
-        } else {
-            renderSize.y = contentSize.x / aspectRatio;
-            float offset = (contentSize.y - renderSize.y) * 0.5f;
-            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + offset);
+        // Add 16:9 aspect ratio toggle button on the same line
+        ImGui::SameLine();
+        static bool enforce16by9 = false;
+        if (ImGui::Button(enforce16by9 ? "16:9 On" : "16:9 Off")) {
+            enforce16by9 = !enforce16by9;
         }
 
-        // Retrieve the texture from the framebuffer for rendering scene
-        ImTextureID textureID = (ImTextureID)(intptr_t)m_saveFrameBuffer.getColorAttachment(0);
+        // Get content region for rendering
+        ImVec2 contentSize = ImGui::GetContentRegionAvail();
+        ImVec2 renderSize = contentSize;
+        float offsetX = 0.0f, offsetY = 0.0f;
 
-        // Render scene view (centered)
+        // Apply aspect ratio if enabled
+        if (enforce16by9) {
+            float aspectRatio = 16.0f / 9.0f;
+            if (contentSize.x / contentSize.y > aspectRatio) {
+                renderSize.x = contentSize.y * aspectRatio;
+                offsetX = (contentSize.x - renderSize.x) * 0.5f;
+            } else {
+                renderSize.y = contentSize.x / aspectRatio;
+                offsetY = (contentSize.y - renderSize.y) * 0.5f;
+            }
+        }
+
+        // Set cursor position to account for centering when using 16:9
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offsetX);
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + offsetY);
+
+        // Render the texture
+        ImTextureID textureID = (ImTextureID)(intptr_t)m_saveFrameBuffer.getColorAttachment(0);
         ImGui::Image(textureID, renderSize, ImVec2(0, 1), ImVec2(1, 0));
 
-        // Display resolution info
-        ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ImGui::GetFrameHeightWithSpacing());
-        ImGui::Text("Resolution: %dx%d", (int)renderSize.x, (int)renderSize.y);
+        // Position resolution text at the top right of the game view
+        std::string resText = "Resolution: " + std::to_string((int)renderSize.x) + "x" + std::to_string((int)renderSize.y);
+        ImVec2 textSize = ImGui::CalcTextSize(resText.c_str());
+        ImVec2 textPos = ImGui::GetItemRectMin();
+        textPos.x += renderSize.x - textSize.x - 10; // 10 pixels padding from right edge
+        textPos.y += 10; // 10 pixels padding from top
+
+        ImGui::GetWindowDrawList()->AddText(textPos, IM_COL32(255, 255, 255, 255), resText.c_str());
     }
 
     void drawPropertyView() {
@@ -365,32 +397,6 @@ private:
         }
     }
 
-    void drawTerminal() {
-        ImGui::Text("Terminal");
-        ImGui::Separator();
-
-        // Terminal output area (read-only)
-        ImGui::BeginChild("TerminalOutput", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()), true, ImGuiWindowFlags_HorizontalScrollbar);
-        ImGui::TextWrapped("Welcome to the engine terminal.");
-        ImGui::TextWrapped("> Last command executed successfully.");
-        ImGui::EndChild();
-
-        // Terminal input
-        ImGui::PushItemWidth(-1);
-        if (!m_terminalFocus && ImGui::IsWindowFocused())
-            ImGui::SetKeyboardFocusHere();
-
-        if (ImGui::InputText("##TerminalInput", m_terminalInput, IM_ARRAYSIZE(m_terminalInput),
-                            ImGuiInputTextFlags_EnterReturnsTrue)) {
-            // Process terminal input
-            memset(m_terminalInput, 0, sizeof(m_terminalInput));
-            m_terminalFocus = true;
-        } else {
-            m_terminalFocus = false;
-        }
-        ImGui::PopItemWidth();
-    }
-
     void copyAndClearScreen() {
         // Retrieve the current viewport dimensions
         GLint viewport[4];
@@ -411,11 +417,6 @@ private:
         // Unbind the framebuffer and return to default framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    }
-
-    // Resize the framebuffer when the window size changes
-    void resizeFramebuffer() {
-        m_saveFrameBuffer.resize(m_width, m_height);
     }
 };
 

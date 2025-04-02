@@ -36,56 +36,45 @@ int main() {
         return -1;
     }
     inputManager.init(window.getGLFWwindow());
-    printPCInfo();
+
+    // Init editor specific UI
+    Profiler profiler;
+    Editor editor(settings.width, settings.height);
+    std::cout << "Success. Running engine setup...\n";
 
     // ------------------------ Scene Setup --------------------------
     Scene scene;
     scene.loadScene();
 
-    // ----------------------- Renderer Setup -----------------------
+    // ----------------------- FrameGraph Setup -----------------------
 
     // Create renderer and send mesh data to GPU
     Camera& camera = scene.getPrimaryCamera();
     Renderer renderer(settings, &camera);
     window.setRenderer(&renderer);
-
-    // Create the skybox file paths (this should be handled by scene)
-    std::vector<std::string> skyboxPaths = {
-        ASSET_DIR "textures/skyboxes/bspace/1.png",
-        ASSET_DIR "textures/skyboxes/bspace/3.png",
-        ASSET_DIR "textures/skyboxes/bspace/5.png",
-        ASSET_DIR "textures/skyboxes/bspace/6.png",
-        ASSET_DIR "textures/skyboxes/bspace/2.png",
-        ASSET_DIR "textures/skyboxes/bspace/4.png"
-    };
+    editor.setRenderer(&renderer);
 
     // Create the frame graph with scene
     FrameGraph frameGraph(scene);
     frameGraph.addRenderPass(std::make_unique<ShadowPass>());
     frameGraph.addRenderPass(std::make_unique<GeometryPass>());
 
-    // This is kind of messy and a one time solution. Maybe have a shared resoure map in the framegraph.
-    // Create and initialize skybox pass with the paths
     auto skyboxPass = std::make_unique<SkyboxPass>();
-    skyboxPass->loadSkyBox(skyboxPaths);
-    // Keep a reference to the skybox pass for later use
-    SkyboxPass* skyboxPassPtr = skyboxPass.get();
+    skyboxPass->setSkyBox(scene.getSkyBox());
     frameGraph.addRenderPass(std::move(skyboxPass));
 
-    // Draw the forward objects on top of the skybox
     frameGraph.addRenderPass(std::make_unique<ForwardPass>());
 
-    // Light pass is to be the final pass
     auto lightPass = std::make_unique<LightPass>();
-    lightPass->setSkybox(skyboxPassPtr->getSkybox());
+    lightPass->setSkyBox(scene.getSkyBox());
     frameGraph.addRenderPass(std::move(lightPass));
 
     // Post processing passes. Debug pass is like a post process.
     frameGraph.addRenderPass(std::make_unique<DebugPass>(&camera));
 
+    // ----------------------- Renderer Setup -----------------------
     // Init all meshses
-    auto renderQuery = scene.registry.view<Mesh*, ModelMatrix>();
-    renderQuery.each([&](auto entity, Mesh* mesh, ModelMatrix&) {
+    scene.registry.view<Mesh*, ModelMatrix>().each([&](entt::entity entity, Mesh* mesh, const ModelMatrix& modelMatrix) {
         renderer.initMeshBuffers(mesh);
     });
 
@@ -101,21 +90,18 @@ int main() {
         renderer.setupInstanceAttributes(instanceID, matrices);
     }
 
-    frameGraph.setupPasses();
-
     // -------------------- Start Game -------------------
+    frameGraph.setupPasses();
     GameObjectSystem gameObjectSystem(scene.registry);
     TransformSystem transformSystem(scene.registry);
     LightSystem lightSystem(scene.registry);
 
+    // printPCInfo();
+    std::cout << "Success. Starting game...\n";
     gameObjectSystem.startAll();
 
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
-
-    Profiler profiler;
-    Editor editor(settings.width, settings.height);
-    editor.setRenderer(&renderer);
 
     // -------------------- Game Loop -------------------
     while (!window.shouldClose()) {
@@ -153,10 +139,9 @@ int main() {
 
         // ------------------ ImGui Rendering ------------------
         window.beginImGuiFrame();
+        profiler.record(1.0f / deltaTime);
+        profiler.display();
         editor.drawEditorLayout(scene, renderer);
-        // Draw the screen quad to apply the lighting pass
-        // profiler.record(1.0f / deltaTime);
-        // profiler.display();
         window.endImGuiFrame();
 
         // Swap buffers and poll events

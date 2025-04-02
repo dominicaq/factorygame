@@ -82,18 +82,7 @@ public:
         glDepthMask(depthMaskEnabled);
     }
 
-    unsigned int getSkybox() { return m_skyboxTexture; }
-
-    void loadSkyBox(const std::vector<std::string>& skyboxFilePaths) {
-        // Ensure we have exactly 6 faces for the skybox
-        if (skyboxFilePaths.size() != 6) {
-            std::cerr << "Skybox requires exactly 6 texture paths\n";
-            return;
-        }
-
-        // Load the cubemap textures from the provided file paths
-        m_skyboxTexture = CubeMap::createFromImages(skyboxFilePaths);
-    }
+    void setSkyBox(unsigned int skyboxTexture) { m_skyboxTexture = skyboxTexture; }
 
 private:
     unsigned int m_skyboxVAO, m_skyboxVBO;

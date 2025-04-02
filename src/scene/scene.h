@@ -44,6 +44,13 @@ public:
     void setPrimaryCamera(entt::entity cameraEntity);
 
     // =========================================================================
+    // SKybox Management
+    // =========================================================================
+    unsigned int getSkyBox() const { return m_skyboxHandle; }
+
+    void loadSkyBox(const std::vector<std::string>& skyboxFilePaths);
+
+    // =========================================================================
     // Mesh Instancing
     // =========================================================================
     /*
@@ -84,6 +91,7 @@ private:
     std::vector<Mesh*> m_meshInstances;
     std::unordered_map<size_t, size_t> m_instanceCounts;
     std::unordered_map<size_t, size_t> m_currentIndices;
+    unsigned int m_skyboxHandle;
     bool m_instanceCountsDirty = true;
 
     // Misc

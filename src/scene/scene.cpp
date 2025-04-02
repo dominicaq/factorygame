@@ -19,6 +19,17 @@ void Scene::loadScene() {
     m_wireframeMaterial = new Material(wireframeShader);
     m_wireframeMaterial->albedoColor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
 
+    // ------------------------ Skybox Setup ------------------------
+    std::vector<std::string> skyboxPaths = {
+        ASSET_DIR "textures/skyboxes/bspace/1.png",
+        ASSET_DIR "textures/skyboxes/bspace/3.png",
+        ASSET_DIR "textures/skyboxes/bspace/5.png",
+        ASSET_DIR "textures/skyboxes/bspace/6.png",
+        ASSET_DIR "textures/skyboxes/bspace/2.png",
+        ASSET_DIR "textures/skyboxes/bspace/4.png"
+    };
+    loadSkyBox(skyboxPaths);
+
     // ------------------------ Setup Camera ------------------------
     entt::entity cameraEntity = registry.create();
     SceneData save_cameraData;
@@ -455,6 +466,17 @@ Camera& Scene::getPrimaryCamera() {
 
 void Scene::setPrimaryCamera(entt::entity cameraEntity) {
     m_primaryCameraEntity = cameraEntity;
+}
+
+void Scene::loadSkyBox(const std::vector<std::string>& skyboxFilePaths) {
+    // Ensure we have exactly 6 faces for the skybox
+    if (skyboxFilePaths.size() != 6) {
+        std::cerr << "Skybox requires exactly 6 texture paths\n";
+        return;
+    }
+
+    // Load the cubemap textures from the provided file paths
+    m_skyboxHandle = CubeMap::createFromImages(skyboxFilePaths);
 }
 
 // Scene instancing
