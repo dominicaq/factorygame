@@ -16,8 +16,6 @@ This project is an OpenGL deferred renderer with plans to become a game engine, 
 - **GameObject Parent-Child Hierarchy** – Supports a parent-child structure for `GameObject` transformations, where child objects inherit transformations from their parent objects.
 - **Debug Gizmos** - Draw wireframe gizmos for visual debugging
 
-Okay, here's an example of an "Engine Specifics" section you can add to your README.md, based on the information you've provided and common engine details. Remember to fill in the actual values and details specific to your engine.
-
 Markdown
 
 ## Engine Specifics
