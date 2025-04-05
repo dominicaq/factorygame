@@ -37,18 +37,14 @@ The engine utilizes an Entity-Component-System (ECS) architecture powered by the
 * **Mesh:** Stores all required data for a single mesh, including vertices, indices, normals, tangents, and bitangents.
 
 ### Rendering
-
-**Limitations:**
-
-* **Maximum Lights:** The engine currently supports up to 1000 lights to maintain performance. This limit can be adjusted in the codebase if needed.
-* **Maximum Shadow Casters:** The number of simultaneous shadow casters is limited to 20, primarily due to hardware constraints.
-
-**Features:**
-
 * **Physically Based Rendering (PBR) Lighting Model:** Implements a PBR lighting model for realistic material rendering.
 * **Point and Spot Lights:** Supports point, spot, and directional lights.
 * **Optional Shadow Casting:** Point, spot, and directional lights can be configured to cast shadows.
 * **Optional Parallax Occlusion Mapping:** If a `Mesh` `Material` has a `heightMap` texture, the engine will apply this feature.
+  
+**Limitations:**
+* **Maximum Lights:** The engine currently supports up to 1000 lights to maintain performance. This limit can be adjusted in the codebase if needed.
+* **Maximum Shadow Casters:** The number of simultaneous shadow casters is limited to 20, primarily due to hardware constraints.
 
 ### Miscellaneous
 
