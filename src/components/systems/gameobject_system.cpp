@@ -32,6 +32,22 @@ void GameObjectSystem::updateAll(const float& currentTime, const float& deltaTim
         }
         gameObject.updateScripts(deltaTime);
     }
+
+    // If any objects called to destroy themselves, we clean them up
+    bool updateInstanceCounts = false;
+    for (const auto& [entity] : m_registry.view<PendingDestroy>().each()) {
+        if (m_registry.valid(entity)) {
+            if (m_registry.any_of<MeshInstance>(entity)) {
+                updateInstanceCounts = true;
+            }
+
+            m_registry.destroy(entity);
+        }
+    }
+
+    if (updateInstanceCounts && m_onDirtyInstance) {
+        m_onDirtyInstance();
+    }
 }
 
 std::vector<GameObject*> GameObjectSystem::getActiveGameObjects() const {
@@ -43,4 +59,8 @@ std::vector<GameObject*> GameObjectSystem::getActiveGameObjects() const {
     }
 
     return activeObjects;
+}
+
+void GameObjectSystem::setOnDirtyInstanceCallback(std::function<void()> callback) {
+    m_onDirtyInstance = std::move(callback);
 }

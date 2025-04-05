@@ -16,6 +16,7 @@ private:
     glm::vec3 targetDirection;
     float timeSinceDirectionChange = 0.0f;
     float speedMultiplier = 1.0f; // Oscillating speed effect
+    float timeAlive = 0.0f;
 
     void start() override {
         setRandomDirection();
@@ -25,6 +26,7 @@ private:
 
     void update(const float& deltaTime) override {
         timeSinceDirectionChange += deltaTime;
+        timeAlive += deltaTime;
 
         // Smoothly interpolate between directions
         if (timeSinceDirectionChange >= directionChangeDuration) {
@@ -41,6 +43,8 @@ private:
 
         checkAndTeleportBorders(position);
         gameObject->setPosition(glm::vec3(position.x, 0, position.z));
+
+        // maybeDestroyRandomly(timeAlive);
     }
 
     void setRandomDirection() {
@@ -56,5 +60,13 @@ private:
         if (position.x < -borderSize) position.x = borderSize;
         if (position.z > borderSize) position.z = -borderSize;
         if (position.z < -borderSize) position.z = borderSize;
+    }
+
+    void maybeDestroyRandomly(float timeSinceStart, float chance = 0.01f) {
+        if (timeSinceStart >= 5.0f) {
+            if (static_cast<float>(std::rand()) / RAND_MAX < chance) {
+                gameObject->destroy();
+            }
+        }
     }
 };

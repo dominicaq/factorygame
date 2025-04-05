@@ -34,8 +34,8 @@ struct Mesh {
 };
 
 struct MeshInstance {
-    size_t id = SIZE_MAX;
-    Material* material = nullptr;
+    Material* material;
+    uint8_t id;
 };
 
 #endif // MESH_H

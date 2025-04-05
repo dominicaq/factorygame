@@ -15,11 +15,6 @@
 #include "editor/profiler.h"
 #include "editor/pcinfo.h"
 
-#include <string>
-#include <vector>
-#include <iostream>
-#include <sstream>
-
 // Define globals
 InputManager inputManager;
 DebugContext DEBUG_CTX;
@@ -40,7 +35,7 @@ int main() {
     // Init editor specific UI
     Profiler profiler;
     Editor editor(settings.width, settings.height);
-    std::cout << "Success. Running engine setup...\n";
+    std::cout << "[Info] Success. Running engine setup...\n";
 
     // ------------------------ Scene Setup --------------------------
     Scene scene;
@@ -93,11 +88,14 @@ int main() {
     // -------------------- Start Game -------------------
     frameGraph.setupPasses();
     GameObjectSystem gameObjectSystem(scene.registry);
+    gameObjectSystem.setOnDirtyInstanceCallback([&scene]() {
+        scene.flagDirtyInstanceCount();
+    });
     TransformSystem transformSystem(scene.registry);
     LightSystem lightSystem(scene.registry);
 
-    // printPCInfo();
-    std::cout << "Success. Starting game...\n";
+    std::cout << "[Info] Success. Starting game...\n";
+    printPCInfo();
     gameObjectSystem.startAll();
 
     float deltaTime = 0.0f;

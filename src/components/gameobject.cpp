@@ -85,10 +85,12 @@ void GameObject::destroy() {
     for (auto it = entitiesToDestroy.rbegin(); it != entitiesToDestroy.rend(); ++it) {
         entt::entity entity = *it;
         if (m_registry.valid(entity)) {
-            m_registry.destroy(entity);
+            // Queue these entities for destruction
+            m_registry.emplace_or_replace<PendingDestroy>(entity);
         }
     }
 
+    // Mark this gameobject as no longer usable
     m_entity = entt::null;
 }
 

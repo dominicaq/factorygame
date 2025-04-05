@@ -53,6 +53,7 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/external/glad/include
     ${CMAKE_SOURCE_DIR}/external/imgui
     ${CMAKE_SOURCE_DIR}/external/implot
+    ${CMAKE_SOURCE_DIR}/external/cereal-1.3.2/include
     ${CMAKE_SOURCE_DIR}/external/
 )
 

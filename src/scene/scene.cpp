@@ -208,7 +208,7 @@ void Scene::loadScene() {
     int n = 5;
     float circleRadius = 10.0f;
     float yPosition = 10.0f;
-    // createSuns(1, 50.0f, 50.0f, basicShader);
+    createSuns(1, 50.0f, 50.0f, basicShader);
 
     createSpotLights(3, circleRadius, yPosition, basicShader);
 
@@ -360,7 +360,7 @@ void Scene::createSpotLights(int n, float circleRadius, float yPosition, Shader*
 
         lightData.color = color;
         lightData.intensity = 5.0f;
-        lightData.castShadow = true;
+        lightData.castShadow = false;
         lightData.isActive = true;
 
         // Light type properties
@@ -382,10 +382,10 @@ void Scene::createSpotLights(int n, float circleRadius, float yPosition, Shader*
         Mesh* lightCube = ResourceLoader::loadMesh(MODEL_DIR + "/spotlight.obj");
         if (lightCube != nullptr) {
             Material* cubeMaterial = new Material(basicShader);
-            cubeMaterial->albedoColor = color;
-            cubeMaterial->albedoMap = nullptr;
+            cubeMaterial->albedoColor = glm::vec4(1.0f);
+            cubeMaterial->albedoMap = new Texture(TEXTURE_DIR + "gold/gold.png");
             cubeMaterial->normalMap = nullptr;
-            cubeMaterial->isDeferred = false;
+            cubeMaterial->isDeferred = true;
             lightCube->material = cubeMaterial;
             registry.emplace<Mesh*>(lightEntity, lightCube);
         }
@@ -481,7 +481,7 @@ void Scene::loadSkyBox(const std::vector<std::string>& skyboxFilePaths) {
 
 // Scene instancing
 MeshInstance Scene::addMeshInstance(Mesh* mesh) {
-    size_t meshIndex = m_meshInstances.size();
+    uint8_t meshIndex = (uint8_t)m_meshInstances.size();
     m_meshInstances.push_back(mesh);
 
     MeshInstance newInstance;
@@ -492,38 +492,40 @@ MeshInstance Scene::addMeshInstance(Mesh* mesh) {
 void Scene::updateInstanceMap() {
     // Handle instance count updates (less frequent)
     if (m_instanceCountsDirty) {
-        // Reset counts while keeping map structure
+        // Clear and count in one pass
         for (auto& [id, count] : m_instanceCounts) {
             count = 0;
         }
 
-        // Count instances
         registry.view<MeshInstance>().each([&](const MeshInstance& instance) {
             m_instanceCounts[instance.id]++;
         });
 
         // Resize vectors based on new counts
-        for (const auto& [id, count] : m_instanceCounts) {
-            if (m_instanceMap.find(id) == m_instanceMap.end()) {
-                m_instanceMap[id] = std::vector<glm::mat4>(count);
-            } else {
-                m_instanceMap[id].resize(count);
-            }
+        for (auto& [id, count] : m_instanceCounts) {
+            auto& instanceVector = m_instanceMap[id];
+            instanceVector.resize(count);
+            // Initialize current index for this ID while we're here
+            m_currentIndices[id] = 0;
         }
 
         m_instanceCountsDirty = false;
+    } else {
+        // Only reset indices if we didn't do it in the count update
+        for (auto& [id, index] : m_currentIndices) {
+            index = 0;
+        }
     }
 
-    // Reset indices at the start of each update
-    for (auto& [id, index] : m_currentIndices) {
-        index = 0;
-    }
-
-    // Collect matrices in a single view iteration
-    registry.view<MeshInstance, ModelMatrix>().each([&](const MeshInstance& instance, const ModelMatrix& modelMatrix) {
-        size_t id = instance.id;
+    auto view = registry.view<MeshInstance, ModelMatrix>();
+    view.each([&](const auto& instance, const auto& modelMatrix) {
+        const size_t id = instance.id;
+        auto& instanceVector = m_instanceMap[id];
         size_t& idx = m_currentIndices[id];
-        m_instanceMap[id][idx] = modelMatrix.matrix;
-        idx++;
+
+        // Safety check in case something got out of sync
+        if (idx < instanceVector.size()) {
+            instanceVector[idx++] = modelMatrix.matrix;
+        }
     });
 }

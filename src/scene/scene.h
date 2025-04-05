@@ -66,6 +66,11 @@ public:
     const std::vector<Mesh*>& getMeshInstances() const { return m_meshInstances; }
 
     /*
+    * Tell the scene to recount the number of active instances to keep instance map up to date
+    */
+    void flagDirtyInstanceCount() { m_instanceCountsDirty = true; };
+
+    /*
     * Resets the instance map with the latest mesh transformations and instance counts.
     * Collects transformation matrices `ModelMatrix` of the mesh instances and stores them in the appropriate vector for each mesh ID.
     */
