@@ -16,8 +16,6 @@ This project is an OpenGL deferred renderer with plans to become a game engine, 
 - **GameObject Parent-Child Hierarchy** – Supports a parent-child structure for `GameObject` transformations, where child objects inherit transformations from their parent objects.
 - **Debug Gizmos** - Draw wireframe gizmos for visual debugging
 
-Markdown
-
 ## Engine Specifics
 
 This section outlines some key implementation details and limitations of the engine.
@@ -31,7 +29,6 @@ The engine utilizes an Entity-Component-System (ECS) architecture powered by the
 * **Rotation:** Stores the 3D rotation of an entity using a quaternion (`glm::quat`). Modifying this component directly updates the `EulerAngles` component and vice versa.
 * **Scale:** Stores the 3D scale of an entity (`glm::vec3`).
 * **EulerAngles:** Stores the 3D rotation of an entity using Euler angles (in degrees) (`glm::vec3`). *Note: While the engine primarily uses quaternions for internal calculations, Euler angles are maintained for potential use cases and editor integration.*
-* **Rotation:** Bypass euler angles and modify the quaternion directly. Modifying the `Rotation` component will also update `EulerAngles` component and vice versa.
 * **ModelMatrix:** A component that flags the entity's model matrix as dirty, triggering recalculation.
 * **MetaData:** Stores basic information about the entity, such as its name (`std::string`).
 * **Parent:** Indicates the parent entity in a hierarchical structure.
