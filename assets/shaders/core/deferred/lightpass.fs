@@ -34,7 +34,7 @@ struct SpotLight {
 struct DirectionalLight {
     vec3 dir; float shadowOrthoSize;
     vec3 color; float intensity;
-    int castShadow; int shadowMapIndex; int lightMatrixIndex;
+    int castShadow; int shadowMapIndex; int lightMatrixIndex; int numCascades;
 };
 
 layout(std430, binding = 0) buffer PointLightBuffer {
@@ -82,7 +82,50 @@ float PCFSampling(vec3 projCoords, sampler2D shadowMap, int kernelSize, float bi
     return shadowFactor;
 }
 
-float calculateDirectionalShadow(vec3 fragPos, DirectionalLight light) {
+float sampleCascadeAtlas(vec3 projCoords, int shadowMapIndex, int cascadeIndex, int numCascades, float bias) {
+    // Calculate the width of each cascade in the texture atlas
+    float faceWidth = 1.0 / float(numCascades);
+
+    // Add a small inset to avoid sampling across cascade boundaries
+    float inset = 0.001; // Small value to move sampling away from edges
+
+    // Scale down the UV coordinates within each cascade to avoid edge sampling
+    float scaledX = projCoords.x * (1.0 - 2.0 * inset) + inset;
+
+    // Calculate atlas coordinates with padding between cascades
+    vec2 atlasCoords = vec2(
+        scaledX * faceWidth + cascadeIndex * faceWidth,
+        projCoords.y
+    );
+
+    // Get shadow map dimensions
+    vec2 texelSize = 1.0 / vec2(textureSize(shadowMaps[shadowMapIndex], 0));
+
+    // Calculate the maximum allowed offset to stay within cascade boundaries
+    float maxOffsetX = faceWidth * 0.5 - inset * 2.0;
+
+    // PCF Sampling - ensure we don't sample across cascade boundaries
+    float shadowFactor = 0.0;
+    int kernelSize = 3;
+    float samples = float(kernelSize * kernelSize);
+
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            // Limit the X offset to stay within current cascade
+            float limitedOffsetX = clamp(float(x) * texelSize.x, -maxOffsetX, maxOffsetX);
+            vec2 offset = vec2(limitedOffsetX, float(y) * texelSize.y);
+
+            float depthSample = texture(shadowMaps[shadowMapIndex], atlasCoords + offset).r;
+            shadowFactor += (projCoords.z - bias > depthSample) ? 1.0 : 0.0;
+        }
+    }
+
+    shadowFactor /= samples;
+    return shadowFactor;
+}
+
+// Fixed calculation of cascaded shadow maps for atlas layout
+float calculateCascadedShadow(vec3 fragPos, DirectionalLight light) {
     if (light.castShadow == 0) return 0.0; // No shadow if shadow casting is disabled
 
     // Get the normal from the G-buffer
@@ -91,45 +134,88 @@ float calculateDirectionalShadow(vec3 fragPos, DirectionalLight light) {
 
     // Calculate bias based on surface angle to light
     float NdotL = max(dot(normal, lightDir), 0.0);
-
-    // Use a smaller base bias to reduce artifacts
     float baseBias = 0.0005;
-
-    // Scale bias based on angle between surface normal and light direction
     float angleFactor = 1.0 - NdotL;
+    float bias = clamp(baseBias * (1.0 + angleFactor * 5.0), 0.0001, 0.005);
 
-    // Final bias calculation
-    float bias = baseBias * (1.0 + angleFactor * 5.0);
+    // Distance from camera - used to determine which cascade to use
+    float fragDistance = length(u_CameraPosition - fragPos);
 
-    // Clamp to a reasonable range
-    bias = clamp(bias, 0.0001, 0.005);
+    // Predefined cascade distances from your settings
+    float cascadeDistances[4] = float[4](50.0, 200.0, 500.0, 1000.0); // Far planes
 
-    // Transform fragment position to light space
-    mat4 lightMatrix = lightMatrices[light.lightMatrixIndex];
+    // Determine which cascade to use based on fragment distance
+    int cascadeIndex = light.numCascades - 1; // Default to last cascade
+
+    for (int i = 0; i < light.numCascades; i++) {
+        if (fragDistance < cascadeDistances[i]) {
+            cascadeIndex = i;
+            break;
+        }
+    }
+
+    // Calculate shadow using the selected cascade
+    mat4 lightMatrix = lightMatrices[light.lightMatrixIndex + cascadeIndex];
+
+    // Transform fragment position to light space for this cascade
     vec4 fragPosLightSpace = lightMatrix * vec4(fragPos, 1.0);
 
     // Perspective division
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+
     // Transform to [0,1] range
     projCoords = projCoords * 0.5 + 0.5;
-    // Check if fragment is outside the light's view frustum
-    if (projCoords.x < 0.0 || projCoords.x > 1.0 ||
-        projCoords.y < 0.0 || projCoords.y > 1.0 ||
-        projCoords.z < 0.0 || projCoords.z > 1.0) {
-        return 0.0;
+
+    // Early return if outside frustum
+    if (projCoords.z < 0.0 || projCoords.z > 1.0 ||
+        projCoords.x < 0.0 || projCoords.x > 1.0 ||
+        projCoords.y < 0.0 || projCoords.y > 1.0) {
+        return 0.0; // No shadow if outside frustum
     }
 
-    float shadowFactor = PCFSampling(projCoords, shadowMaps[light.shadowMapIndex], 3, bias);
+    // Use the improved atlas sampling function
+    float shadowFactor = sampleCascadeAtlas(
+        projCoords,
+        light.shadowMapIndex,
+        cascadeIndex,
+        light.numCascades,
+        bias
+    );
 
-    // Add soft shadow edges
-    // float currentDepth = projCoords.z;
-    // float shadowDistance = abs(currentDepth - texture(shadowMaps[light.shadowMapIndex], projCoords.xy).r);
-    // float shadowEdgeBlend = smoothstep(0.0, bias * 2.0, shadowDistance);
+    // Blend between cascades to avoid hard transitions
+    if (cascadeIndex < light.numCascades - 1 && fragDistance > cascadeDistances[cascadeIndex] * 0.9) {
+        float blendFactor = smoothstep(
+            cascadeDistances[cascadeIndex] * 0.9,
+            cascadeDistances[cascadeIndex],
+            fragDistance
+        );
 
-    // // Fade shadows at distance to reduce artifacts at shadow map boundaries
-    // // Assuming shadowOrthoSize corresponds to the shadow map coverage
-    // float distanceToCamera = length(u_CameraPosition - fragPos);
-    // float shadowFade = 1.0 - smoothstep(light.shadowOrthoSize * 0.9, light.shadowOrthoSize, distanceToCamera);
+        // Only blend if we're close enough to the next cascade boundary
+        if (blendFactor > 0.0) {
+            // Sample next cascade
+            int nextCascadeIndex = cascadeIndex + 1;
+            mat4 nextLightMatrix = lightMatrices[light.lightMatrixIndex + nextCascadeIndex];
+
+            vec4 nextFragPosLightSpace = nextLightMatrix * vec4(fragPos, 1.0);
+            vec3 nextProjCoords = nextFragPosLightSpace.xyz / nextFragPosLightSpace.w;
+            nextProjCoords = nextProjCoords * 0.5 + 0.5;
+
+            if (nextProjCoords.z >= 0.0 && nextProjCoords.z <= 1.0 &&
+                nextProjCoords.x >= 0.0 && nextProjCoords.x <= 1.0 &&
+                nextProjCoords.y >= 0.0 && nextProjCoords.y <= 1.0) {
+                float nextShadowFactor = sampleCascadeAtlas(
+                    nextProjCoords,
+                    light.shadowMapIndex,
+                    nextCascadeIndex,
+                    light.numCascades,
+                    bias
+                );
+
+                // Blend between shadow factors
+                shadowFactor = mix(shadowFactor, nextShadowFactor, blendFactor);
+            }
+        }
+    }
 
     return shadowFactor;
 }
@@ -409,7 +495,7 @@ void main() {
         DirectionalLight light = directionalLights[i];
 
         // Calculate shadow
-        float shadow = calculateDirectionalShadow(worldPos, light);
+        float shadow = calculateCascadedShadow(worldPos, light);
 
         // Use the same PBR function you use for other lights
         // No attenuation for directional lights (attenuation = 1.0)

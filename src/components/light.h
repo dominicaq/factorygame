@@ -53,7 +53,7 @@ struct LightSpaceMatrix {
     glm::mat4 matrix = glm::mat4(1.0f);
 };
 
-struct LightSpaceMatrixCube {
+struct LightSpaceMatrixArray {
     glm::mat4 matrices[6] = {
         glm::mat4(1.0f), // Right face (+X)
         glm::mat4(1.0f), // Left face (-X)

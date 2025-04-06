@@ -22,14 +22,14 @@ private:
 
     // Caches for storing shadow textures per light entity
     std::unordered_map<entt::entity, unsigned int> m_lightShadowMapMap;
-    std::unordered_map<entt::entity, unsigned int> m_lightCubemapMap;
+    std::unordered_map<entt::entity, unsigned int> m_lightArrayMap;
 
     // Helper methods
     void renderSceneDepth(Renderer& renderer, entt::registry& registry);
 
     // Texture creation helpers
     unsigned int createShadowMap(int shadowRes);
-    unsigned int createCubeMapAtlas(int shadowREs);
+    unsigned int createLightStrip(int shadowRes, int numFaces);
 };
 
 #endif // SHADOWPASS_H

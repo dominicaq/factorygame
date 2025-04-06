@@ -82,8 +82,9 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
                 currentMapIndex += 1;
 
                 // Get matrices associated with this light (6 faces)
-                if (registry.all_of<LightSpaceMatrixCube>(entity)) {
-                    const auto& cubeMatrixComponent = registry.get<LightSpaceMatrixCube>(entity);
+                if (registry.all_of<LightSpaceMatrixArray>(entity)) {
+                    const auto& cubeMatrixComponent = registry.get<LightSpaceMatrixArray>(entity);
+
                     for (int i = 0; i < 6; i++) {
                         m_lightMatrixData.push_back(cubeMatrixComponent.matrices[i]);
                     }
@@ -155,13 +156,19 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
                 m_lightPassShader.setInt(base + "shadowMapIndex", currentMapIndex);
                 currentMapIndex += 1;
 
-                // Get matrix associated with this light
-                if (registry.all_of<LightSpaceMatrix>(entity)) {
-                    const auto& lightComponent = registry.get<LightSpaceMatrix>(entity);
-                    m_lightMatrixData.push_back(lightComponent.matrix);
+                // Get matrices associated with this light for cascading shadows
+                if (registry.all_of<LightSpaceMatrixArray>(entity)) {
+                    const auto& lightMatrixArray = registry.get<LightSpaceMatrixArray>(entity);
+                    int numCascades = renderer.config.shadows.cascades.numCascades;
+                    m_lightPassShader.setInt(base + "numCascades", numCascades);
                     m_lightPassShader.setInt(base + "lightMatrixIndex", currentMatrixIndex);
-                    currentMatrixIndex += 1;
+
+                    for (int i = 0; i < numCascades; i++) {
+                        m_lightMatrixData.push_back(lightMatrixArray.matrices[i]);
+                    }
+                    currentMatrixIndex += numCascades;
                 }
+
                 break;
             }
         }

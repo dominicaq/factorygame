@@ -26,7 +26,7 @@ int main() {
     DEBUG_CTX.numDepthSlices = 50;
 
     // Initialize window
-    Window window("Factory Game", settings.width, settings.height);
+    Window window("Factory Game", settings.display.width, settings.display.height);
     if (!window.init()) {
         return -1;
     }
@@ -34,7 +34,7 @@ int main() {
 
     // Init editor specific UI
     Profiler profiler;
-    Editor editor(settings.width, settings.height);
+    Editor editor(settings.display.width, settings.display.height);
     std::cout << "[Info] Success. Running engine setup...\n";
 
     // ------------------------ Scene Setup --------------------------
@@ -92,7 +92,7 @@ int main() {
         scene.flagDirtyInstanceCount();
     });
     TransformSystem transformSystem(scene.registry);
-    LightSystem lightSystem(scene.registry);
+    LightSystem lightSystem(settings, scene.registry);
 
     std::cout << "[Info] Success. Starting game...\n";
     printPCInfo();

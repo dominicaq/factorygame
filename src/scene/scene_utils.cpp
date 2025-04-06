@@ -2,12 +2,18 @@
 
 void SceneUtils::addLightComponents(entt::registry& registry, entt::entity entity, Light lightData) {
     registry.emplace<Light>(entity, lightData);
-    registry.emplace<LightSpaceMatrix>(entity);
-}
 
-void SceneUtils::addPointLightComponents(entt::registry& registry, entt::entity entity, Light lightData) {
-    registry.emplace<Light>(entity, lightData);
-    registry.emplace<LightSpaceMatrixCube>(entity);
+    // Save memory footprint by not adding matrix component
+    if (!lightData.castShadow) {
+        return;
+    }
+
+    bool singleMatrix = lightData.type == LightType::Spot;
+    if (singleMatrix) {
+        registry.emplace<LightSpaceMatrix>(entity);
+    } else {
+        registry.emplace<LightSpaceMatrixArray>(entity);
+    }
 }
 
 GameObject* SceneUtils::addGameObjectComponent(entt::registry& registry, entt::entity entity, const SceneData& data) {

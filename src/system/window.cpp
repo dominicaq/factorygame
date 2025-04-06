@@ -11,8 +11,8 @@ Window::Window(const char *title, int width, int height)
     : m_title(title), m_width(width), m_height(height), m_window(nullptr), m_renderer(nullptr)
 {
     // Initialize settings with constructor parameters
-    m_settings.width = width;
-    m_settings.height = height;
+    m_settings.display.width = width;
+    m_settings.display.height = height;
 }
 
 Window::~Window() {
@@ -53,17 +53,17 @@ bool Window::init() {
 #endif
 
     // Apply MSAA setting
-    if (m_settings.msaaSamples > 0) {
-        glfwWindowHint(GLFW_SAMPLES, m_settings.msaaSamples);
+    if (m_settings.quality.msaaSamples > 0) {
+        glfwWindowHint(GLFW_SAMPLES, m_settings.quality.msaaSamples);
     }
 
     // Apply borderless setting if needed
-    if (m_settings.borderless) {
+    if (m_settings.display.borderless) {
         glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
     }
 
     // Create a windowed mode window and its OpenGL context
-    GLFWmonitor* monitor = m_settings.fullscreen ? glfwGetPrimaryMonitor() : nullptr;
+    GLFWmonitor* monitor = m_settings.display.fullscreen ? glfwGetPrimaryMonitor() : nullptr;
 
     m_window = glfwCreateWindow(m_width, m_height, m_title, monitor, NULL);
     if (!m_window) {
@@ -77,7 +77,7 @@ bool Window::init() {
     glfwSetFramebufferSizeCallback(m_window, framebufferSizeCallback);
 
     // Apply VSync setting
-    setVSync(m_settings.vsync);
+    setVSync(m_settings.display.vsync);
 
     // Set this Window object as the user pointer for the GLFW window
     glfwSetWindowUserPointer(m_window, this);
@@ -137,8 +137,8 @@ void Window::swapBuffersAndPollEvents() {
 void Window::resize(int newWidth, int newHeight) {
     m_width = newWidth;
     m_height = newHeight;
-    m_settings.width = newWidth;
-    m_settings.height = newHeight;
+    m_settings.display.width = newWidth;
+    m_settings.display.height = newHeight;
     glfwSetWindowSize(m_window, m_width, m_height);
 
     // Get the framebuffer size (in pixels) instead of using the window size
@@ -170,25 +170,25 @@ bool Window::applySettings(const config::GraphicsSettings& settings) {
     bool requiresRestart = false;
 
     // Check if any settings require a restart
-    if (settings.msaaSamples != m_settings.msaaSamples) {
+    if (settings.quality.msaaSamples != m_settings.quality.msaaSamples) {
         requiresRestart = true;
     }
 
-    if (settings.borderless != m_settings.borderless) {
+    if (settings.display.borderless != m_settings.display.borderless) {
         requiresRestart = true;
     }
 
     // Apply settings that can be changed at runtime
-    if (settings.width != m_settings.width || settings.height != m_settings.height) {
-        resize(settings.width, settings.height);
+    if (settings.display.width != m_settings.display.width || settings.display.height != m_settings.display.height) {
+        resize(settings.display.width, settings.display.height);
     }
 
-    if (settings.vsync != m_settings.vsync) {
-        setVSync(settings.vsync);
+    if (settings.display.vsync != m_settings.display.vsync) {
+        setVSync(settings.display.vsync);
     }
 
-    if (settings.fullscreen != m_settings.fullscreen) {
-        setFullscreen(settings.fullscreen);
+    if (settings.display.fullscreen != m_settings.display.fullscreen) {
+        setFullscreen(settings.display.fullscreen);
     }
 
     // Apply renderer settings if a renderer is attached
@@ -207,11 +207,11 @@ bool Window::applySettings(const config::GraphicsSettings& settings) {
 
 void Window::setVSync(bool enabled) {
     glfwSwapInterval(enabled ? 1 : 0);
-    m_settings.vsync = enabled;
+    m_settings.display.vsync = enabled;
 }
 
 void Window::setFullscreen(bool fullscreen) {
-    if (fullscreen == m_settings.fullscreen) {
+    if (fullscreen == m_settings.display.fullscreen) {
         return;
     }
 
@@ -221,8 +221,8 @@ void Window::setFullscreen(bool fullscreen) {
         const GLFWvidmode* mode = glfwGetVideoMode(monitor);
 
         // Save windowed dimensions before switching
-        if (!m_settings.fullscreen) {
-            glfwGetWindowSize(m_window, &m_settings.width, &m_settings.height);
+        if (!m_settings.display.fullscreen) {
+            glfwGetWindowSize(m_window, &m_settings.display.width, &m_settings.display.height);
         }
 
         // Switch to fullscreen
@@ -231,27 +231,27 @@ void Window::setFullscreen(bool fullscreen) {
         m_height = mode->height;
     } else {
         // Switch back to windowed mode
-        glfwSetWindowMonitor(m_window, nullptr, 100, 100, m_settings.width, m_settings.height, 0);
-        m_width = m_settings.width;
-        m_height = m_settings.height;
+        glfwSetWindowMonitor(m_window, nullptr, 100, 100, m_settings.display.width, m_settings.display.height, 0);
+        m_width = m_settings.display.width;
+        m_height = m_settings.display.height;
     }
 
-    m_settings.fullscreen = fullscreen;
+    m_settings.display.fullscreen = fullscreen;
 
     // Re-apply vsync setting as it might be reset when changing monitors
-    setVSync(m_settings.vsync);
+    setVSync(m_settings.display.vsync);
 }
 
 void Window::setBorderless(bool borderless) {
-    m_settings.borderless = borderless;
+    m_settings.display.borderless = borderless;
 }
 
 void Window::setMSAA(int samples) {
-    m_settings.msaaSamples = samples;
+    m_settings.quality.msaaSamples = samples;
 }
 
 void Window::setMaxFrameRate(int frameRate) {
-    m_settings.maxFrameRate = frameRate;
+    m_settings.display.maxFrameRate = frameRate;
 }
 
 /*

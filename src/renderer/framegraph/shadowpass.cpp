@@ -12,11 +12,11 @@ ShadowPass::~ShadowPass() {
     }
     m_lightShadowMapMap.clear();
 
-    // Clean up all cubemaps
-    for (auto& [entity, cubemap] : m_lightCubemapMap) {
-        glDeleteTextures(1, &cubemap);
+    // Clean up all light arrays
+    for (auto& [entity, lightArrayTexture] : m_lightArrayMap) {
+        glDeleteTextures(1, &lightArrayTexture);
     }
-    m_lightCubemapMap.clear();
+    m_lightArrayMap.clear();
 }
 
 void ShadowPass::setup() {
@@ -32,8 +32,8 @@ void ShadowPass::setup() {
 
 void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
     // Get shadow config properties
-    int shadowRes = renderer.config.shadowResolution;
-    bool enableShadows = renderer.config.enableShadows;
+    int shadowRes = renderer.config.shadows.shadowResolution;
+    bool enableShadows = renderer.config.shadows.enableShadows;
     if (!enableShadows) {
         return;
     }
@@ -51,7 +51,7 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 
     m_shadowShader.use();
 
-    // Render 2D shadow maps (directional/spotlights)
+    // Render single shadow maps (spotlights)
     registry.view<LightSpaceMatrix, Light>().each([&](auto entity, auto& lightSpaceMatrix, auto& light) {
         if (!light.castShadow) {
             return;
@@ -78,19 +78,24 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
         light.depthHandle = depthHandle;
     });
 
-    // Render cubemaps for point lights
-    registry.view<LightSpaceMatrixCube, Light>().each([&](auto entity, auto& lightSpaceCube, auto& light) {
+    // Render shadow map arrays
+    registry.view<LightSpaceMatrixArray, Light>().each([&](auto entity, auto& lightSpaceCube, auto& light) {
         if (!light.castShadow) {
             return;
         }
 
+        int numFaces = 6;
+        if (light.type == LightType::Directional) {
+            numFaces = renderer.config.shadows.cascades.numCascades;
+        }
+
         // Create or reuse a cubemap for this light
-        if (m_lightCubemapMap.find(entity) == m_lightCubemapMap.end()) {
-            m_lightCubemapMap[entity] = createCubeMapAtlas(shadowRes);
+        if (m_lightArrayMap.find(entity) == m_lightArrayMap.end()) {
+            m_lightArrayMap[entity] = createLightStrip(shadowRes, numFaces);
         }
 
         // Get the cubemap for this light
-        unsigned int depthAtlas = m_lightCubemapMap[entity];
+        unsigned int depthAtlas = m_lightArrayMap[entity];
 
         // Bind the framebuffer using the custom framebuffer
         m_shadowFrameBuffer->bind();
@@ -99,7 +104,7 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
         glClear(GL_DEPTH_BUFFER_BIT);
 
         // Render each face to its section in the atlas
-        for (int face = 0; face < 6; ++face) {
+        for (int face = 0; face < numFaces; ++face) {
             // Calculate the viewport position for this face
             int xOffset = face * shadowRes;
             glViewport(xOffset, 0, shadowRes, shadowRes);
@@ -165,10 +170,10 @@ void ShadowPass::cleanupLightResources(entt::entity lightEntity) {
     }
 
     // Clean up point light cubemap
-    auto cubemapIt = m_lightCubemapMap.find(lightEntity);
-    if (cubemapIt != m_lightCubemapMap.end()) {
+    auto cubemapIt = m_lightArrayMap.find(lightEntity);
+    if (cubemapIt != m_lightArrayMap.end()) {
         glDeleteTextures(1, &cubemapIt->second);
-        m_lightCubemapMap.erase(cubemapIt);
+        m_lightArrayMap.erase(cubemapIt);
     }
 }
 
@@ -193,13 +198,13 @@ unsigned int ShadowPass::createShadowMap(int shadowRes) {
     return shadowMap;
 }
 
-unsigned int ShadowPass::createCubeMapAtlas(int shadowRes) {
+unsigned int ShadowPass::createLightStrip(int shadowRes, int numFaces) {
     unsigned int cubemap;
     glGenTextures(1, &cubemap);
     glBindTexture(GL_TEXTURE_2D, cubemap);
 
-    // Create a 2D texture with the width being 6 * SHADOW_RESOLUTION and the height being SHADOW_RESOLUTION
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, shadowRes * 6, shadowRes, 0,
+    // Create a 2D texture with the width being numFaces * SHADOW_RESOLUTION and the height being SHADOW_RESOLUTION
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, numFaces * shadowRes, shadowRes, 0,
                  GL_DEPTH_COMPONENT, GL_FLOAT, NULL);  // Initialize with NULL, which sets all depth values to 1.0
 
     // Set texture parameters

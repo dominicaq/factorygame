@@ -32,16 +32,9 @@ public:
      * @param registry - The registry to add the components to.
      * @param entity - The entity to which the components will be added.
      * @param lightData - The light data to associate with the entity.
+     * @param isSpot - Attaches LightSpaceMatrixArray instead of LightSpaceMatrix for directional shaodow map cascades and point lights
      */
     static void addLightComponents(entt::registry& registry, entt::entity entity, Light lightData);
-
-    /*
-     * Adds point light components to the specified entity in the registry.
-     * @param registry - The registry to add the components to.
-     * @param entity - The entity to which the components will be added.
-     * @param lightData - The light data to associate with the entity.
-     */
-    static void addPointLightComponents(entt::registry& registry, entt::entity entity, Light lightData);
 
     /*
      * Adds a GameObject component to the specified entity in the registry.

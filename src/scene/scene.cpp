@@ -210,10 +210,10 @@ void Scene::loadScene() {
     float yPosition = 10.0f;
     createSuns(1, 50.0f, 50.0f, basicShader);
 
-    createSpotLights(3, circleRadius, yPosition, basicShader);
+    // createSpotLights(3, circleRadius, yPosition, basicShader);
 
     // Light balls
-    createSpheres(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
+    // createSpheres(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
 
     // Normal balls
     createSpheres(1000, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
@@ -293,13 +293,7 @@ void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basic
         lightData.type = LightType::Directional;
         lightData.directional.shadowOrthoSize = 20.0f;
 
-        if (lightData.castShadow) {
-            if (lightData.type == LightType::Point) {
-                SceneUtils::addPointLightComponents(registry, lightEntity, lightData);
-            } else {
-                SceneUtils::addLightComponents(registry, lightEntity, lightData);
-            }
-        }
+        SceneUtils::addLightComponents(registry, lightEntity, lightData);
 
         // Cube mesh
         Mesh* lightCube = MeshGen::createSphere(30, 30);
@@ -360,7 +354,7 @@ void Scene::createSpotLights(int n, float circleRadius, float yPosition, Shader*
 
         lightData.color = color;
         lightData.intensity = 5.0f;
-        lightData.castShadow = false;
+        lightData.castShadow = true;
         lightData.isActive = true;
 
         // Light type properties
@@ -370,13 +364,7 @@ void Scene::createSpotLights(int n, float circleRadius, float yPosition, Shader*
         lightData.spot.outerCutoff = cos(glm::radians(30.0f));
         lightData.spot.range = 50.0f;
 
-        if (lightData.castShadow) {
-            if (lightData.type == LightType::Point) {
-                SceneUtils::addPointLightComponents(registry, lightEntity, lightData);
-            } else {
-                SceneUtils::addLightComponents(registry, lightEntity, lightData);
-            }
-        }
+        SceneUtils::addLightComponents(registry, lightEntity, lightData);
 
         // Cube mesh
         Mesh* lightCube = ResourceLoader::loadMesh(MODEL_DIR + "/spotlight.obj");
@@ -392,7 +380,7 @@ void Scene::createSpotLights(int n, float circleRadius, float yPosition, Shader*
     }
 }
 
-void Scene::createSpheres(int n, float fieldSize, float minHeight, float maxHeight, Shader* basicShader, bool castShadows) {
+void Scene::createSpheres(int n, float fieldSize, float minHeight, float maxHeight, Shader* basicShader, bool litSpheres) {
     Mesh* asteroidMesh = MeshGen::createSphere(25, 25);
     if (!asteroidMesh) {
         return;
@@ -423,7 +411,7 @@ void Scene::createSpheres(int n, float fieldSize, float minHeight, float maxHeig
     for (int i = 0; i < n; ++i) {
         // Random position
         float x = posDist(gen);
-        float y = heightDist(gen);
+        float y = heightDist(gen) + 1.0f;
         float z = posDist(gen);
 
         // Random rotation
@@ -442,7 +430,7 @@ void Scene::createSpheres(int n, float fieldSize, float minHeight, float maxHeig
         save_asteroid.eulerAngles = randomRotation;
 
         // Add a point light to each asteroid
-        if (castShadows) {
+        if (litSpheres) {
             Light asteroidLight;
             asteroidLight.color = glm::vec3(colorDist(gen), colorDist(gen), colorDist(gen));
             asteroidLight.intensity = 25.0f;
@@ -450,7 +438,7 @@ void Scene::createSpheres(int n, float fieldSize, float minHeight, float maxHeig
             asteroidLight.type = LightType::Point;
             asteroidLight.castShadow = true;
             asteroidLight.isActive = true;
-            SceneUtils::addPointLightComponents(registry, asteroidEntity, asteroidLight);
+            SceneUtils::addLightComponents(registry, asteroidEntity, asteroidLight);
         }
 
         // Game object

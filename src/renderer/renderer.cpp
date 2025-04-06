@@ -11,8 +11,8 @@ Renderer::Renderer(config::GraphicsSettings settings, Camera* camera) {
 
     // Viewport
     m_camera = camera;
-    m_width = config.width;
-    m_height = config.height;
+    m_width = config.display.width;
+    m_height = config.display.height;
 
     initOpenGLState();
     initScreenQuad();
