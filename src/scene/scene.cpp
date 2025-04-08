@@ -216,7 +216,7 @@ void Scene::loadScene() {
     createSpheres(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
 
     // Normal balls
-    // createSpheres(1000, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
+    createSpheres(1000, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
 
     // Gizmo Cube
     // Box dimensions

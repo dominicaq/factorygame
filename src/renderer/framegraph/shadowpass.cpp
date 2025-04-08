@@ -87,6 +87,7 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
         int numFaces = 6;
         if (light.type == LightType::Directional) {
             numFaces = renderer.config.shadows.cascades.numCascades;
+            shadowRes = renderer.config.shadows.directionalLightResolution;
         }
 
         // Create or reuse a cubemap for this light
@@ -125,6 +126,7 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
         }
 
         // Store the atlas handle in the light component
+        shadowRes = renderer.config.shadows.shadowResolution;
         light.depthHandle = depthAtlas;
     });
 
