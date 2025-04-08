@@ -17,13 +17,13 @@ private:
     mutable bool m_dirtyProjection = true;
 
     // EnTT components
-    entt::entity m_cameraEntity;
+    entt::entity m_entity;
     entt::registry& m_registry;
 
 public:
     // Constructor
     Camera(entt::entity cameraEntity, entt::registry& registry)
-        : m_cameraEntity(cameraEntity), m_registry(registry) {}
+        : m_entity(cameraEntity), m_registry(registry) {}
 
     // Setters that mark projection as dirty
     void setNearPlane(float nearPlane) {
@@ -52,14 +52,19 @@ public:
     float getFov() const { return m_fov; }
     float getAspectRatio() const { return m_aspectRatio; }
 
+    glm::vec3 getForward() {
+        const auto& rotation = m_registry.get<Rotation>(m_entity).quaternion;
+        return glm::normalize(rotation * glm::vec3(0.0f, 0.0f, -1.0f));
+    }
+
     glm::vec3 getPosition() const {
-        const auto& positionComponent = m_registry.get<Position>(m_cameraEntity);
+        const auto& positionComponent = m_registry.get<Position>(m_entity);
         return positionComponent.position;
     }
 
     glm::mat4 getViewMatrix() const {
-        const auto& orientation = m_registry.get<Rotation>(m_cameraEntity).quaternion;
-        const auto& position = m_registry.get<Position>(m_cameraEntity).position;
+        const auto& orientation = m_registry.get<Rotation>(m_entity).quaternion;
+        const auto& position = m_registry.get<Position>(m_entity).position;
 
         // Convert quaternion to rotation matrix
         glm::mat4 rotationMatrix = glm::mat4_cast(orientation);

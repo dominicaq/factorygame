@@ -53,7 +53,7 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 
     // Render single shadow maps (spotlights)
     registry.view<LightSpaceMatrix, Light>().each([&](auto entity, auto& lightSpaceMatrix, auto& light) {
-        if (!light.castShadow) {
+        if (!light.castShadow || !light.isActive) {
             return;
         }
 
@@ -79,8 +79,8 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
     });
 
     // Render shadow map arrays
-    registry.view<LightSpaceMatrixArray, Light>().each([&](auto entity, auto& lightSpaceCube, auto& light) {
-        if (!light.castShadow) {
+    registry.view<LightSpaceMatrixArray, Light>().each([&](auto entity, auto& lightSpaceArray, auto& light) {
+        if (!light.castShadow || !light.isActive) {
             return;
         }
 
@@ -109,9 +109,19 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
             int xOffset = face * shadowRes;
             glViewport(xOffset, 0, shadowRes, shadowRes);
 
+            // Extract split depth from matrix (we placed this var into the matrix)
+            float splitDepth = 0.0f;
+            if (light.type == LightType::Directional) {
+                splitDepth = lightSpaceArray.matrices[face][2][3];
+                lightSpaceArray.matrices[face][2][3] = 0.0f;
+            }
+
             // Render the scene from the face index
-            m_shadowShader.setMat4("u_LightSpaceMatrix", lightSpaceCube.matrices[face]);
+            m_shadowShader.setMat4("u_LightSpaceMatrix", lightSpaceArray.matrices[face]);
             renderSceneDepth(renderer, registry);
+
+            // Propigate split depth to the shader
+            lightSpaceArray.matrices[face][2][3] = splitDepth;
         }
 
         // Store the atlas handle in the light component

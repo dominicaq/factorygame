@@ -92,7 +92,7 @@ int main() {
         scene.flagDirtyInstanceCount();
     });
     TransformSystem transformSystem(scene.registry);
-    LightSystem lightSystem(settings, scene.registry);
+    LightSystem lightSystem(settings, scene.getPrimaryCamera(), scene.registry);
 
     std::cout << "[Info] Success. Starting game...\n";
     printPCInfo();

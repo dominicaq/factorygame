@@ -11,17 +11,22 @@
 
 class LightSystem {
 public:
-    explicit LightSystem(config::GraphicsSettings& settings, entt::registry& registry);
+    explicit LightSystem(config::GraphicsSettings& settings, Camera& activeCamera, entt::registry& registry);
     void updateShadowMatrices();
 
 private:
     entt::registry& m_registry;
+    Camera& m_activeCamera;
+
     config::GraphicsSettings& m_settings;
 
-    glm::mat4 calculateSpotMatrix(const glm::vec3& position, const glm::vec3& direction, const Light& light);
-    void updateDirectionalLightMatrices(LightSpaceMatrixArray& lightSpaceArray, const glm::vec3& position, const glm::vec3& direction, const Light& light);
-
+    // Light functions
+    void calculateSpotMatrix(glm::mat4& matrix, const glm::vec3& position, const glm::vec3& direction, const Light& light);
+    void updateDirectionalLightMatrices(LightSpaceMatrixArray& lightSpaceArray, const glm::vec3& direction);
     void updatePointLightMatrices(LightSpaceMatrixArray& lightSpaceCube, const glm::vec3& position, float radius);
+
+    // Helper function for frustum corners calculation
+    std::vector<glm::vec3> LightSystem::calculateFrustumCorners(float near, float far);
 };
 
 #endif // LIGHTSYSTEM_H

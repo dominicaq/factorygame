@@ -37,17 +37,15 @@ struct GraphicsSettings {
     // Shadow settings
     struct ShadowSettings {
         bool enableShadows = true;
-        int shadowResolution = 1024;
         float shadowBias = 0.005f;
+
+        int shadowResolution = 4096; // was 1024, need to implement different size resolutions later
+        int directionalLightResolution = 4096; // not being used (yet)
 
         // Cascade shadow settings
         struct CascadeSettings {
-            int numCascades = 4;
-            float cascadeNearPlanes[4] = { 1.0f, 40.0f, 190.0f, 450.0f };
-            float cascadeFarPlanes[4] = { 50.0f, 200.0f, 500.0f, 1000.0f };
-            float cascadeSizeMultipliers[4] = { 0.5f, 1.0f, 2.0f, 4.0f };
-            float cascadeCenterPositions[4] = { 25.0f, 120.0f, 350.0f, 725.0f };
-            float shadowOrthoSize = 50.0f;
+            int numCascades = 4;  // One more cascade for better quality
+            float cascadeSplitLambda = 0.95f; // [0.1f - 1.0f] range
         } cascades;
     } shadows;
 };

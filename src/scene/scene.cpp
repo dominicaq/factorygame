@@ -210,13 +210,13 @@ void Scene::loadScene() {
     float yPosition = 10.0f;
     createSuns(1, 50.0f, 50.0f, basicShader);
 
-    // createSpotLights(3, circleRadius, yPosition, basicShader);
+    createSpotLights(3, circleRadius, yPosition, basicShader);
 
     // Light balls
-    // createSpheres(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
+    createSpheres(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
 
     // Normal balls
-    createSpheres(1000, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
+    // createSpheres(1000, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
 
     // Gizmo Cube
     // Box dimensions
@@ -268,7 +268,7 @@ void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basic
         // Light component
         Light lightData;
         glm::vec4 color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-        switch (i+1 % 3) {
+        switch (i+2 % 3) {
             case 0:
                 color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f); // Soft White
                 break;

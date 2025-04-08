@@ -1,6 +1,6 @@
 #include "light_system.h"
 
-LightSystem::LightSystem(config::GraphicsSettings& settings, entt::registry& registry) : m_registry(registry), m_settings(settings) {}
+LightSystem::LightSystem(config::GraphicsSettings& settings, Camera& activeCamera, entt::registry& registry) : m_registry(registry), m_activeCamera{activeCamera}, m_settings(settings) {}
 
 void LightSystem::updateShadowMatrices() {
     m_registry.view<Light, Position>().each([this](auto entity, Light& light, Position& position) {
@@ -9,39 +9,65 @@ void LightSystem::updateShadowMatrices() {
         }
 
         switch (light.type) {
-            case LightType::Point:
-                if (m_registry.all_of<LightSpaceMatrixArray>(entity)) {
-                    LightSpaceMatrixArray& lightSpaceCube = m_registry.get<LightSpaceMatrixArray>(entity);
-                    updatePointLightMatrices(lightSpaceCube, position.position, light.point.radius);
+            case LightType::Point: {
+                if (!m_registry.all_of<LightSpaceMatrixArray>(entity)) {
+                    return;
                 }
+
+                LightSpaceMatrixArray& lightSpaceCube = m_registry.get<LightSpaceMatrixArray>(entity);
+                updatePointLightMatrices(lightSpaceCube, position.position, light.point.radius);
+
                 break;
-
-            case LightType::Directional:
-                if (m_registry.all_of<LightSpaceMatrixArray>(entity)) {
-                    // Handle directional lights with matrix arrays
-                    LightSpaceMatrixArray& lightSpaceArray = m_registry.get<LightSpaceMatrixArray>(entity);
-                    Rotation& rotationComponent = m_registry.get<Rotation>(entity);
-
-                    // Forward is the -Z axis
-                    glm::vec3 lightDirection = rotationComponent.quaternion * glm::vec3(0.0f, 0.0f, -1.0f);
-                    updateDirectionalLightMatrices(lightSpaceArray, position.position, glm::normalize(lightDirection), light);
+            } case LightType::Directional: {
+                if (!m_registry.all_of<LightSpaceMatrixArray>(entity)) {
+                    return;
                 }
+
+                // Handle directional lights with matrix arrays
+                LightSpaceMatrixArray& lightSpaceArray = m_registry.get<LightSpaceMatrixArray>(entity);
+                Rotation& rotationComponent = m_registry.get<Rotation>(entity);
+
+                // Forward is the -Z axis
+                glm::vec3 lightDirection = rotationComponent.quaternion * glm::vec3(0.0f, 0.0f, -1.0f);
+                updateDirectionalLightMatrices(lightSpaceArray, glm::normalize(lightDirection));
+
                 break;
-
-            default:
-                // Handle other light types and legacy single-matrix support
-                if (m_registry.all_of<LightSpaceMatrix>(entity)) {
-                    // Legacy single-matrix support
-                    LightSpaceMatrix& lightSpaceComponent = m_registry.get<LightSpaceMatrix>(entity);
-                    Rotation& rotationComponent = m_registry.get<Rotation>(entity);
-
-                    // Forward is the -Z axis
-                    glm::vec3 lightDirection = rotationComponent.quaternion * glm::vec3(0.0f, 0.0f, -1.0f);
-                    lightSpaceComponent.matrix = calculateSpotMatrix(position.position, glm::normalize(lightDirection), light);
+            } default: {
+                if (!m_registry.all_of<LightSpaceMatrix>(entity)) {
+                    return;
                 }
+                // Single-matrix support
+                LightSpaceMatrix& lightSpace = m_registry.get<LightSpaceMatrix>(entity);
+                Rotation& rotationComponent = m_registry.get<Rotation>(entity);
+
+                // Forward is the -Z axis
+                glm::vec3 lightDirection = rotationComponent.quaternion * glm::vec3(0.0f, 0.0f, -1.0f);
+                calculateSpotMatrix(lightSpace.matrix, position.position, glm::normalize(lightDirection), light);
+
                 break;
+            }
         }
     });
+}
+
+void LightSystem::calculateSpotMatrix(glm::mat4& matrix,
+    const glm::vec3& position,
+    const glm::vec3& direction,
+    const Light& light)
+{
+    glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), direction));
+    glm::vec3 up = glm::normalize(glm::cross(direction, right));
+
+
+    float outerCutoff = glm::clamp(light.spot.outerCutoff, -1.0f, 1.0f);
+    float fov = glm::acos(outerCutoff) * 2.0f;
+
+    glm::mat4 projection(1.0f);
+    glm::mat4 view(1.0f);
+    projection = glm::perspective(fov, 1.0f, 1.0f, light.spot.range);
+    view = glm::lookAt(position, position + direction, up);
+
+    matrix = projection * view;
 }
 
 void LightSystem::updatePointLightMatrices(LightSpaceMatrixArray& lightSpaceCube, const glm::vec3& position, float radius) {
@@ -56,47 +82,93 @@ void LightSystem::updatePointLightMatrices(LightSpaceMatrixArray& lightSpaceCube
     lightSpaceCube.matrices[5] = projection * glm::lookAt(position, position + glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f,  1.0f,  0.0f)); // Back face (-Z)
 }
 
-void LightSystem::updateDirectionalLightMatrices(LightSpaceMatrixArray& lightSpaceArray, const glm::vec3& position, const glm::vec3& direction, const Light& light) {
-    // Calculate right and up vectors for consistent orientation
-    glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), direction));
-    glm::vec3 up = glm::normalize(glm::cross(direction, right));
-
-    float orthoSize = light.directional.shadowOrthoSize;
-
-    // Cascade configuration
+void LightSystem::updateDirectionalLightMatrices(LightSpaceMatrixArray& lightSpaceArray, const glm::vec3& lightDir) {
+    // Calculate the splits
     int numCascades = m_settings.shadows.cascades.numCascades;
+    std::vector<float> cascadeSplits(numCascades);
 
-    // Create the cascade shadow maps
+    float nearClip = m_activeCamera.getNearPlane();
+    float farClip = m_activeCamera.getFarPlane();
+    float clipRange = farClip - nearClip;
+
+    float minZ = nearClip;
+    float maxZ = nearClip + clipRange;
+
+    float range = maxZ - minZ;
+    float ratio = maxZ / minZ;
+
     for (int i = 0; i < numCascades; ++i) {
-        float nearPlane = m_settings.shadows.cascades.cascadeNearPlanes[i];
-        float farPlane = m_settings.shadows.cascades.cascadeFarPlanes[i];
-        float sizeMultiplier = m_settings.shadows.cascades.cascadeSizeMultipliers[i];
-        float centerPos = m_settings.shadows.cascades.cascadeCenterPositions[i];
-
-        glm::mat4 projection = glm::ortho(
-            -orthoSize * sizeMultiplier, orthoSize * sizeMultiplier,
-            -orthoSize * sizeMultiplier, orthoSize * sizeMultiplier,
-            nearPlane, farPlane
-        );
-
-        glm::vec3 lightPos = position - direction * centerPos;
-        glm::mat4 view = glm::lookAt(lightPos, position, up);
-
-        lightSpaceArray.matrices[i] = projection * view;
+        float p = (i + 1) / static_cast<float>(numCascades);
+        float log = minZ * std::pow(ratio, p);
+        float uniform = minZ + range * p;
+        float d = m_settings.shadows.cascades.cascadeSplitLambda * (log - uniform) + uniform;
+        cascadeSplits[i] = (d - nearClip) / clipRange;
     }
-}
 
-glm::mat4 LightSystem::calculateSpotMatrix(const glm::vec3& position, const glm::vec3& direction, const Light& light) {
-    glm::mat4 projection(1.0f);
-    glm::mat4 view(1.0f);
+    // Calculate the light view matrix for each split
+    glm::mat4 projection = m_activeCamera.getProjectionMatrix();
+    glm::mat4 view = m_activeCamera.getViewMatrix();
+    glm::mat4 invCam = glm::inverse(projection * view);
 
-    glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), direction));
-    glm::vec3 up = glm::normalize(glm::cross(direction, right));
+    // Source:
+    // https://johanmedestrom.wordpress.com/2016/03/18/opengl-cascaded-shadow-maps/
+    float lastSplitDist = 0.0f;
+    for (size_t i = 0; i < numCascades; i++) {
+        float splitDist = cascadeSplits[i];
 
-    float outerCutoff = glm::clamp(light.spot.outerCutoff, -1.0f, 1.0f);
-    float fov = glm::acos(outerCutoff) * 2.0f;
-    projection = glm::perspective(fov, 1.0f, 1.0f, light.spot.range);
-    view = glm::lookAt(position, position + direction, up);
+        glm::vec3 frustumCorners[8] = {
+            glm::vec3(-1.0f,  1.0f, 0.0f),
+            glm::vec3( 1.0f,  1.0f, 0.0f),
+            glm::vec3( 1.0f, -1.0f, 0.0f),
+            glm::vec3(-1.0f, -1.0f, 0.0f),
+            glm::vec3(-1.0f,  1.0f,  1.0f),
+            glm::vec3( 1.0f,  1.0f,  1.0f),
+            glm::vec3( 1.0f, -1.0f,  1.0f),
+            glm::vec3(-1.0f, -1.0f,  1.0f),
+        };
 
-    return projection * view;
+        for (size_t j = 0; j < 8; j++) {
+            glm::vec4 invCorner = invCam * glm::vec4(frustumCorners[j], 1.0f);
+            frustumCorners[j] = invCorner / invCorner.w;
+        }
+
+        for (size_t j = 0; j < 4; j++) {
+            glm::vec3 dist = frustumCorners[j + 4] - frustumCorners[j];
+            frustumCorners[j + 4] = frustumCorners[j] + (dist * splitDist);
+            frustumCorners[j] = frustumCorners[j] + (dist * lastSplitDist);
+        }
+
+        // Get frustum center
+        glm::vec3 frustumCenter = glm::vec3(0.0f);
+        for (size_t j = 0; j < 8; j++) {
+            frustumCenter += frustumCorners[j];
+        }
+        frustumCenter /= 8.0f;
+
+        float radius = 0.0f;
+        for (size_t j = 0; j < 8; j++) {
+            float distance = glm::length(frustumCorners[j] - frustumCenter);
+            radius = glm::max(radius, distance);
+        }
+        radius = std::ceil(radius * 16.0f) / 16.0f;
+
+        glm::vec3 maxExtents = glm::vec3(radius);
+        glm::vec3 minExtents = -maxExtents;
+
+        glm::mat4 lightViewMatrix = glm::lookAt(frustumCenter - lightDir * -minExtents.z, frustumCenter, glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 lightOrthoMatrix = glm::ortho(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.0f, maxExtents.z - minExtents.z);
+
+        // Store split distance and matrix in cascade
+        float splitDepth = (nearClip + splitDist * clipRange) * -1.0f;
+        lightSpaceArray.matrices[i] = lightOrthoMatrix * lightViewMatrix;
+
+        /* Store in matrix for extraction later
+        [0][0] [0][1] [0][2] [0][3]  // x-axis transformation
+        [1][0] [1][1] [1][2] [1][3]  // y-axis transformation
+        [2][0] [2][1] [2][2] [2][3]  // z-axis transformation
+        [3][0] [3][1] [3][2] [3][3]  // homogeneous coordinates */
+        lightSpaceArray.matrices[i][2][3] = splitDepth;
+
+        lastSplitDist = cascadeSplits[i];
+    }
 }

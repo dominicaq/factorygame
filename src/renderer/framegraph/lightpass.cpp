@@ -49,6 +49,7 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
 
     Camera* camera = renderer.getCamera();
     m_lightPassShader.setVec3("u_CameraPosition", camera->getPosition());
+    m_lightPassShader.setMat4("view", camera->getViewMatrix());
 
     int pointCount = 0, spotCount = 0, directionalCount = 0;
     int currentMatrixIndex = 0;
@@ -138,7 +139,7 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
                 // Set light properties
                 glm::vec3 direction = rotationComponent.quaternion * glm::vec3(0.0f, 0.0f, -1.0f);
                 m_lightPassShader.setVec3(base + "dir", glm::normalize(direction));
-                m_lightPassShader.setFloat(base + "shadowOrthoSize", lightComponent.directional.shadowOrthoSize);
+
                 // Set color and intensity
                 m_lightPassShader.setVec3(base + "color", lightComponent.color);
                 m_lightPassShader.setFloat(base + "intensity", lightComponent.intensity);
@@ -158,13 +159,20 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
 
                 // Get matrices associated with this light for cascading shadows
                 if (registry.all_of<LightSpaceMatrixArray>(entity)) {
-                    const auto& lightMatrixArray = registry.get<LightSpaceMatrixArray>(entity);
+                    auto& lightSpaceArray = registry.get<LightSpaceMatrixArray>(entity);
+
                     int numCascades = renderer.config.shadows.cascades.numCascades;
                     m_lightPassShader.setInt(base + "numCascades", numCascades);
                     m_lightPassShader.setInt(base + "lightMatrixIndex", currentMatrixIndex);
 
                     for (int i = 0; i < numCascades; i++) {
-                        m_lightMatrixData.push_back(lightMatrixArray.matrices[i]);
+                        // Send cascade data
+                        float sliceDepth = lightSpaceArray.matrices[i][2][3];
+                        m_lightPassShader.setFloat(base + "cascadeSliceDepths[" + std::to_string(i) + "]", sliceDepth);
+
+                        // Send light space data
+                        lightSpaceArray.matrices[i][2][3] = 0.0f;
+                        m_lightMatrixData.push_back(lightSpaceArray.matrices[i]);
                     }
                     currentMatrixIndex += numCascades;
                 }

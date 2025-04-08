@@ -16,6 +16,7 @@ uniform vec3 u_CameraPosition;
 
 // Skybox texture
 uniform samplerCube skybox;
+uniform mat4 view;
 
 // SSBO for lights
 struct PointLight {
@@ -32,9 +33,10 @@ struct SpotLight {
 };
 
 struct DirectionalLight {
-    vec3 dir; float shadowOrthoSize;
-    vec3 color; float intensity;
-    int castShadow; int shadowMapIndex; int lightMatrixIndex; int numCascades;
+    vec3 dir; float intensity;
+    vec3 color; int castShadow;
+    float cascadeSliceDepths[4];
+    int shadowMapIndex; int lightMatrixIndex; int numCascades; int _padding;
 };
 
 layout(std430, binding = 0) buffer PointLightBuffer {
@@ -83,48 +85,48 @@ float PCFSampling(vec3 projCoords, sampler2D shadowMap, int kernelSize, float bi
 }
 
 float sampleCascadeAtlas(vec3 projCoords, int shadowMapIndex, int cascadeIndex, int numCascades, float bias) {
-    // Calculate the width of each cascade in the texture atlas
-    float faceWidth = 1.0 / float(numCascades);
+    // For horizontal strip layout, each cascade uses the full height but 1/numCascades of the width
+    float stripWidth = 1.0 / float(numCascades);
 
     // Add a small inset to avoid sampling across cascade boundaries
-    float inset = 0.001; // Small value to move sampling away from edges
+    float inset = 0.001;
 
-    // Scale down the UV coordinates within each cascade to avoid edge sampling
-    float scaledX = projCoords.x * (1.0 - 2.0 * inset) + inset;
+    // Scale coordinates to fit within the strip and avoid edge bleeding
+    float adjustedX = projCoords.x * (stripWidth - 2.0 * inset) + inset;
+    float adjustedY = projCoords.y;
 
-    // Calculate atlas coordinates with padding between cascades
+    // Calculate the final UV coordinates in the atlas
+    // For horizontal strips, x is offset by cascadeIndex * stripWidth
     vec2 atlasCoords = vec2(
-        scaledX * faceWidth + cascadeIndex * faceWidth,
-        projCoords.y
+        adjustedX + cascadeIndex * stripWidth,
+        adjustedY
     );
 
     // Get shadow map dimensions
     vec2 texelSize = 1.0 / vec2(textureSize(shadowMaps[shadowMapIndex], 0));
 
-    // Calculate the maximum allowed offset to stay within cascade boundaries
-    float maxOffsetX = faceWidth * 0.5 - inset * 2.0;
-
-    // PCF Sampling - ensure we don't sample across cascade boundaries
+    // PCF Sampling with 3x3 kernel
     float shadowFactor = 0.0;
     int kernelSize = 3;
-    float samples = float(kernelSize * kernelSize);
 
     for (int x = -1; x <= 1; ++x) {
         for (int y = -1; y <= 1; ++y) {
-            // Limit the X offset to stay within current cascade
-            float limitedOffsetX = clamp(float(x) * texelSize.x, -maxOffsetX, maxOffsetX);
-            vec2 offset = vec2(limitedOffsetX, float(y) * texelSize.y);
+            // Limit offset to prevent sampling across strip boundaries
+            vec2 offset = vec2(
+                clamp(float(x) * texelSize.x, -inset, inset),
+                float(y) * texelSize.y
+            );
 
             float depthSample = texture(shadowMaps[shadowMapIndex], atlasCoords + offset).r;
             shadowFactor += (projCoords.z - bias > depthSample) ? 1.0 : 0.0;
         }
     }
 
-    shadowFactor /= samples;
+    shadowFactor /= 9.0; // 3x3 kernel = 9 samples
     return shadowFactor;
 }
 
-// Fixed calculation of cascaded shadow maps for atlas layout
+// Updated cascade calculation function to work with slice depths from DirectionalLight
 float calculateCascadedShadow(vec3 fragPos, DirectionalLight light) {
     if (light.castShadow == 0) return 0.0; // No shadow if shadow casting is disabled
 
@@ -138,42 +140,36 @@ float calculateCascadedShadow(vec3 fragPos, DirectionalLight light) {
     float angleFactor = 1.0 - NdotL;
     float bias = clamp(baseBias * (1.0 + angleFactor * 5.0), 0.0001, 0.005);
 
-    // Distance from camera - used to determine which cascade to use
-    float fragDistance = length(u_CameraPosition - fragPos);
+    // Get view space depth
+    float fragViewDepth = (view * vec4(fragPos, 1.0)).z;
 
-    // Predefined cascade distances from your settings
-    float cascadeDistances[4] = float[4](50.0, 200.0, 500.0, 1000.0); // Far planes
-
-    // Determine which cascade to use based on fragment distance
+    // Find which cascade to use based on slice depths
     int cascadeIndex = light.numCascades - 1; // Default to last cascade
-
-    for (int i = 0; i < light.numCascades; i++) {
-        if (fragDistance < cascadeDistances[i]) {
+    for (int i = 0; i < light.numCascades - 1; i++) {
+        if (fragViewDepth > light.cascadeSliceDepths[i]) {
             cascadeIndex = i;
             break;
         }
     }
 
-    // Calculate shadow using the selected cascade
+    // Get the light space matrix for this cascade
     mat4 lightMatrix = lightMatrices[light.lightMatrixIndex + cascadeIndex];
 
-    // Transform fragment position to light space for this cascade
+    // Transform fragment position to light space
     vec4 fragPosLightSpace = lightMatrix * vec4(fragPos, 1.0);
-
-    // Perspective division
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
 
     // Transform to [0,1] range
     projCoords = projCoords * 0.5 + 0.5;
 
-    // Early return if outside frustum
+    // Check if fragment is in light frustum
     if (projCoords.z < 0.0 || projCoords.z > 1.0 ||
         projCoords.x < 0.0 || projCoords.x > 1.0 ||
         projCoords.y < 0.0 || projCoords.y > 1.0) {
-        return 0.0; // No shadow if outside frustum
+        return 0.0;
     }
 
-    // Use the improved atlas sampling function
+    // Sample the shadow map
     float shadowFactor = sampleCascadeAtlas(
         projCoords,
         light.shadowMapIndex,
@@ -183,39 +179,55 @@ float calculateCascadedShadow(vec3 fragPos, DirectionalLight light) {
     );
 
     // Blend between cascades to avoid hard transitions
-    if (cascadeIndex < light.numCascades - 1 && fragDistance > cascadeDistances[cascadeIndex] * 0.9) {
-        float blendFactor = smoothstep(
-            cascadeDistances[cascadeIndex] * 0.9,
-            cascadeDistances[cascadeIndex],
-            fragDistance
-        );
+    if (cascadeIndex < light.numCascades - 1) {
+        float nextSliceDepth = light.cascadeSliceDepths[cascadeIndex + 1];
+        float blendZone = nextSliceDepth * 0.9;
 
-        // Only blend if we're close enough to the next cascade boundary
-        if (blendFactor > 0.0) {
-            // Sample next cascade
-            int nextCascadeIndex = cascadeIndex + 1;
-            mat4 nextLightMatrix = lightMatrices[light.lightMatrixIndex + nextCascadeIndex];
+        if (fragViewDepth < blendZone && fragViewDepth > nextSliceDepth) {
+            // Calculate blend factor
+            float blendFactor = smoothstep(
+                nextSliceDepth,
+                blendZone,
+                fragViewDepth
+            );
 
-            vec4 nextFragPosLightSpace = nextLightMatrix * vec4(fragPos, 1.0);
-            vec3 nextProjCoords = nextFragPosLightSpace.xyz / nextFragPosLightSpace.w;
-            nextProjCoords = nextProjCoords * 0.5 + 0.5;
+            // Only blend if needed
+            if (blendFactor > 0.0) {
+                // Sample next cascade
+                int nextCascadeIndex = cascadeIndex + 1;
+                mat4 nextLightMatrix = lightMatrices[light.lightMatrixIndex + nextCascadeIndex];
 
-            if (nextProjCoords.z >= 0.0 && nextProjCoords.z <= 1.0 &&
-                nextProjCoords.x >= 0.0 && nextProjCoords.x <= 1.0 &&
-                nextProjCoords.y >= 0.0 && nextProjCoords.y <= 1.0) {
-                float nextShadowFactor = sampleCascadeAtlas(
-                    nextProjCoords,
-                    light.shadowMapIndex,
-                    nextCascadeIndex,
-                    light.numCascades,
-                    bias
-                );
+                vec4 nextFragPosLightSpace = nextLightMatrix * vec4(fragPos, 1.0);
+                vec3 nextProjCoords = nextFragPosLightSpace.xyz / nextFragPosLightSpace.w;
+                nextProjCoords = nextProjCoords * 0.5 + 0.5;
 
-                // Blend between shadow factors
-                shadowFactor = mix(shadowFactor, nextShadowFactor, blendFactor);
+                if (nextProjCoords.z >= 0.0 && nextProjCoords.z <= 1.0 &&
+                    nextProjCoords.x >= 0.0 && nextProjCoords.x <= 1.0 &&
+                    nextProjCoords.y >= 0.0 && nextProjCoords.y <= 1.0) {
+
+                    float nextShadowFactor = sampleCascadeAtlas(
+                        nextProjCoords,
+                        light.shadowMapIndex,
+                        nextCascadeIndex,
+                        light.numCascades,
+                        bias
+                    );
+
+                    // Blend shadow factors
+                    shadowFactor = mix(shadowFactor, nextShadowFactor, blendFactor);
+                }
             }
         }
     }
+
+    // For visualization of cascade levels (useful for debugging)
+    // Uncomment to see which cascade is used for each pixel
+    /*
+    if (cascadeIndex == 0) return vec3(shadowFactor, 0.0, 0.0);
+    else if (cascadeIndex == 1) return vec3(0.0, shadowFactor, 0.0);
+    else if (cascadeIndex == 2) return vec3(0.0, 0.0, shadowFactor);
+    else return vec3(shadowFactor, shadowFactor, 0.0);
+    */
 
     return shadowFactor;
 }
