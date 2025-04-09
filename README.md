@@ -33,10 +33,10 @@ This project is an OpenGL deferred renderer with plans to become a game engine, 
 
 <p align="center">
   <strong>Demonstration of 1,000 and 10,000 non-shadow casting light sources</strong><br><br>
-  <video src="https://github.com/user-attachments/assets/a2d19c46-dfa8-4272-b3e5-cb477fefa2b5" controls style="max-width: 100%; height: auto;"></video>
+  <video src="https://github.com/user-attachments/assets/d83abfd2-544a-47c7-b1c7-16d012311dcd" controls style="max-width: 100%; height: auto;"></video>
 </p>
 
-> If the video doesn't load, [click here to view it directly](https://github.com/user-attachments/assets/a2d19c46-dfa8-4272-b3e5-cb477fefa2b5).
+> If the video doesn't load, [click here to view it directly](https://github.com/user-attachments/assets/d83abfd2-544a-47c7-b1c7-16d012311dcd).
 
 ---
 
