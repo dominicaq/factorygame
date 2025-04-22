@@ -7,7 +7,7 @@
 
 class BouncingMotion final : public Script {
 public:
-    float borderSize = 40.0f;
+    float borderSize = 100.0f;
     float movementSpeed = 5.0f;
     float directionChangeDuration = 3.0f; // More frequent direction shifts
 
@@ -33,13 +33,13 @@ private:
             setRandomDirection();
             timeSinceDirectionChange = 0.0f;
         }
-        velocityDirection = glm::mix(velocityDirection, targetDirection, deltaTime * 2.0f);
+        velocityDirection = glm::mix(velocityDirection, targetDirection, deltaTime * 5.0f);
 
         // Oscillate speed for variety
         speedMultiplier = 0.8f + 0.4f * std::sin(timeSinceDirectionChange * 2.0f);
 
         glm::vec3 position = gameObject->getPosition();
-        position += velocityDirection * deltaTime * movementSpeed * speedMultiplier;
+        position += velocityDirection * deltaTime * movementSpeed * speedMultiplier * 5.0f;
 
         checkAndTeleportBorders(position);
         gameObject->setPosition(glm::vec3(position.x, 0, position.z));

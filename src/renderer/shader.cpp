@@ -3,6 +3,9 @@
 
 #include <iostream>
 #include <sstream>
+#include <filesystem>
+#include <regex>
+#include <set>
 
 Shader::Shader() : m_ID(0) {}
 
@@ -14,6 +17,64 @@ Shader::~Shader() {
     if (glIsProgram(m_ID)) {
         glDeleteProgram(m_ID);
     }
+}
+
+/*
+* Process shader includes
+*/
+std::string Shader::processIncludes(const std::string& source, const std::string& shaderDirectory,
+                                    std::set<std::string>& includedFiles) {
+    std::istringstream stream(source);
+    std::ostringstream processedSource;
+    std::string line;
+    std::regex includeRegex("#include\\s+\"([^\"]+)\"");
+
+    while (std::getline(stream, line)) {
+        std::smatch match;
+        if (std::regex_search(line, match, includeRegex)) {
+            // Found an include directive
+            std::string includePath = match[1].str();
+
+            // Construct the full path starting from shader directory
+            std::filesystem::path fullPath = std::filesystem::path(shaderDirectory) / includePath;
+            std::string canonicalPath = std::filesystem::absolute(fullPath).string();
+
+            // Check if this file has already been included
+            if (includedFiles.find(canonicalPath) != includedFiles.end()) {
+                // File already included, add a comment instead
+                continue;
+            }
+
+            // Mark this file as included
+            includedFiles.insert(canonicalPath);
+
+            // Read the included file
+            std::string includedCode = ResourceLoader::readFile(canonicalPath);
+
+            if (includedCode.empty()) {
+                std::cerr << "[Error] Failed to include shader file: " << canonicalPath << "\n";
+            } else {
+                // The included file may also have includes, so process recursively
+                // Use the directory of the included file as the base for any nested includes
+                std::string includedFileDir = fullPath.parent_path().string();
+                std::string processedInclude = processIncludes(includedCode, includedFileDir, includedFiles);
+
+                // Add a comment to mark where the include happened and add the processed code
+                processedSource << processedInclude << "\n";
+            }
+        } else {
+            // Not an include line, just copy it
+            processedSource << line << "\n";
+        }
+    }
+
+    return processedSource.str();
+}
+
+// Public wrapper for processIncludes that initializes the tracking set
+std::string Shader::processIncludes(const std::string& source, const std::string& shaderDirectory) {
+    std::set<std::string> includedFiles;
+    return processIncludes(source, shaderDirectory, includedFiles);
 }
 
 /*
@@ -120,6 +181,12 @@ bool Shader::load(const std::string& vertexPath, const std::string& fragmentPath
     // Clear the uniform location cache when loading a new shader
     m_UniformLocationCache.clear();
 
+    // Extract the shader directory paths
+    std::filesystem::path vertexFsPath(vertexPath);
+    std::filesystem::path fragmentFsPath(fragmentPath);
+    std::string vertexDir = vertexFsPath.parent_path().string();
+    std::string fragmentDir = fragmentFsPath.parent_path().string();
+
     // Load shaders from files
     std::string vertexCode = ResourceLoader::readFile(vertexPath);
     if (vertexCode.empty()) {
@@ -132,6 +199,10 @@ bool Shader::load(const std::string& vertexPath, const std::string& fragmentPath
         std::cerr << "[Error] Shader::load: Failed to read fragment shader file: " << fragmentPath << "\n";
         return false;
     }
+
+    // Process includes in both shaders (each with its own tracking set)
+    vertexCode = processIncludes(vertexCode, vertexDir);
+    fragmentCode = processIncludes(fragmentCode, fragmentDir);
 
     // Compile shaders
     int compileStatus = 0;

@@ -34,8 +34,8 @@ void Scene::loadScene() {
     entt::entity cameraEntity = registry.create();
     SceneData save_cameraData;
     save_cameraData.name = "Main Camera";
-    save_cameraData.position = glm::vec3(4.0f, 0.21f, 4.04f);
-    save_cameraData.eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
+    save_cameraData.position = glm::vec3(0.0f, 10.0f, 0.0f);
+    save_cameraData.eulerAngles = glm::vec3(90.0f, 360.0f, 0.0f);
     GameObject* cameraObject = SceneUtils::addGameObjectComponent(registry, cameraEntity, save_cameraData);
     cameraObject->addScript<FreeCamera>();
 
@@ -83,7 +83,7 @@ void Scene::loadScene() {
         bunnyMaterial->albedoMap = new Texture(TEXTURE_DIR + "uv_map.jpg");
 
         bunnyMesh->material = bunnyMaterial;
-        registry.emplace<Mesh*>(bunnyEntity, bunnyMesh);
+        // registry.emplace<Mesh*>(bunnyEntity, bunnyMesh);
     }
 
     for (int row = 0; row < numRows; ++row) {
@@ -101,7 +101,7 @@ void Scene::loadScene() {
             carMaterial->albedoColor = glm::vec4(0.2f, 0.7f, 0.2f, 0.5f);
             carMaterial->isDeferred = false;
             carMesh->material = carMaterial;
-            registry.emplace<Mesh*>(carEntity, carMesh);
+            // registry.emplace<Mesh*>(carEntity, carMesh);
         }
 
         // Parent bunny to the first buggy
@@ -111,7 +111,7 @@ void Scene::loadScene() {
     }
 
     // --------------------- Gold Wall ---------------------
-    int numBalls = 3;
+    int numBalls = 0;
     float ballSpace = 6.0f;
     for (int i = 0; i < numBalls; ++i) {
         entt::entity ballEntity = registry.create();
@@ -155,7 +155,7 @@ void Scene::loadScene() {
     save_planeData.scale = glm::vec3(1.0f, 1.0f, 1.0f);
     GameObject* planeObject = SceneUtils::addGameObjectComponent(registry, planeEntity, save_planeData);
 
-    Mesh* planeMesh = MeshGen::createPlane(2,2,100,100);
+    Mesh* planeMesh = MeshGen::createPlane(2,2,200,200);
     if (planeMesh != nullptr) {
         Material* planeMaterial = new Material(basicShader);
         planeMaterial->albedoColor = glm::vec4(1.0f);
@@ -205,7 +205,7 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 5;
+    int n = 100;
     float circleRadius = 10.0f;
     float yPosition = 10.0f;
     createSuns(1, 50.0f, 50.0f, basicShader);
@@ -216,7 +216,7 @@ void Scene::loadScene() {
     createSpheres(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
 
     // Normal balls
-    createSpheres(1000, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
+    // createSpheres(1000, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
 
     // Gizmo Cube
     // Box dimensions
@@ -285,7 +285,7 @@ void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basic
 
         lightData.color = color;
         lightData.intensity = 5.0f;
-        lightData.castShadow = true;
+        lightData.castShadow = false;
         lightData.isActive = true;
 
         // Light type properties
@@ -304,7 +304,7 @@ void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basic
             cubeMaterial->normalMap = nullptr;
             cubeMaterial->isDeferred = false;
             lightCube->material = cubeMaterial;
-            registry.emplace<Mesh*>(lightEntity, lightCube);
+            // registry.emplace<Mesh*>(lightEntity, lightCube);
         }
     }
 }
@@ -434,9 +434,9 @@ void Scene::createSpheres(int n, float fieldSize, float minHeight, float maxHeig
             Light asteroidLight;
             asteroidLight.color = glm::vec3(colorDist(gen), colorDist(gen), colorDist(gen));
             asteroidLight.intensity = 25.0f;
-            asteroidLight.point.radius = 15.0f;
+            asteroidLight.point.radius = 2.0f;
             asteroidLight.type = LightType::Point;
-            asteroidLight.castShadow = true;
+            asteroidLight.castShadow = false;
             asteroidLight.isActive = true;
             SceneUtils::addLightComponents(registry, asteroidEntity, asteroidLight);
         }
