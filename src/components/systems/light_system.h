@@ -24,9 +24,6 @@ private:
     void calculateSpotMatrix(glm::mat4& matrix, const glm::vec3& position, const glm::vec3& direction, const Light& light);
     void updateDirectionalLightMatrices(LightSpaceMatrixArray& lightSpaceArray, const glm::vec3& direction);
     void updatePointLightMatrices(LightSpaceMatrixArray& lightSpaceCube, const glm::vec3& position, float radius);
-
-    // Helper function for frustum corners calculation
-    std::vector<glm::vec3> LightSystem::calculateFrustumCorners(float near, float far);
 };
 
 #endif // LIGHTSYSTEM_H
