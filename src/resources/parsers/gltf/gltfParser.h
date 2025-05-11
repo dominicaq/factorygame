@@ -91,7 +91,7 @@ size_t getComponentSize(int componentType) {
 /*
 * Parsing
 */
-bool parseGlTF(std::vector<Mesh>& meshes, std::string fileName) {
+bool loadGltf(std::vector<Mesh>& meshes, std::string fileName) {
     std::ifstream file(fileName);
     if (!file.is_open()) {
         std::cerr << "Failed to open file: " << fileName << "\n";
@@ -164,9 +164,6 @@ bool parseBuffers(const json &gltfDoc, const std::string &fileName, std::vector<
 
     for (size_t i = 0; i < buffersJson.size(); ++i) {
         const auto& bufferJson = buffersJson[i];
-        size_t byteLength = 0;
-        parseJsonProperty(bufferJson, "byteLength", byteLength);
-
         if (!bufferJson.contains("uri")) {
             continue;
         }
@@ -191,6 +188,8 @@ bool parseBuffers(const json &gltfDoc, const std::string &fileName, std::vector<
                 return false;
             }
 
+            size_t byteLength = 0;
+            parseJsonProperty(bufferJson, "byteLength", byteLength);
             buffers[i].resize(byteLength);
             bufferFile.read(reinterpret_cast<char*>(buffers[i].data()), byteLength);
         }
@@ -236,7 +235,6 @@ bool parseAccessors(
         for (size_t primitiveIdx = 0; primitiveIdx < primitivesJson.size(); ++primitiveIdx) {
             Mesh mesh;
             const auto& primitiveJson = primitivesJson[primitiveIdx];
-
             if (!primitiveJson.contains("attributes")) {
                 continue;
             }
@@ -306,6 +304,59 @@ bool parseAccessors(
 }
 
 template <typename T>
+void unpackData(const uint8_t* dataPtr, int componentType, int vecSize, T& target) {
+    // Helper template function for unpacking vector components
+    auto unpackVec = [&](auto* typedPtr, float normalizer = 1.0f) {
+        if constexpr (std::is_same_v<T, glm::vec2>) {
+            target = glm::vec2(
+                static_cast<float>(typedPtr[0]) / normalizer,
+                static_cast<float>(typedPtr[1]) / normalizer
+            );
+        } else if constexpr (std::is_same_v<T, glm::vec3>) {
+            target = glm::vec3(
+                static_cast<float>(typedPtr[0]) / normalizer,
+                static_cast<float>(typedPtr[1]) / normalizer,
+                static_cast<float>(typedPtr[2]) / normalizer
+            );
+        } else if constexpr (std::is_same_v<T, glm::vec4>) {
+            target = glm::vec4(
+                static_cast<float>(typedPtr[0]) / normalizer,
+                static_cast<float>(typedPtr[1]) / normalizer,
+                static_cast<float>(typedPtr[2]) / normalizer,
+                static_cast<float>(typedPtr[3]) / normalizer
+            );
+        } else if constexpr (std::is_same_v<T, uint32_t>) {
+            target = static_cast<uint32_t>(typedPtr[0]);
+        }
+    };
+
+    // Handle different component types according to glTF 2.0 spec
+    switch (componentType) {
+        case 5120: // BYTE - signed 8-bit integer
+            unpackVec(reinterpret_cast<const int8_t*>(dataPtr), 127.0f);
+            break;
+        case 5121: // UNSIGNED_BYTE - unsigned 8-bit integer
+            unpackVec(dataPtr, 255.0f);
+            break;
+        case 5122: // SHORT - signed 16-bit integer
+            unpackVec(reinterpret_cast<const int16_t*>(dataPtr), 32767.0f);
+            break;
+        case 5123: // UNSIGNED_SHORT - unsigned 16-bit integer
+            unpackVec(reinterpret_cast<const uint16_t*>(dataPtr), 65535.0f);
+            break;
+        case 5125: // UNSIGNED_INT - unsigned 32-bit integer
+            unpackVec(reinterpret_cast<const uint32_t*>(dataPtr));
+            break;
+        case 5126: // FLOAT - 32-bit float
+            unpackVec(reinterpret_cast<const float*>(dataPtr));
+            break;
+        default:
+            std::cerr << "Unsupported component type: " << componentType << std::endl;
+            break;
+    }
+}
+
+template <typename T>
 void parseAccessorData(
     const json& accessorJson,
     const std::vector<std::vector<uint8_t>>& buffers,
@@ -323,19 +374,15 @@ void parseAccessorData(
     int componentType = 0;
     parseJsonProperty(accessorJson, "componentType", componentType);
 
-    size_t bufferIndex = bufferView.index;
-    size_t bufferViewByteOffset = bufferView.byteOFfset;
-    size_t bufferViewByteStride = bufferView.stride;
-
-    const uint8_t* bufferData = buffers[bufferIndex].data() + bufferViewByteOffset + byteOffset;
+    const uint8_t* bufferData = buffers[bufferView.index].data() + bufferView.byteOFfset + byteOffset;
     size_t elementByteSize = getComponentSize(componentType) * vecSize;
-    size_t stride = bufferViewByteStride == 0 ? elementByteSize : bufferViewByteStride;
+    size_t stride = bufferView.stride == 0 ? elementByteSize : bufferView.stride;
 
     targetVector.resize(count);
 
     for (size_t i = 0; i < count; ++i) {
-        // const uint8_t* dataPtr = bufferData + i * stride;
-        // unpackData(dataPtr, componentType, vecSize, targetVector[i]);
+        const uint8_t* dataPtr = bufferData + i * stride;
+        unpackData(dataPtr, componentType, vecSize, targetVector[i]);
     }
 }
 

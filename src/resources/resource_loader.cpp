@@ -4,11 +4,13 @@
 
 // Loaders
 #include "objloader.h"
+#include "parsers/gltf/gltfParser.h"
 
 #include <fstream>
 #include <sstream>
 #include <iostream>
 #include <filesystem>
+#include <utility>
 
 /*
 * System
@@ -74,8 +76,16 @@ Mesh* ResourceLoader::loadMesh(const std::string& filepath) {
     if (extension == "obj") {
         return ObjLoader::loadOBJ(fileContent);
     } else if (extension == "gltf") {
-        std::cerr << "[Error] ResourceLoader::loadMesh: GLTF loading not yet implemented: " << filepath << "\n";
-        return nullptr;
+        std::vector<Mesh> meshes;
+        bool success = loadGltf(meshes, filepath);
+        if (!success ||meshes.empty()) {
+            std::cerr << "[Error] ResourceLoader::loadMesh: Failed to load glTF file or file contains no meshes: " << filepath << "\n";
+            return nullptr;
+        }
+
+        // Return just the first mesh for now
+        Mesh* firstMesh = new Mesh(meshes[0]);
+        return firstMesh;
     } else {
         std::cerr << "[Error] ResourceLoader::loadMesh: Unknown file extension: " << extension << " for file: " << filepath << "\n";
         return nullptr;

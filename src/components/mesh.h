@@ -7,18 +7,19 @@
 #include <vector>
 
 struct Mesh {
+    // Raw mesh data
+    std::vector<glm::vec3> vertices;
+    std::vector<glm::vec3> normals;
+    std::vector<glm::vec3> tangents;
+    std::vector<glm::vec3> bitangents;
+    std::vector<glm::vec2> uvs;
+    std::vector<unsigned int> indices;
+    Material* material = nullptr;
+
     /*
     * WARNING: DO NOT set the Mesh ID yourself. It will be overwritten anyway.
     */
     size_t id = SIZE_MAX;
-    // Mesh data
-    std::vector<glm::vec3> vertices;
-    std::vector<glm::vec2> uvs;
-    std::vector<glm::vec3> normals;
-    std::vector<glm::vec3> tangents;
-    std::vector<glm::vec3> bitangents;
-    std::vector<unsigned int> indices;
-    Material* material = nullptr;
     bool wireframe = false;
 
     // Method to clear CPU-side mesh data

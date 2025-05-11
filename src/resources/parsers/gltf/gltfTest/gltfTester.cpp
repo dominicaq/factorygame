@@ -4,8 +4,8 @@
 int main() {
     std::string assetDir = std::string(GLTF_TEST_ASSETS_DIR);
     std::vector<Mesh> dummyMeshes;
-    bool success = parseGlTF(dummyMeshes, assetDir + "triangle/triangle.gltf");
-    if (!success) {
+    bool success = loadGltf(dummyMeshes, assetDir + "triangle/triangle.gltf");
+    if (!success || dummyMeshes.empty()) {
         std::cout << "Parse failed\n";
         return -1;
     }
