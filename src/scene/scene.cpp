@@ -197,6 +197,29 @@ void Scene::loadScene() {
         registry.emplace<Mesh*>(diabloEntity, diabloMesh);
     }
 
+    entt::entity gltfEntity = registry.create();
+    SceneData save_gltfData;
+    save_gltfData.name = "gltf test";
+    save_gltfData.position = glm::vec3(0.0f, 1.9f, -1.0f);
+    save_gltfData.scale = glm::vec3(3.0f);
+    GameObject* gltfObject = SceneUtils::addGameObjectComponent(registry, gltfEntity, save_gltfData);
+    Mesh* gltfTestModel = ResourceLoader::loadMesh(ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf");
+    if (gltfTestModel != nullptr) {
+        // TODO: in the future i wont need this. will build materials as theyre parsed in
+        Material* gltfMat = new Material(basicShader);
+        gltfMat->albedoColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        gltfMat->isDeferred = true;
+
+        Texture* gltfAM = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_diffuse.tga");
+        gltfMat->albedoMap = gltfAM;
+
+        Texture* gltfNM = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_nm_tangent.tga");
+        gltfMat->normalMap = gltfNM;
+
+        gltfTestModel->material = gltfMat;
+        registry.emplace<Mesh*>(gltfEntity, gltfTestModel);
+    }
+
     // --------------------- Dummy Entity (global scripts) ------------------
     entt::entity dummyEntity = registry.create();
     SceneData save_dummyData;

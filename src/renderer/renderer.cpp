@@ -83,7 +83,8 @@ void Renderer::initOpenGLState() {
 void Renderer::draw(const Mesh* mesh) {
     size_t index = mesh->id;
     if (index >= m_meshData.size() || m_meshData[index].VAO == 0) {
-        std::cerr << "[Error] Remderer::draw: Mesh buffer id not found!\n";
+        // TODO: TEMP
+        // std::cerr << "[Error] Remderer::draw: Mesh buffer id not found!\n";
         return;
     }
 
@@ -151,11 +152,16 @@ void Renderer::drawInstanced(size_t instanceID, bool wireframe) {
 }
 
 void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic, size_t instanceID) {
+    if (!mesh) {
+        std::cerr << "[Error] Renderer::initMeshBuffers: Mesh pointer is null.\n";
+        return;
+    }
+
     if (mesh->uvs.empty() ||
         mesh->normals.empty() ||
         mesh->tangents.empty() ||
         mesh->bitangents.empty()) {
-        std::cerr << "[Error] Renderer::initMeshBuffers: UVs, normals, tangents, and bitangents must be provided for all vertices.\n";
+        std::cerr << "[Error] Renderer::initMeshBuffers: UVs, normals, and tangent space must be provided.\n";
         return;
     }
 
