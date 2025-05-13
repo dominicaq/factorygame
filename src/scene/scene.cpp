@@ -197,29 +197,60 @@ void Scene::loadScene() {
         registry.emplace<Mesh*>(diabloEntity, diabloMesh);
     }
 
-    entt::entity gltfEntity = registry.create();
-    SceneData save_gltfData;
-    save_gltfData.name = "gltf test";
-    save_gltfData.position = glm::vec3(0.0f, 1.9f, -1.0f);
-    save_gltfData.scale = glm::vec3(3.0f);
-    GameObject* gltfObject = SceneUtils::addGameObjectComponent(registry, gltfEntity, save_gltfData);
-    Mesh* gltfTestModel = ResourceLoader::loadMesh(ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf");
-    if (gltfTestModel != nullptr) {
-        // TODO: in the future i wont need this. will build materials as theyre parsed in
+    /*
+    * glTF OBJECT
+    */
+
+    // SceneData gltfParentSaveData;
+    // gltfParentSaveData.name = "glTF test";
+    // gltfParentSaveData.position = glm::vec3(0.0f, 1.9f, -1.0f);
+    // gltfParentSaveData.scale = glm::vec3(3.0f);
+    // gltfNodeData.push_back(gltfParentSaveData);
+
+    std::vector<SceneData> gltfNodeData;
+    std::vector<Mesh*> gltfTestModel;
+    ResourceLoader::loadMeshVector(ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf", gltfTestModel, gltfNodeData);
+
+    // First pass: Create entities and assign models
+    std::vector<entt::entity> gltfEntities(gltfTestModel.size());
+    for (size_t i = 0; i < gltfTestModel.size(); ++i) {
+        gltfEntities[i] = registry.create();
+
+        GameObject* gltfObject = SceneUtils::addGameObjectComponent(registry, gltfEntities[i], gltfNodeData[i]);
+        if (gltfTestModel[i] == nullptr) {
+            continue;
+        }
+
         Material* gltfMat = new Material(basicShader);
-        gltfMat->albedoColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        gltfMat->albedoColor = glm::vec4(1.0f);
         gltfMat->isDeferred = true;
 
+        // Placeholder textures (replace with GLTF-provided textures later)
         Texture* gltfAM = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_diffuse.tga");
-        gltfMat->albedoMap = gltfAM;
-
         Texture* gltfNM = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_nm_tangent.tga");
+        gltfMat->albedoMap = gltfAM;
         gltfMat->normalMap = gltfNM;
 
-        gltfTestModel->material = gltfMat;
-        registry.emplace<Mesh*>(gltfEntity, gltfTestModel);
+        gltfTestModel[i]->material = gltfMat;
+        registry.emplace<Mesh*>(gltfEntities[i], gltfTestModel[i]);
     }
 
+    // Second pass: Set up parent-child relationships
+    for (size_t i = 0; i < gltfNodeData.size(); ++i) {
+        for (size_t childIdx : gltfNodeData[i].children) {
+            if (childIdx >= gltfEntities.size())
+                continue;
+
+            GameObject* childObj = registry.try_get<GameObject>(gltfEntities[childIdx]);
+            if (!childObj)
+                continue;
+
+            // childObj->setParent(gltfEntities[i]);
+        }
+    }
+    // GameObject* parentObj = registry.try_get<GameObject>(gltfEntities[0]);
+    // parentObj->setPosition(glm::vec3(0));
+    // parentObj->setScale(glm::vec3(1));
     // --------------------- Dummy Entity (global scripts) ------------------
     entt::entity dummyEntity = registry.create();
     SceneData save_dummyData;

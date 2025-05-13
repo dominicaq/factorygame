@@ -2,6 +2,7 @@
 #define RESOURCE_LOADER_H
 
 #include "../components/mesh.h"
+#include "scene/sceneData.h"
 
 #include <string>
 
@@ -15,6 +16,7 @@ namespace ResourceLoader {
     * Mesh functions
     */
     Mesh* loadMesh(const std::string& filepath);
+    void loadMeshVector(const std::string& filepath, std::vector<Mesh*>& meshes, std::vector<SceneData>& nodeData);
 
     /*
     * Image functions

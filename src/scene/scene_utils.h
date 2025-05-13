@@ -3,18 +3,8 @@
 
 #include <string>
 #include <glm/glm.hpp>
+#include "sceneData.h"
 #include "engine.h"
-
-// Meta data is the data saved to disk
-struct SceneData {
-    // Meta data
-    std::string name;
-
-    // Transform
-    glm::vec3 position = glm::vec3(0.0f);
-    glm::vec3 scale = glm::vec3(1.0f);
-    glm::vec3 eulerAngles = glm::vec3(0.0f);
-};
 
 enum class GizmoType {
     AXIS,

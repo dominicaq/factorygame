@@ -27,7 +27,7 @@ bool parseAccessors(
     const json& gltfDoc,
     std::vector<std::vector<uint8_t>>& buffers,
     std::vector<glTFBufferView>& bufferViews,
-    std::vector<Mesh>& meshes);
+    std::vector<Mesh*>& meshes);
 bool parseBuffers(const json &gltfDoc, const std::string &fileName, std::vector<std::vector<uint8_t>>& buffers);
 template <typename T>
 void parseAccessorData(
@@ -37,6 +37,7 @@ void parseAccessorData(
     size_t accessorIndex,
     std::vector<T>& targetVector,
     int vecSize);
+bool parseNodes(const json& gltfDoc, std::vector<SceneData>& nodeData);
 
 /*
  * Utility
@@ -56,7 +57,7 @@ std::string base64Decode(const std::string& base64) {
         "0123456789+/";
 
     std::vector<unsigned char> decodedBytes;
-    int val = 0, valb = -8;
+    size_t val = 0, valb = -8;
 
     for (unsigned char c : base64) {
         if (c == '=') break;
@@ -85,7 +86,7 @@ size_t getComponentSize(int componentType) {
 /*
 * Parsing
 */
-bool loadGltf(std::vector<Mesh>& meshes, std::string fileName) {
+bool loadglTF(std::string fileName, std::vector<Mesh*>& meshes, std::vector<SceneData>& nodeData) {
     std::ifstream file(fileName);
     if (!file.is_open()) {
         std::cerr << "Failed to open file: " << fileName << "\n";
@@ -145,6 +146,14 @@ bool loadGltf(std::vector<Mesh>& meshes, std::string fileName) {
         return false;
     }
 
+    // Meta data parsing (materials, game object positions, rotations, etc.)
+    if (!parseNodes(gltfDoc, nodeData)) {
+        std::cerr << "Failed to parse glTF node meta data\n";
+        meshes.clear();
+        nodeData.clear();
+        return false;
+    }
+
     return true;
 }
 
@@ -199,7 +208,7 @@ bool parseAccessors(
     const json& gltfDoc,
     std::vector<std::vector<uint8_t>>& buffers,
     std::vector<glTFBufferView>& bufferViews,
-    std::vector<Mesh>& meshes) {
+    std::vector<Mesh*>& meshes) {
 
     if (!gltfDoc.contains("accessors") || !gltfDoc["accessors"].is_array() || gltfDoc["accessors"].empty()) {
         std::cerr << "glTF file doesn't contain valid accessors array\n";
@@ -219,7 +228,6 @@ bool parseAccessors(
 
     for (size_t meshIdx = 0; meshIdx < meshesJson.size(); ++meshIdx) {
         const auto& meshJson = meshesJson[meshIdx];
-
         if (!meshJson.contains("primitives") || !meshJson["primitives"].is_array() || meshJson["primitives"].empty()) {
             std::cerr << "Mesh " << meshIdx << " doesn't contain valid primitives\n";
             continue;
@@ -227,7 +235,7 @@ bool parseAccessors(
 
         const auto& primitivesJson = meshJson["primitives"];
         for (size_t primitiveIdx = 0; primitiveIdx < primitivesJson.size(); ++primitiveIdx) {
-            Mesh mesh;
+            Mesh* mesh = new Mesh();
             const auto& primitiveJson = primitivesJson[primitiveIdx];
             if (!primitiveJson.contains("attributes")) {
                 continue;
@@ -240,7 +248,7 @@ bool parseAccessors(
                 size_t positionIdx = attributeJson["POSITION"];
                 const auto& positionAccesor = accessorsJson[positionIdx];
                 size_t positionBufferViewIdx = positionAccesor["bufferView"];
-                parseAccessorData(positionAccesor, buffers, bufferViews[positionBufferViewIdx], positionIdx, mesh.vertices, 3);
+                parseAccessorData(positionAccesor, buffers, bufferViews[positionBufferViewIdx], positionIdx, mesh->vertices, 3);
             }
 
             // Process NORMAL attribute
@@ -248,7 +256,7 @@ bool parseAccessors(
                 size_t normalIdx = attributeJson["NORMAL"];
                 const auto& normalAccesor = accessorsJson[normalIdx];
                 size_t normalBufferViewIdx = normalAccesor["bufferView"];
-                parseAccessorData(normalAccesor, buffers, bufferViews[normalBufferViewIdx], normalIdx, mesh.normals, 3);
+                parseAccessorData(normalAccesor, buffers, bufferViews[normalBufferViewIdx], normalIdx, mesh->normals, 3);
             }
 
             // Process TEXCOORD_0 attribute
@@ -256,7 +264,7 @@ bool parseAccessors(
                 size_t uvIdx = attributeJson["TEXCOORD_0"];
                 const auto& uvAccesor = accessorsJson[uvIdx];
                 size_t uvBufferViewIdx = uvAccesor["bufferView"];
-                parseAccessorData(uvAccesor, buffers, bufferViews[uvBufferViewIdx], uvIdx, mesh.uvs, 2);
+                parseAccessorData(uvAccesor, buffers, bufferViews[uvBufferViewIdx], uvIdx, mesh->uvs, 2);
             }
 
             // Process TANGENT attribute
@@ -264,18 +272,18 @@ bool parseAccessors(
                 size_t tangentIdx = attributeJson["TANGENT"];
                 const auto& tangentAccessor = accessorsJson[tangentIdx];
                 size_t tangentBufferViewIdx = tangentAccessor["bufferView"];
-                parseAccessorData(tangentAccessor, buffers, bufferViews[tangentBufferViewIdx], tangentIdx, mesh.tangents, 3);
+                parseAccessorData(tangentAccessor, buffers, bufferViews[tangentBufferViewIdx], tangentIdx, mesh->tangents, 3);
 
                 // Calculate bitangents using the tangent vector and normal
-                mesh.bitangents.resize(mesh.tangents.size());
-                for (size_t i = 0; i < mesh.tangents.size(); ++i) {
+                mesh->bitangents.resize(mesh->tangents.size());
+                for (size_t i = 0; i < mesh->tangents.size(); ++i) {
                     // Ensure we have normals to calculate bitangent
-                    if (i < mesh.normals.size()) {
-                        const glm::vec3& normal = mesh.normals[i];
-                        const glm::vec3& tangent = mesh.tangents[i];
+                    if (i < mesh->normals.size()) {
+                        const glm::vec3& normal = mesh->normals[i];
+                        const glm::vec3& tangent = mesh->tangents[i];
 
                         // Calculate bitangent using cross product
-                        mesh.bitangents[i] = glm::cross(normal, tangent);
+                        mesh->bitangents[i] = glm::cross(normal, tangent);
                     }
                 }
             }
@@ -285,25 +293,25 @@ bool parseAccessors(
                 size_t indicesAccessorIndex = primitiveJson["indices"];
                 const auto& indicesAccessor = accessorsJson[indicesAccessorIndex];
                 size_t indicesBufferViewIndex = indicesAccessor["bufferView"];
-                parseAccessorData(indicesAccessor, buffers, bufferViews[indicesBufferViewIndex], indicesAccessorIndex, mesh.indices, 1);
+                parseAccessorData(indicesAccessor, buffers, bufferViews[indicesBufferViewIndex], indicesAccessorIndex, mesh->indices, 1);
             }
 
             // Material if present
             if (primitiveJson.contains("material")) {
                 size_t materialIdx = primitiveJson["material"];
-                // TODO: finish material parsing
-                // mesh.material = ...
+                // TODO: parse material indexes
+                // mesh->material = ...
             }
 
-            if (mesh.vertices.empty() || mesh.normals.empty() || mesh.bitangents.empty() || mesh.tangents.empty()) {
+            if (mesh->vertices.empty() || mesh->normals.empty() || mesh->bitangents.empty() || mesh->tangents.empty()) {
                 std::stringstream warningMsg;
-                warningMsg << "[Warning] Skipping glTF mesh at index [" << meshIdx
+                warningMsg << "[Warning] Skipping glTF mesh->at index [" << mesh->id
                         << "]: one or more required attributes are missing.\n"
                         << "Present data: \n"
-                        << "Vertices: " << (mesh.vertices.empty() ? "Missing" : "OK") << "\n"
-                        << "Normals: " << (mesh.normals.empty() ? "Missing" : "OK") << "\n"
-                        << "Tangents: " << (mesh.tangents.empty() ? "Missing" : "OK") << "\n"
-                        << "Bitangents: " << (mesh.bitangents.empty() ? "Missing" : "OK") << "\n";
+                        << "Vertices: " << (mesh->vertices.empty() ? "Missing" : "OK") << "\n"
+                        << "Normals: " << (mesh->normals.empty() ? "Missing" : "OK") << "\n"
+                        << "Tangents: " << (mesh->tangents.empty() ? "Missing" : "OK") << "\n"
+                        << "Bitangents: " << (mesh->bitangents.empty() ? "Missing" : "OK") << "\n";
 
                 std::cerr << warningMsg.str() << "\n";
                 continue;
@@ -314,6 +322,108 @@ bool parseAccessors(
     }
 
     return !meshes.empty();
+}
+
+/*
+* Node data parsing
+*/
+bool parseNodes(const json& gltfDoc, std::vector<SceneData>& nodeData) {
+    if (!gltfDoc.contains("nodes") || !gltfDoc["nodes"].is_array()) {
+        return false;
+    }
+
+    const auto& nodesJson = gltfDoc["nodes"];
+    nodeData.resize(nodesJson.size());
+
+    for (size_t i = 0; i < nodesJson.size(); ++i) {
+        const auto& nodeJson = nodesJson[i];
+        SceneData& node = nodeData[i];
+
+        // Parse name
+        if (nodeJson.contains("name")) {
+            node.name = nodeJson["name"].get<std::string>();
+        }
+
+        // Parse children
+        if (nodeJson.contains("children") && nodeJson["children"].is_array()) {
+            for (const auto& child : nodeJson["children"]) {
+                node.children.push_back(child.get<size_t>());
+            }
+        }
+
+        // Handle TRS or matrix - matrix takes precedence if both are specified
+        if (nodeJson.contains("matrix") && nodeJson["matrix"].is_array()) {
+            const auto& matArray = nodeJson["matrix"];
+            if (matArray.size() == 16) {
+                // Convert column-major 4x4 matrix to our needed format
+                // Assuming you're storing this in node.matrix or similar
+                // This is a placeholder - you'll want to adapt this based on how you're storing matrices
+                std::array<float, 16> matrix;
+                for (size_t j = 0; j < 16; ++j) {
+                    matrix[j] = matArray[j].get<float>();
+                }
+
+                // If you're using glm::mat4 you'd do something like:
+                // node.matrix = glm::make_mat4(matrix.data());
+
+                // If you need to extract TRS components from the matrix:
+                // glm::vec3 scale, translation;
+                // glm::quat rotation;
+                // glm::vec3 skew;
+                // glm::vec4 perspective;
+                // glm::decompose(node.matrix, scale, rotation, translation, skew, perspective);
+                // node.position = translation;
+                // node.scale = scale;
+                // node.eulerAngles = glm::eulerAngles(rotation);
+            }
+        } else {
+            // Parse translation
+            node.position = glm::vec3(0.0f);
+            if (nodeJson.contains("translation") && nodeJson["translation"].is_array()) {
+                const auto& transArray = nodeJson["translation"];
+                if (transArray.size() == 3) {
+                    for (int j = 0; j < 3; ++j) {
+                        node.position[j] = transArray[j].get<float>();
+                    }
+                }
+            }
+
+            // Parse scale
+            node.scale = glm::vec3(1.0f);
+            if (nodeJson.contains("scale") && nodeJson["scale"].is_array()) {
+                const auto& scaleArray = nodeJson["scale"];
+                if (scaleArray.size() == 3) {
+                    for (int j = 0; j < 3; ++j) {
+                        node.scale[j] = scaleArray[j].get<float>();
+                    }
+                }
+            }
+
+            // Parse rotation (quaternion to Euler)
+            node.eulerAngles = glm::vec3(0.0f);
+            if (nodeJson.contains("rotation") && nodeJson["rotation"].is_array()) {
+                const auto& rotArray = nodeJson["rotation"];
+                if (rotArray.size() == 4) {
+                    glm::quat q(
+                        rotArray[3].get<float>(), // w
+                        rotArray[0].get<float>(), // x
+                        rotArray[1].get<float>(), // y
+                        rotArray[2].get<float>()  // z
+                    );
+                    node.eulerAngles = glm::eulerAngles(q);
+                }
+            }
+        }
+
+        // Handle mesh reference if present
+        // if (nodeJson.contains("mesh")) {
+        //     node.meshIndex = nodeJson["mesh"].get<int>();
+        // } else {
+        //     node.meshIndex = -1; // No mesh assigned
+        // }
+    }
+
+    return true;
 }
 
 void loadMaterial(const json& gltfDoc, Material& material) {

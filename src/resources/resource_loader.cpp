@@ -60,7 +60,7 @@ Mesh* ResourceLoader::loadMesh(const std::string& filepath) {
     }
 
     // Extract the file extension
-    std::size_t dotPos = filepath.find_last_of(".");
+    size_t dotPos = filepath.find_last_of(".");
     if (dotPos == std::string::npos) {
         std::cerr << "[Error] ResourceLoader::loadMesh: Failed to determine file type for: " << filepath << "\n";
         return nullptr;
@@ -76,25 +76,46 @@ Mesh* ResourceLoader::loadMesh(const std::string& filepath) {
     if (extension == "obj") {
         return ObjLoader::loadOBJ(fileContent);
     } else if (extension == "gltf") {
-        std::vector<Mesh> meshes;
-        bool success = loadGltf(meshes, filepath);
-        if (!success ||meshes.empty()) {
-            std::cerr << "[Error] ResourceLoader::loadMesh: Failed to load glTF file or file contains no meshes: " << filepath << "\n";
-            return nullptr;
-        }
-
-        // Return just the first mesh for now
-        Mesh* firstMesh = new Mesh(meshes[0]);
-        return firstMesh;
+        std::cerr << "[Error] ResourceLoader::loadMesh: for glTF files use ResoucreLoader::loadMeshVector() for file: " << filepath << "\n";
+        return nullptr;
     } else {
         std::cerr << "[Error] ResourceLoader::loadMesh: Unknown file extension: " << extension << " for file: " << filepath << "\n";
         return nullptr;
     }
 }
 
-/*
-* Cube maps
-*/
+void ResourceLoader::loadMeshVector(const std::string& filepath, std::vector<Mesh*>& meshes, std::vector<SceneData>& nodeData) {
+    std::string fileContent = readFile(filepath);
+    if (fileContent.empty()) {
+        std::cerr << "[Error] ResourceLoader::loadMesh: File contents empty: " << filepath << "\n";
+        return;
+    }
+
+    // Extract the file extension
+    size_t dotPos = filepath.find_last_of(".");
+    if (dotPos == std::string::npos) {
+        std::cerr << "[Error] ResourceLoader::loadMesh: Failed to determine file type for: " << filepath << "\n";
+        return;
+    }
+
+    std::string extension = filepath.substr(dotPos + 1);
+    for (char& c : extension) {
+        c = std::tolower(c);
+    }
+
+    if (extension != "gltf") {
+        std::cerr << "[Error] ResourceLoader::loadMeshVector: only accepts glTF files: " << filepath << "\n";
+        return;
+    }
+
+    if (!loadglTF(filepath, meshes, nodeData)) {
+        std::cerr << "[Error] ResourceLoader::loadMeshVector: Failed to load glTF mesh\n";
+        meshes.clear();
+        nodeData.clear();
+        return;
+    }
+}
+
 /*
 * Cubemap (Loading only image data, no OpenGL calls)
 */
