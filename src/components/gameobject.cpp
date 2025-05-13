@@ -178,8 +178,35 @@ glm::vec3& GameObject::getScale() {
 }
 
 void GameObject::setScale(const glm::vec3& scale) {
+    glm::vec3 oldScale = m_registry.get<Scale>(m_entity).scale;
     m_registry.get<Scale>(m_entity).scale = scale;
     m_registry.get<ModelMatrix>(m_entity).dirty = true;
+
+    // Propagate scale changes to children
+    if (m_registry.any_of<Children>(m_entity)) {
+        glm::vec3 scaleRatio = scale / oldScale; // Calculate scaling ratio
+        updateChildrenScale(m_entity, scaleRatio);
+    }
+}
+
+void GameObject::updateChildrenScale(entt::entity parent, const glm::vec3& scaleRatio) {
+    if (!m_registry.any_of<Children>(parent)) {
+        return;
+    }
+
+    for (auto child : m_registry.get<Children>(parent).children) {
+        if (m_registry.valid(child)) {
+            // Update child's scale by multiplying with scale ratio
+            auto& childScale = m_registry.get<Scale>(child).scale;
+            childScale *= scaleRatio;
+
+            // Mark child's model matrix as dirty
+            m_registry.get<ModelMatrix>(child).dirty = true;
+
+            // Recursively update this child's children
+            updateChildrenScale(child, scaleRatio);
+        }
+    }
 }
 
 glm::vec3 GameObject::getForward() {

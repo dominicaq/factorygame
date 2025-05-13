@@ -200,65 +200,13 @@ void Scene::loadScene() {
     /*
     * glTF OBJECT
     */
-    // Create a root parent entity to hold all the model parts
-    entt::entity gltfRootEntity = registry.create();
     SceneData gltfRootData;
     gltfRootData.name = "glTF Root";
     gltfRootData.position = glm::vec3(0.0f, 1.9f, -1.0f);
     gltfRootData.scale = glm::vec3(3.0f);
-    GameObject* gltfRootObject = SceneUtils::addGameObjectComponent(registry, gltfRootEntity, gltfRootData);
-    // gltfRootObject->addScript<MoveScript>();
+    GameObject* gltfRootObject = SceneUtils::createMeshGameObject(registry, basicShader, gltfRootData, ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf");
+    gltfRootObject->addScript<MoveScript>();
 
-    // Load the glTF model data
-    std::vector<SceneData> gltfNodeData;
-    std::vector<Mesh*> gltfTestModel;
-    ResourceLoader::loadMeshVector(ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf", gltfTestModel, gltfNodeData);
-
-    // First pass: Create entities and assign models
-    std::vector<entt::entity> gltfEntities(gltfNodeData.size());
-    for (size_t i = 0; i < gltfNodeData.size(); ++i) {
-        gltfEntities[i] = registry.create();
-
-        GameObject* gltfObject = SceneUtils::addGameObjectComponent(registry, gltfEntities[i], gltfNodeData[i]);
-
-        // If this node has a mesh, assign it
-        if (i < gltfTestModel.size() && gltfTestModel[i] != nullptr) {
-            Material* gltfMat = new Material(basicShader);
-            gltfMat->albedoColor = glm::vec4(1.0f);
-            gltfMat->isDeferred = true;
-
-            // Placeholder textures (replace with GLTF-provided textures later)
-            Texture* gltfAM = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_diffuse.tga");
-            Texture* gltfNM = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_nm_tangent.tga");
-            gltfMat->albedoMap = gltfAM;
-            gltfMat->normalMap = gltfNM;
-
-            gltfTestModel[i]->material = gltfMat;
-            registry.emplace<Mesh*>(gltfEntities[i], gltfTestModel[i]);
-        }
-
-        // Initially, set all nodes as children of the root entity
-        gltfObject->setParent(gltfRootEntity);
-    }
-
-    // Second pass: Set up the actual hierarchy as defined by the glTF file
-    for (size_t i = 0; i < gltfNodeData.size(); ++i) {
-        for (size_t childIdx : gltfNodeData[i].children) {
-            if (childIdx >= gltfEntities.size())
-                continue;
-
-            GameObject* childObj = registry.try_get<GameObject>(gltfEntities[childIdx]);
-            if (!childObj)
-                continue;
-
-            // Set the proper parent according to the glTF hierarchy
-            childObj->setParent(gltfEntities[i]);
-        }
-    }
-
-    // GameObject* parentObj = registry.try_get<GameObject>(gltfEntities[0]);
-    // parentObj->setPosition(glm::vec3(0));
-    // parentObj->setScale(glm::vec3(1));
     // --------------------- Dummy Entity (global scripts) ------------------
     entt::entity dummyEntity = registry.create();
     SceneData save_dummyData;

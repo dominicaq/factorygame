@@ -22,6 +22,7 @@ private:
     std::vector<std::shared_ptr<Script>> m_scripts;
 
     void markChildrenDirty(entt::entity parent);
+    void updateChildrenScale(entt::entity parent, const glm::vec3& scaleRatio);
 
 public:
     GameObject(entt::entity entity, entt::registry& registry);
