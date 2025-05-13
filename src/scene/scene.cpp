@@ -7,6 +7,7 @@
 #include "MoveScript.h"
 #include "BouncingMotion.h"
 #include "ViewFramebuffers.h"
+#include "ScaleScript.h"
 
 /*
 * Scene Management
@@ -200,12 +201,9 @@ void Scene::loadScene() {
     /*
     * glTF OBJECT
     */
-    SceneData gltfRootData;
-    gltfRootData.name = "glTF Root";
-    gltfRootData.position = glm::vec3(0.0f, 1.9f, -1.0f);
-    gltfRootData.scale = glm::vec3(1.0f);
-    GameObject* gltfRootObject = SceneUtils::createMeshGameObject(registry, basicShader, gltfRootData, ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf");
-    // gltfRootObject->addScript<MoveScript>();
+    GameObject* gltfRootObject = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf");
+    gltfRootObject->setPosition(glm::vec3(0,0,13));
+    // gltfRootObject->addScript<ScaleScript>();
 
     // --------------------- Dummy Entity (global scripts) ------------------
     entt::entity dummyEntity = registry.create();

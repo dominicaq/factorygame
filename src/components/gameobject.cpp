@@ -149,6 +149,7 @@ glm::vec3& GameObject::getPosition() {
 void GameObject::setPosition(const glm::vec3& pos) {
     m_registry.get<Position>(m_entity).position = pos;
     m_registry.get<ModelMatrix>(m_entity).dirty = true;
+    markChildrenDirty(m_entity);
 }
 
 glm::vec3& GameObject::getEuler() {
@@ -162,7 +163,7 @@ void GameObject::setEuler(const glm::vec3& euler) {
     auto& rotationComponent = m_registry.get<Rotation>(m_entity);
     rotationComponent.quaternion = glm::quat(glm::radians(euler));
 
-    m_registry.get<ModelMatrix>(m_entity).dirty = true;
+    markChildrenDirty(m_entity);
 }
 
 glm::quat& GameObject::getRotation() {
@@ -184,69 +185,13 @@ glm::vec3& GameObject::getScale() {
     return m_registry.get<Scale>(m_entity).scale;
 }
 
-void GameObject::setScale(const glm::vec3& newLocalScale) {
+void GameObject::setScale(const glm::vec3& newScale) {
     auto& scaleComponent = m_registry.get<Scale>(m_entity);
-    glm::vec3 oldLocalScale = scaleComponent.scale;
-    scaleComponent.scale = newLocalScale;
-
-    // Only adjust children if scale is actually changing
-    if (oldLocalScale != newLocalScale && m_registry.any_of<Children>(m_entity)) {
-        adjustChildrenPositionsForScale(m_entity, oldLocalScale, newLocalScale);
-    }
+    scaleComponent.scale = newScale;
 
     // Update world matrices
     m_registry.get<ModelMatrix>(m_entity).dirty = true;
     markChildrenDirty(m_entity);
-}
-
-// Helper method to adjust children positions when parent scale changes
-void GameObject::adjustChildrenPositionsForScale(entt::entity parent,
-                                               const glm::vec3& oldScale,
-                                               const glm::vec3& newScale) {
-    // Skip if no children
-    if (!m_registry.any_of<Children>(parent)) {
-        return;
-    }
-
-    for (auto child : m_registry.get<Children>(parent).children) {
-        if (!m_registry.valid(child)) {
-            continue;
-        }
-
-        // Get child's local position
-        glm::vec3& childPos = m_registry.get<Position>(child).position;
-
-        // We need to adjust position to maintain world position
-        // Current formula: worldPos = parentPos + (parentRot * (childPos * parentScale))
-        // So when parentScale changes, we need to adjust childPos to maintain same worldPos
-
-        // Scale ratio between new and old scales
-        glm::vec3 scaleRatio;
-        for (int i = 0; i < 3; i++) {
-            // Avoid division by zero
-            scaleRatio[i] = (oldScale[i] != 0.0f) ? (newScale[i] / oldScale[i]) : 1.0f;
-        }
-
-        // Adjust child position to maintain world position
-        childPos = childPos / scaleRatio;
-
-        // Mark child for redraw
-        m_registry.get<ModelMatrix>(child).dirty = true;
-    }
-}
-
-void GameObject::updateWorldScales(entt::entity parent) {
-    // Mark this entity's model matrix as dirty
-    m_registry.get<ModelMatrix>(parent).dirty = true;
-
-    // Recursively update all children
-    if (m_registry.any_of<Children>(parent)) {
-        for (auto child : m_registry.get<Children>(parent).children) {
-            if (m_registry.valid(child)) {
-                updateWorldScales(child);
-            }
-        }
-    }
 }
 
 glm::vec3 GameObject::calculateWorldScale(entt::entity entity) {
@@ -287,7 +232,9 @@ void GameObject::markChildrenDirty(entt::entity parent) {
 
     for (auto child : m_registry.get<Children>(parent).children) {
         auto& modelMatrix = m_registry.get<ModelMatrix>(child);
-        modelMatrix.dirty = true;
-        markChildrenDirty(child);
+        if (!modelMatrix.dirty) {
+            modelMatrix.dirty = true;
+            markChildrenDirty(child);
+        }
     }
 }

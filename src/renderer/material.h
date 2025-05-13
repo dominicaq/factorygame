@@ -40,7 +40,7 @@ struct Material {
         : shader(shader),
           albedoColor(glm::vec4(1.0f)),
           shininess(32.0f),
-          isDeferred(false)
+          isDeferred(true)
     {}
 
     // Function to bind the material data to the shader

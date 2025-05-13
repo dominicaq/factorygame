@@ -34,7 +34,7 @@ GameObject* SceneUtils::addGameObjectComponent(entt::registry& registry, entt::e
     return &registry.emplace<GameObject>(entity, entity, registry);
 }
 
-GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* shader, const SceneData& rootData, const std::string& filePath) {
+GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* shader, const std::string& filePath) {
     // Parse the mesh
     std::vector<SceneData> nodeData;
     std::vector<Mesh*> meshes;
@@ -43,48 +43,56 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
         return nullptr;
     }
 
-    // Create the root for the mesh
-    entt::entity rootEntity = registry.create();
-    GameObject* rootObject = SceneUtils::addGameObjectComponent(registry, rootEntity, rootData);
-    if (!rootObject) {
-        return nullptr;
-    }
-
-    // First pass: Create entities and assign models
+    // Create entities for each node
     std::vector<entt::entity> entities(nodeData.size());
+    std::vector<GameObject*> gameObjects(nodeData.size());
+
+    // First pass: Create entities and assign meshes/materials
     for (size_t i = 0; i < nodeData.size(); ++i) {
         entities[i] = registry.create();
-        GameObject* gameObj = SceneUtils::addGameObjectComponent(registry, entities[i], nodeData[i]);
+        gameObjects[i] = SceneUtils::addGameObjectComponent(registry, entities[i], nodeData[i]);
 
         // If this node has a mesh, assign it
         if (i < meshes.size() && meshes[i] != nullptr) {
             Material* gltfMat = new Material(shader);
-            gltfMat->albedoColor = glm::vec4(1.0f);
-            gltfMat->isDeferred = true;
             meshes[i]->material = gltfMat;
             registry.emplace<Mesh*>(entities[i], meshes[i]);
         }
-
-        // Initially, set all nodes as children of the root entity
-        gameObj->setParent(rootEntity);
     }
 
-    // Second pass: Set up the actual hierarchy as defined by the glTF file
+    // Second pass: Set up the hierarchy as defined by the file
     for (size_t i = 0; i < nodeData.size(); ++i) {
         for (size_t childIdx : nodeData[i].children) {
             if (childIdx >= entities.size())
                 continue;
 
-            GameObject* childObj = registry.try_get<GameObject>(entities[childIdx]);
+            GameObject* childObj = gameObjects[childIdx];
             if (!childObj)
                 continue;
 
-            // Set the proper parent according to the glTF hierarchy
+            // Set the proper parent according to the hierarchy
             childObj->setParent(entities[i]);
         }
     }
 
-    return rootObject;
+    // Find the root object - the node that doesn't have a parent in the hierarchy
+    size_t rootNodeIndex = 0;
+    for (size_t i = 0; i < nodeData.size(); ++i) {
+        bool hasParentInHierarchy = false;
+        for (size_t j = 0; j < nodeData.size(); ++j) {
+            if (std::find(nodeData[j].children.begin(), nodeData[j].children.end(), i) != nodeData[j].children.end()) {
+                hasParentInHierarchy = true;
+                break;
+            }
+        }
+
+        if (!hasParentInHierarchy) {
+            rootNodeIndex = i;
+            break; // We found the root, no need to continue checking
+        }
+    }
+
+    return gameObjects[rootNodeIndex];
 }
 
 void SceneUtils::createEmptyGameObject(entt::registry& registry, const SceneData& data) {
