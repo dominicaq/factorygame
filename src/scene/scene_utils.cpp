@@ -54,27 +54,19 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
     std::vector<entt::entity> entities(nodeData.size());
     for (size_t i = 0; i < nodeData.size(); ++i) {
         entities[i] = registry.create();
-
-        GameObject* gltfObject = SceneUtils::addGameObjectComponent(registry, entities[i], nodeData[i]);
+        GameObject* gameObj = SceneUtils::addGameObjectComponent(registry, entities[i], nodeData[i]);
 
         // If this node has a mesh, assign it
         if (i < meshes.size() && meshes[i] != nullptr) {
             Material* gltfMat = new Material(shader);
             gltfMat->albedoColor = glm::vec4(1.0f);
             gltfMat->isDeferred = true;
-
-            // Placeholder textures (replace with GLTF-provided textures later)
-            Texture* gltfAM = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_diffuse.tga");
-            Texture* gltfNM = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_nm_tangent.tga");
-            gltfMat->albedoMap = gltfAM;
-            gltfMat->normalMap = gltfNM;
-
             meshes[i]->material = gltfMat;
             registry.emplace<Mesh*>(entities[i], meshes[i]);
         }
 
         // Initially, set all nodes as children of the root entity
-        gltfObject->setParent(rootEntity);
+        gameObj->setParent(rootEntity);
     }
 
     // Second pass: Set up the actual hierarchy as defined by the glTF file

@@ -203,9 +203,9 @@ void Scene::loadScene() {
     SceneData gltfRootData;
     gltfRootData.name = "glTF Root";
     gltfRootData.position = glm::vec3(0.0f, 1.9f, -1.0f);
-    gltfRootData.scale = glm::vec3(3.0f);
+    gltfRootData.scale = glm::vec3(1.0f);
     GameObject* gltfRootObject = SceneUtils::createMeshGameObject(registry, basicShader, gltfRootData, ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf");
-    gltfRootObject->addScript<MoveScript>();
+    // gltfRootObject->addScript<MoveScript>();
 
     // --------------------- Dummy Entity (global scripts) ------------------
     entt::entity dummyEntity = registry.create();

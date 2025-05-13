@@ -64,7 +64,7 @@ public:
      */
     static void createModel(entt::registry& registry, const SceneData& data, Mesh* mesh);
 
-    GameObject* createMeshGameObject(entt::registry& registry, Shader* shader, const SceneData& rootData, const std::string& filePath);
+    static GameObject* createMeshGameObject(entt::registry& registry, Shader* shader, const SceneData& rootData, const std::string& filePath);
 };
 
 #endif // SCENE_UTILS_H

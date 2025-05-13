@@ -105,26 +105,33 @@ std::string GameObject::getName() {
 * Transform
 */
 void GameObject::setParent(entt::entity newParent) {
+    // Get current world position and rotation
     glm::vec3 childWorldPos = m_registry.get<Position>(m_entity).position;
     glm::quat childWorldRot = m_registry.get<Rotation>(m_entity).quaternion;
-    glm::vec3 childWorldScale = m_registry.get<Scale>(m_entity).scale;
 
+    // Get new parent world transform
     glm::vec3 parentWorldPos = m_registry.get<Position>(newParent).position;
     glm::quat parentWorldRot = m_registry.get<Rotation>(newParent).quaternion;
-    glm::vec3 parentWorldScale = m_registry.get<Scale>(newParent).scale;
+    glm::vec3 parentWorldScale = calculateWorldScale(newParent);
 
     glm::quat parentWorldRotInv = glm::inverse(parentWorldRot);
     glm::vec3 invParentScale = glm::vec3(1.0f) / parentWorldScale;
 
+    // Calculate local transforms
     glm::vec3 localPos = parentWorldRotInv * ((childWorldPos - parentWorldPos) * invParentScale);
     glm::quat localRot = parentWorldRotInv * childWorldRot;
-    glm::vec3 localScale = childWorldScale / parentWorldScale;
 
+    // For scale, we calculate a new local scale that will maintain the current world scale
+    glm::vec3 childWorldScale = calculateWorldScale(m_entity);
+    glm::vec3 localScale = childWorldScale * invParentScale;
+
+    // Set components
     m_registry.get<Position>(m_entity).position = localPos;
     m_registry.get<Rotation>(m_entity).quaternion = glm::normalize(localRot);
     m_registry.get<Scale>(m_entity).scale = localScale;
     m_registry.get<EulerAngles>(m_entity).euler = glm::degrees(glm::eulerAngles(glm::normalize(localRot)));
 
+    // Set up parent-child relationship
     m_registry.emplace<Parent>(m_entity, newParent);
 
     if (!m_registry.any_of<Children>(newParent)) {
@@ -177,36 +184,84 @@ glm::vec3& GameObject::getScale() {
     return m_registry.get<Scale>(m_entity).scale;
 }
 
-void GameObject::setScale(const glm::vec3& scale) {
-    glm::vec3 oldScale = m_registry.get<Scale>(m_entity).scale;
-    m_registry.get<Scale>(m_entity).scale = scale;
-    m_registry.get<ModelMatrix>(m_entity).dirty = true;
+void GameObject::setScale(const glm::vec3& newLocalScale) {
+    auto& scaleComponent = m_registry.get<Scale>(m_entity);
+    glm::vec3 oldLocalScale = scaleComponent.scale;
+    scaleComponent.scale = newLocalScale;
 
-    // Propagate scale changes to children
-    if (m_registry.any_of<Children>(m_entity)) {
-        glm::vec3 scaleRatio = scale / oldScale; // Calculate scaling ratio
-        updateChildrenScale(m_entity, scaleRatio);
+    // Only adjust children if scale is actually changing
+    if (oldLocalScale != newLocalScale && m_registry.any_of<Children>(m_entity)) {
+        adjustChildrenPositionsForScale(m_entity, oldLocalScale, newLocalScale);
     }
+
+    // Update world matrices
+    m_registry.get<ModelMatrix>(m_entity).dirty = true;
+    markChildrenDirty(m_entity);
 }
 
-void GameObject::updateChildrenScale(entt::entity parent, const glm::vec3& scaleRatio) {
+// Helper method to adjust children positions when parent scale changes
+void GameObject::adjustChildrenPositionsForScale(entt::entity parent,
+                                               const glm::vec3& oldScale,
+                                               const glm::vec3& newScale) {
+    // Skip if no children
     if (!m_registry.any_of<Children>(parent)) {
         return;
     }
 
     for (auto child : m_registry.get<Children>(parent).children) {
-        if (m_registry.valid(child)) {
-            // Update child's scale by multiplying with scale ratio
-            auto& childScale = m_registry.get<Scale>(child).scale;
-            childScale *= scaleRatio;
+        if (!m_registry.valid(child)) {
+            continue;
+        }
 
-            // Mark child's model matrix as dirty
-            m_registry.get<ModelMatrix>(child).dirty = true;
+        // Get child's local position
+        glm::vec3& childPos = m_registry.get<Position>(child).position;
 
-            // Recursively update this child's children
-            updateChildrenScale(child, scaleRatio);
+        // We need to adjust position to maintain world position
+        // Current formula: worldPos = parentPos + (parentRot * (childPos * parentScale))
+        // So when parentScale changes, we need to adjust childPos to maintain same worldPos
+
+        // Scale ratio between new and old scales
+        glm::vec3 scaleRatio;
+        for (int i = 0; i < 3; i++) {
+            // Avoid division by zero
+            scaleRatio[i] = (oldScale[i] != 0.0f) ? (newScale[i] / oldScale[i]) : 1.0f;
+        }
+
+        // Adjust child position to maintain world position
+        childPos = childPos / scaleRatio;
+
+        // Mark child for redraw
+        m_registry.get<ModelMatrix>(child).dirty = true;
+    }
+}
+
+void GameObject::updateWorldScales(entt::entity parent) {
+    // Mark this entity's model matrix as dirty
+    m_registry.get<ModelMatrix>(parent).dirty = true;
+
+    // Recursively update all children
+    if (m_registry.any_of<Children>(parent)) {
+        for (auto child : m_registry.get<Children>(parent).children) {
+            if (m_registry.valid(child)) {
+                updateWorldScales(child);
+            }
         }
     }
+}
+
+glm::vec3 GameObject::calculateWorldScale(entt::entity entity) {
+    glm::vec3 localScale = m_registry.get<Scale>(entity).scale;
+
+    // If we have a parent, multiply by parent's world scale
+    if (m_registry.all_of<Parent>(entity)) {
+        entt::entity parentEntity = m_registry.get<Parent>(entity).parent;
+        if (m_registry.valid(parentEntity)) {
+            return localScale * calculateWorldScale(parentEntity);
+        }
+    }
+
+    // No parent or invalid parent, local scale is world scale
+    return localScale;
 }
 
 glm::vec3 GameObject::getForward() {
