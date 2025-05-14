@@ -148,6 +148,7 @@ glm::vec3& GameObject::getPosition() {
 
 void GameObject::setPosition(const glm::vec3& pos) {
     m_registry.get<Position>(m_entity).position = pos;
+
     m_registry.get<ModelMatrix>(m_entity).dirty = true;
     markChildrenDirty(m_entity);
 }
@@ -163,6 +164,8 @@ void GameObject::setEuler(const glm::vec3& euler) {
     auto& rotationComponent = m_registry.get<Rotation>(m_entity);
     rotationComponent.quaternion = glm::quat(glm::radians(euler));
 
+    // Update world matrices
+    m_registry.get<ModelMatrix>(m_entity).dirty = true;
     markChildrenDirty(m_entity);
 }
 
@@ -177,8 +180,9 @@ void GameObject::setRotation(const glm::quat& rotation) {
     rotationComponent.quaternion = rotation;
     eulerComponent.euler = glm::degrees(glm::eulerAngles(rotation));
 
-    // Mark the model matrix as dirty
+    // Update world matrices
     m_registry.get<ModelMatrix>(m_entity).dirty = true;
+    markChildrenDirty(m_entity);
 }
 
 glm::vec3& GameObject::getScale() {

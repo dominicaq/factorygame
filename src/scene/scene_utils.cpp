@@ -75,24 +75,25 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
         }
     }
 
-    // Find the root object - the node that doesn't have a parent in the hierarchy
-    size_t rootNodeIndex = 0;
-    for (size_t i = 0; i < nodeData.size(); ++i) {
-        bool hasParentInHierarchy = false;
-        for (size_t j = 0; j < nodeData.size(); ++j) {
-            if (std::find(nodeData[j].children.begin(), nodeData[j].children.end(), i) != nodeData[j].children.end()) {
-                hasParentInHierarchy = true;
-                break;
-            }
-        }
-
-        if (!hasParentInHierarchy) {
-            rootNodeIndex = i;
-            break; // We found the root, no need to continue checking
+    // Collect all children indices
+    std::unordered_set<size_t> childrenSet;
+    for (const auto& node : nodeData) {
+        for (size_t child : node.children) {
+            childrenSet.insert(child);
         }
     }
 
-    return gameObjects[rootNodeIndex];
+    // Find the root object - the node that doesn't have a parent in the hierarchy
+    // The root is the first node that is not anyone's child
+    size_t rootIdx = 0;
+    for (size_t i = 0; i < nodeData.size(); ++i) {
+        if (childrenSet.find(i) == childrenSet.end()) {
+            rootIdx = i;
+            break;
+        }
+    }
+
+    return gameObjects[rootIdx];
 }
 
 void SceneUtils::createEmptyGameObject(entt::registry& registry, const SceneData& data) {

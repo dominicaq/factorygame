@@ -403,15 +403,13 @@ bool parseNodes(const json& gltfDoc, std::vector<SceneData>& nodeData) {
             node.eulerAngles = glm::vec3(0.0f);
             if (nodeJson.contains("rotation") && nodeJson["rotation"].is_array()) {
                 const auto& rotArray = nodeJson["rotation"];
-                if (rotArray.size() == 4) {
-                    glm::quat q(
-                        rotArray[3].get<float>(), // w
-                        rotArray[0].get<float>(), // x
-                        rotArray[1].get<float>(), // y
-                        rotArray[2].get<float>()  // z
-                    );
-                    node.eulerAngles = glm::eulerAngles(q);
-                }
+                glm::quat q(
+                    rotArray[0].get<float>(), // x
+                    rotArray[1].get<float>(), // y
+                    rotArray[2].get<float>(), // z
+                    rotArray[3].get<float>()  // w
+                );
+                node.eulerAngles = glm::eulerAngles(q);
             }
         }
 
