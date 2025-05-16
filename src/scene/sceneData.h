@@ -14,4 +14,5 @@ struct SceneData {
     glm::vec3 eulerAngles = glm::vec3(0.0f);
 
     std::vector<size_t> children;
+    int meshIndex = -1;
 };

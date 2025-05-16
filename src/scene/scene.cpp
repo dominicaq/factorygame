@@ -177,7 +177,7 @@ void Scene::loadScene() {
     entt::entity diabloEntity = registry.create();
     SceneData save_diabloData;
     save_diabloData.name = "Diablo";
-    save_diabloData.position = glm::vec3(0.0f, 1.9f, -1.0f);
+    save_diabloData.position = glm::vec3(0.0f, 1.9f, -10.0f);
     save_diabloData.scale = glm::vec3(3.0f);
     GameObject* diabloObject = SceneUtils::addGameObjectComponent(registry, diabloEntity, save_diabloData);
     diabloObject->addScript<MoveScript>();
@@ -199,11 +199,28 @@ void Scene::loadScene() {
     }
 
     /*
-    * glTF OBJECT
+    * glTF Game Objects
     */
-    GameObject* meshGameObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf");
-    meshGameObj->setScale(glm::vec3(0.2f));
-    meshGameObj->addScript<MoveScript>();
+    GameObject* meshGameObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf");
+    if (meshGameObj) {
+        meshGameObj->setScale(glm::vec3(5.0f));
+        meshGameObj->setPosition(glm::vec3(0.0f, 5.0f, 0.0f));
+        meshGameObj->setEuler(glm::vec3(90,0,0));
+        // meshGameObj->addScript<MoveScript>();
+    }
+
+    GameObject* dragonObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "dragon/dragon.gltf");
+    if (dragonObj) {
+        dragonObj->setScale(glm::vec3(1.0f));
+        dragonObj->setPosition(glm::vec3(0.0f, 0.0f, 10.0f));
+    }
+
+    // Broken, needs to be looked at
+    GameObject* romanObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Sponza/glTF/Sponza.gltf");
+    if (romanObj) {
+        romanObj->setScale(glm::vec3(0.1f));
+        romanObj->setPosition(glm::vec3(0.0f, 0.0f, 10.0f));
+    }
 
     // --------------------- Dummy Entity (global scripts) ------------------
     entt::entity dummyEntity = registry.create();

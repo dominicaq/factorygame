@@ -17,7 +17,7 @@ public:
     // =========================================================================
     // Component Helpers
     // =========================================================================
-    /*
+    /**
      * Adds light components to the specified entity in the registry.
      * @param registry - The registry to add the components to.
      * @param entity - The entity to which the components will be added.
@@ -26,7 +26,7 @@ public:
      */
     static void addLightComponents(entt::registry& registry, entt::entity entity, Light lightData);
 
-    /*
+    /**
      * Adds a GameObject component to the specified entity in the registry.
      * Associates the provided scene data with the entity, including transform and meta data.
      * @param registry - The registry to add the component to.
@@ -39,14 +39,14 @@ public:
     // =========================================================================
     // GameObject Helpers
     // =========================================================================
-    /*
+    /**
      * Creates an empty GameObject in the registry and associates it with the provided scene data.
      * @param registry - The registry to create the GameObject in.
      * @param data - The scene data to associate with the GameObject.
      */
     static void createEmptyGameObject(entt::registry& registry, const SceneData& data);
 
-    /*
+    /**
      * Creates a gizmo GameObject in the registry based on the provided scene data and primitive type.
      * @param registry - The registry to create the GameObject in.
      * @param data - The scene data to associate with the GameObject.
@@ -56,7 +56,7 @@ public:
      */
     static entt::entity createGizmo(entt::registry& registry, const SceneData& data, Material* mat, GizmoType type);
 
-    /*
+    /**
      * Creates a model GameObject in the registry and associates it with the provided scene data and mesh.
      * @param registry - The registry to create the GameObject in.
      * @param data - The scene data to associate with the GameObject.
@@ -64,6 +64,14 @@ public:
      */
     static void createModel(entt::registry& registry, const SceneData& data, Mesh* mesh);
 
+    /**
+     * Creates a root GameObject with a mesh and any associated child GameObjects from the provided mesh file.
+     *
+     * @param registry The entity registry to create the GameObject hierarchy in.
+     * @param shader Pointer to the Shader to associate with the GameObjects.
+     * @param filePath Path to the mesh file to load. The file may contain multiple mesh parts, which will be created as child GameObjects.
+     * @return Pointer to the root GameObject. Child GameObjects will be attached as part of its hierarchy.
+     */
     static GameObject* createMeshGameObject(entt::registry& registry, Shader* shader, const std::string& filePath);
 };
 

@@ -97,9 +97,8 @@ void Renderer::draw(const Mesh* mesh) {
     // Bind VAO
     glBindVertexArray(data.VAO);
 
-    GLenum drawMode = mesh->wireframe ? GL_LINES : GL_TRIANGLES;
-
     // Draw the mesh
+    GLenum drawMode = mesh->wireframe ? GL_LINES : mesh->drawMode;
     if (data.EBO != 0) {
         glDrawElements(drawMode, data.indexCount, GL_UNSIGNED_INT, 0);
     } else {

@@ -15,6 +15,7 @@ struct Mesh {
     std::vector<glm::vec2> uvs;
     std::vector<unsigned int> indices;
     Material* material = nullptr;
+    int drawMode = GL_TRIANGLES;
 
     /*
     * WARNING: DO NOT set the Mesh ID yourself. It will be overwritten anyway.

@@ -109,7 +109,7 @@ void ResourceLoader::loadMeshVector(const std::string& filepath, std::vector<Mes
     }
 
     if (!loadglTF(filepath, meshes, nodeData)) {
-        std::cerr << "[Error] ResourceLoader::loadMeshVector: Failed to load glTF mesh\n";
+        std::cerr << "[Error] ResourceLoader::loadMeshVector: Failed to load glTF mesh: \n" << filepath << "\n";
         meshes.clear();
         nodeData.clear();
         return;

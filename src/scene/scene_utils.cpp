@@ -52,11 +52,12 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
         entities[i] = registry.create();
         gameObjects[i] = SceneUtils::addGameObjectComponent(registry, entities[i], nodeData[i]);
 
-        // If this node has a mesh, assign it
-        if (i < meshes.size() && meshes[i] != nullptr) {
+        // If this node has a mesh reference, use the meshIndex to connect to the right mesh
+        int meshIndex = nodeData[i].meshIndex;
+        if (meshIndex >= 0 && meshIndex < meshes.size() && meshes[meshIndex] != nullptr) {
             Material* gltfMat = new Material(shader);
-            meshes[i]->material = gltfMat;
-            registry.emplace<Mesh*>(entities[i], meshes[i]);
+            meshes[meshIndex]->material = gltfMat;
+            registry.emplace<Mesh*>(entities[i], meshes[meshIndex]);
         }
     }
 
