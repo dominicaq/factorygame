@@ -43,7 +43,40 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
         return nullptr;
     }
 
-    // Create entities for each node
+    // Handle the case where there's no node data but we have meshes
+    if (nodeData.size() == 1) {
+        // Create a single root game object
+        entt::entity rootEntity = registry.create();
+        GameObject* rootObject = SceneUtils::addGameObjectComponent(registry, rootEntity, nodeData[0]);
+
+        // Create child entities for each mesh
+        for (size_t i = 0; i < meshes.size(); ++i) {
+            if (meshes[i] == nullptr) {
+                continue;
+            }
+
+            // Create an entity for this mesh
+            entt::entity meshEntity = registry.create();
+
+            // Create default SceneData for this mesh
+            SceneData meshNodeData;
+            meshNodeData.name = "Mesh_" + std::to_string(i);
+
+            // Add GameObject component
+            GameObject* meshObject = SceneUtils::addGameObjectComponent(registry, meshEntity, meshNodeData);
+
+            // Assign the mesh component
+            Material* gltfMat = new Material(shader);
+            meshes[i]->material = gltfMat;
+            registry.emplace<Mesh*>(meshEntity, meshes[i]);
+
+            // Set this mesh as a child of the root
+            meshObject->setParent(rootEntity);
+        }
+
+        return rootObject;
+    }
+
     std::vector<entt::entity> entities(nodeData.size());
     std::vector<GameObject*> gameObjects(nodeData.size());
 

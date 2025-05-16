@@ -206,7 +206,7 @@ void Scene::loadScene() {
         meshGameObj->setScale(glm::vec3(5.0f));
         meshGameObj->setPosition(glm::vec3(0.0f, 5.0f, 0.0f));
         meshGameObj->setEuler(glm::vec3(90,0,0));
-        // meshGameObj->addScript<MoveScript>();
+        meshGameObj->addScript<MoveScript>();
     }
 
     GameObject* dragonObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "dragon/dragon.gltf");
@@ -215,11 +215,19 @@ void Scene::loadScene() {
         dragonObj->setPosition(glm::vec3(0.0f, 0.0f, 10.0f));
     }
 
-    // Broken, needs to be looked at
+    GameObject* laternObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf");
+    if (laternObj) {
+        laternObj->setScale(glm::vec3(1.0f));
+        laternObj->setPosition(glm::vec3(10.0f, 0.0f, 10.0f));
+    }
+
+    // The scale is 0.0008 which is causing scaling issues. however I load the entire scene correctly.
     GameObject* romanObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Sponza/glTF/Sponza.gltf");
     if (romanObj) {
-        romanObj->setScale(glm::vec3(0.1f));
-        romanObj->setPosition(glm::vec3(0.0f, 0.0f, 10.0f));
+        romanObj->setScale(glm::vec3(1.0f));
+        romanObj->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+        // romanObj->addScript<MoveScript>();
+        // romanObj->addScript<ScaleScript>();
     }
 
     // --------------------- Dummy Entity (global scripts) ------------------

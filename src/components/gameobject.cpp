@@ -230,15 +230,17 @@ glm::vec3 GameObject::getRight() {
 }
 
 void GameObject::markChildrenDirty(entt::entity parent) {
-    if (!m_registry.any_of<Children>(parent)) {
+    if (!m_registry.all_of<Children>(parent)) {
         return;
     }
 
-    for (auto child : m_registry.get<Children>(parent).children) {
-        auto& modelMatrix = m_registry.get<ModelMatrix>(child);
-        if (!modelMatrix.dirty) {
+    const auto& children = m_registry.get<Children>(parent).children;
+    for (auto child : children) {
+        if (m_registry.all_of<ModelMatrix>(child)) {
+            auto& modelMatrix = m_registry.get<ModelMatrix>(child);
             modelMatrix.dirty = true;
-            markChildrenDirty(child);
         }
+
+        markChildrenDirty(child);
     }
 }
