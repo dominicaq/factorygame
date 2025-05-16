@@ -73,6 +73,8 @@ public:
      * @return Pointer to the root GameObject. Child GameObjects will be attached as part of its hierarchy.
      */
     static GameObject* createMeshGameObject(entt::registry& registry, Shader* shader, const std::string& filePath);
+
+    static void calculateMeshBounds(const std::vector<Mesh*>& meshes, glm::vec3& outMin, glm::vec3& outMax, float& outMaxSingleMeshDim);
 };
 
 #endif // SCENE_UTILS_H

@@ -139,7 +139,7 @@ void GameObject::setParent(entt::entity newParent) {
     }
     m_registry.get<Children>(newParent).children.push_back(m_entity);
 
-    markChildrenDirty(m_entity);
+    // markTransformsDirty(m_entity);
 }
 
 glm::vec3& GameObject::getPosition() {
@@ -148,9 +148,7 @@ glm::vec3& GameObject::getPosition() {
 
 void GameObject::setPosition(const glm::vec3& pos) {
     m_registry.get<Position>(m_entity).position = pos;
-
-    m_registry.get<ModelMatrix>(m_entity).dirty = true;
-    markChildrenDirty(m_entity);
+    markTransformsDirty(m_entity);
 }
 
 glm::vec3& GameObject::getEuler() {
@@ -164,9 +162,7 @@ void GameObject::setEuler(const glm::vec3& euler) {
     auto& rotationComponent = m_registry.get<Rotation>(m_entity);
     rotationComponent.quaternion = glm::quat(glm::radians(euler));
 
-    // Update world matrices
-    m_registry.get<ModelMatrix>(m_entity).dirty = true;
-    markChildrenDirty(m_entity);
+    markTransformsDirty(m_entity);
 }
 
 glm::quat& GameObject::getRotation() {
@@ -180,9 +176,7 @@ void GameObject::setRotation(const glm::quat& rotation) {
     rotationComponent.quaternion = rotation;
     eulerComponent.euler = glm::degrees(glm::eulerAngles(rotation));
 
-    // Update world matrices
-    m_registry.get<ModelMatrix>(m_entity).dirty = true;
-    markChildrenDirty(m_entity);
+    markTransformsDirty(m_entity);
 }
 
 glm::vec3& GameObject::getScale() {
@@ -192,10 +186,7 @@ glm::vec3& GameObject::getScale() {
 void GameObject::setScale(const glm::vec3& newScale) {
     auto& scaleComponent = m_registry.get<Scale>(m_entity);
     scaleComponent.scale = newScale;
-
-    // Update world matrices
-    m_registry.get<ModelMatrix>(m_entity).dirty = true;
-    markChildrenDirty(m_entity);
+    markTransformsDirty(m_entity);
 }
 
 glm::vec3 GameObject::calculateWorldScale(entt::entity entity) {
@@ -229,7 +220,8 @@ glm::vec3 GameObject::getRight() {
     return glm::normalize(glm::cross(front, glm::vec3(0, 1, 0)));
 }
 
-void GameObject::markChildrenDirty(entt::entity parent) {
+void GameObject::markTransformsDirty(entt::entity parent) {
+    m_registry.get<ModelMatrix>(m_entity).dirty = true;
     if (!m_registry.all_of<Children>(parent)) {
         return;
     }
@@ -241,6 +233,6 @@ void GameObject::markChildrenDirty(entt::entity parent) {
             modelMatrix.dirty = true;
         }
 
-        markChildrenDirty(child);
+        markTransformsDirty(child);
     }
 }

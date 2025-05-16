@@ -201,12 +201,12 @@ void Scene::loadScene() {
     /*
     * glTF Game Objects
     */
-    GameObject* meshGameObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf");
-    if (meshGameObj) {
-        meshGameObj->setScale(glm::vec3(5.0f));
-        meshGameObj->setPosition(glm::vec3(0.0f, 5.0f, 0.0f));
-        meshGameObj->setEuler(glm::vec3(90,0,0));
-        meshGameObj->addScript<MoveScript>();
+    GameObject* helmetObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf");
+    if (helmetObj) {
+        helmetObj->setScale(glm::vec3(1.0f));
+        helmetObj->setPosition(glm::vec3(0.0f, 5.0f, 0.0f));
+        helmetObj->setEuler(glm::vec3(90,0,0));
+        helmetObj->addScript<MoveScript>();
     }
 
     GameObject* dragonObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "dragon/dragon.gltf");
@@ -224,7 +224,7 @@ void Scene::loadScene() {
     // The scale is 0.0008 which is causing scaling issues. however I load the entire scene correctly.
     GameObject* romanObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Sponza/glTF/Sponza.gltf");
     if (romanObj) {
-        romanObj->setScale(glm::vec3(1.0f));
+        romanObj->setScale(glm::vec3(0.5f));
         romanObj->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
         // romanObj->addScript<MoveScript>();
         // romanObj->addScript<ScaleScript>();
@@ -241,9 +241,9 @@ void Scene::loadScene() {
     int n = 100;
     float circleRadius = 10.0f;
     float yPosition = 10.0f;
-    createSuns(1, 50.0f, 50.0f, basicShader);
+    createSuns(1, 50.0f, 25.0f, basicShader);
 
-    createSpotLights(3, circleRadius, yPosition, basicShader);
+    createSpotLights(1, circleRadius, yPosition, basicShader);
 
     // Light balls
     createSpheres(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
@@ -290,13 +290,13 @@ void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basic
 
         // Light game object
         GameObject* lightObject = SceneUtils::addGameObjectComponent(registry, lightEntity, save_lightData);
-        lightObject->addScript<CircularRotation>();
-        CircularRotation* rotationScript = lightObject->getScript<CircularRotation>();
-        if (rotationScript != nullptr) {
-            rotationScript->radius = circleRadius;
-            rotationScript->center = glm::vec3(0.0f, yPosition, 0.0f);
-            rotationScript->rotationSpeed = 0.5f;
-        }
+        // lightObject->addScript<CircularRotation>();
+        // CircularRotation* rotationScript = lightObject->getScript<CircularRotation>();
+        // if (rotationScript != nullptr) {
+        //     rotationScript->radius = circleRadius;
+        //     rotationScript->center = glm::vec3(0.0f, yPosition, 0.0f);
+        //     rotationScript->rotationSpeed = 0.05f;
+        // }
 
         // Light component
         Light lightData;
@@ -318,7 +318,7 @@ void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basic
 
         lightData.color = color;
         lightData.intensity = 5.0f;
-        lightData.castShadow = false;
+        lightData.castShadow = true;
         lightData.isActive = true;
 
         // Light type properties
@@ -364,7 +364,7 @@ void Scene::createSpotLights(int n, float circleRadius, float yPosition, Shader*
         if (rotationScript != nullptr) {
             rotationScript->radius = circleRadius;
             rotationScript->center = glm::vec3(0.0f, yPosition, 0.0f);
-            rotationScript->rotationSpeed = 0.5f;
+            rotationScript->rotationSpeed = 0.05f;
         }
 
         // Light component

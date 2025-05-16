@@ -43,11 +43,35 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
         return nullptr;
     }
 
+    // Mesh bounding box
+    glm::vec3 min, max;
+    float maxSingleMeshDim;
+    calculateMeshBounds(meshes, min, max, maxSingleMeshDim);
+
+    // Calculate overall size (diagonal of the bounding box)
+    float boundingBoxDiagonal = glm::length(max - min);
+
+    // Constants for scaling decisions
+    const float VERY_LARGE_THRESHOLD = 1000.0f;    // Models larger than this are "very large"
+    const float LARGE_MODEL_ROOT_SCALE = 0.01f;    // Root scale to use for very large models
+    const float SMALL_THRESHOLD = 0.01f;           // Models smaller than this are "small"
+    const float TARGET_SIZE = 2.0f;                // Target size for small models
+
+    float rootScale = 1.0f;
+
+    // Decide on scaling approach based on model size
+    if (boundingBoxDiagonal > VERY_LARGE_THRESHOLD) {
+        rootScale = 1.0f / LARGE_MODEL_ROOT_SCALE;
+    } else if (boundingBoxDiagonal < SMALL_THRESHOLD) {
+        rootScale = TARGET_SIZE / boundingBoxDiagonal;
+    }
+
     // Handle the case where there's no node data but we have meshes
     if (nodeData.size() == 1) {
         // Create a single root game object
         entt::entity rootEntity = registry.create();
         GameObject* rootObject = SceneUtils::addGameObjectComponent(registry, rootEntity, nodeData[0]);
+        rootObject->setScale(glm::vec3(rootScale));
 
         // Create child entities for each mesh
         for (size_t i = 0; i < meshes.size(); ++i) {
@@ -55,14 +79,12 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
                 continue;
             }
 
-            // Create an entity for this mesh
-            entt::entity meshEntity = registry.create();
-
             // Create default SceneData for this mesh
             SceneData meshNodeData;
             meshNodeData.name = "Mesh_" + std::to_string(i);
 
-            // Add GameObject component
+            // Create an gameobject for this mesh
+            entt::entity meshEntity = registry.create();
             GameObject* meshObject = SceneUtils::addGameObjectComponent(registry, meshEntity, meshNodeData);
 
             // Assign the mesh component
@@ -140,7 +162,6 @@ entt::entity SceneUtils::createGizmo(entt::registry& registry, const SceneData& 
     GameObject* gameObject = addGameObjectComponent(registry, entity, data);
 
     Mesh* gizmoMesh = nullptr;
-
     switch (type) {
         case GizmoType::AXIS:
             gizmoMesh = Gizmos::createAxis();
@@ -174,4 +195,45 @@ void SceneUtils::createModel(entt::registry& registry, const SceneData& data, Me
     GameObject* gameObject = addGameObjectComponent(registry, entity, data);
 
     registry.emplace<Mesh*>(entity, mesh);
+}
+
+void SceneUtils::calculateMeshBounds(const std::vector<Mesh*>& meshes, glm::vec3& outMin, glm::vec3& outMax, float& outMaxSingleMeshDim) {
+    outMin = glm::vec3(FLT_MAX);
+    outMax = glm::vec3(-FLT_MAX);
+    outMaxSingleMeshDim = -FLT_MAX;
+
+    for (const auto& mesh : meshes) {
+        if (!mesh) continue;
+
+        // Calculate bounding box for this mesh
+        glm::vec3 meshMin(FLT_MAX);
+        glm::vec3 meshMax(-FLT_MAX);
+
+        for (const auto& vertex : mesh->vertices) {
+            meshMin.x = std::min(meshMin.x, vertex.x);
+            meshMin.y = std::min(meshMin.y, vertex.y);
+            meshMin.z = std::min(meshMin.z, vertex.z);
+
+            meshMax.x = std::max(meshMax.x, vertex.x);
+            meshMax.y = std::max(meshMax.y, vertex.y);
+            meshMax.z = std::max(meshMax.z, vertex.z);
+
+            // Update global bounds
+            outMin.x = std::min(outMin.x, vertex.x);
+            outMin.y = std::min(outMin.y, vertex.y);
+            outMin.z = std::min(outMin.z, vertex.z);
+
+            outMax.x = std::max(outMax.x, vertex.x);
+            outMax.y = std::max(outMax.y, vertex.y);
+            outMax.z = std::max(outMax.z, vertex.z);
+        }
+
+        // Calculate largest dimension of this mesh
+        float sizeX = meshMax.x - meshMin.x;
+        float sizeY = meshMax.y - meshMin.y;
+        float sizeZ = meshMax.z - meshMin.z;
+        float largestDim = std::max(std::max(sizeX, sizeY), sizeZ);
+
+        outMaxSingleMeshDim = std::max(outMaxSingleMeshDim, largestDim);
+    }
 }

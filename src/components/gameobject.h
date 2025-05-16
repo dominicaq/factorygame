@@ -21,8 +21,7 @@ private:
     entt::registry& m_registry;
     std::vector<std::shared_ptr<Script>> m_scripts;
 
-    void markChildrenDirty(entt::entity parent);
-    void updateWorldScales(entt::entity parent);
+    void markTransformsDirty(entt::entity parent);
     glm::vec3 calculateWorldScale(entt::entity entity);
     void GameObject::adjustChildrenPositionsForScale(entt::entity parent,
                                                 const glm::vec3& oldScale,

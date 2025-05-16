@@ -19,6 +19,7 @@ void TransformSystem::updateTransformComponents() {
 }
 
 void TransformSystem::checkDirtyParents() {
+    // Check every entity that has a parent
     for (const auto& [entity, parent, modelMatrix] : m_registry.view<Parent, ModelMatrix>().each()) {
         const auto& parentModelMatrix = m_registry.get<ModelMatrix>(parent.parent);
 
