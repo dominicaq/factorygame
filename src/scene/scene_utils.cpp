@@ -66,41 +66,11 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
         rootScale = TARGET_SIZE / boundingBoxDiagonal;
     }
 
-    // Handle the case where there's no node data but we have meshes
-    if (nodeData.size() == 1) {
-        // Create a single root game object
-        entt::entity rootEntity = registry.create();
-        GameObject* rootObject = SceneUtils::addGameObjectComponent(registry, rootEntity, nodeData[0]);
-        rootObject->setScale(glm::vec3(rootScale));
-
-        // Create child entities for each mesh
-        for (size_t i = 0; i < meshes.size(); ++i) {
-            if (meshes[i] == nullptr) {
-                continue;
-            }
-
-            // Create default SceneData for this mesh
-            SceneData meshNodeData;
-            meshNodeData.name = "Mesh_" + std::to_string(i);
-
-            // Create an gameobject for this mesh
-            entt::entity meshEntity = registry.create();
-            GameObject* meshObject = SceneUtils::addGameObjectComponent(registry, meshEntity, meshNodeData);
-
-            // Assign the mesh component
-            Material* gltfMat = new Material(shader);
-            meshes[i]->material = gltfMat;
-            registry.emplace<Mesh*>(meshEntity, meshes[i]);
-
-            // Set this mesh as a child of the root
-            meshObject->setParent(rootEntity);
-        }
-
-        return rootObject;
-    }
-
     std::vector<entt::entity> entities(nodeData.size());
     std::vector<GameObject*> gameObjects(nodeData.size());
+
+    // Track which meshes have been assigned to GameObjects
+    std::vector<bool> meshAssigned(meshes.size(), false);
 
     // First pass: Create entities and assign meshes/materials
     for (size_t i = 0; i < nodeData.size(); ++i) {
@@ -113,6 +83,9 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
             Material* gltfMat = new Material(shader);
             meshes[meshIndex]->material = gltfMat;
             registry.emplace<Mesh*>(entities[i], meshes[meshIndex]);
+
+            // Mark this mesh as assigned
+            meshAssigned[meshIndex] = true;
         }
     }
 
@@ -149,7 +122,35 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
         }
     }
 
-    return gameObjects[rootIdx];
+    GameObject* rootObject = gameObjects[rootIdx];
+    rootObject->setScale(glm::vec3(rootScale));
+
+    // Create GameObjects for any unassigned meshes and parent them to the root object
+    for (size_t i = 0; i < meshes.size(); ++i) {
+        if (!meshAssigned[i] && meshes[i] != nullptr) {
+            // Create a new entity and GameObject for this unassigned mesh
+            entt::entity newEntity = registry.create();
+
+            // Create a default SceneData for the unassigned mesh
+            SceneData unassignedData;
+            unassignedData.name = "UnassignedMesh_" + std::to_string(i);
+            unassignedData.meshIndex = i;
+            unassignedData.eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
+            unassignedData.scale = glm::vec3(rootScale);
+
+            GameObject* newGameObject = SceneUtils::addGameObjectComponent(registry, newEntity, unassignedData);
+
+            // Assign material and mesh
+            Material* newMat = new Material(shader);
+            meshes[i]->material = newMat;
+            registry.emplace<Mesh*>(newEntity, meshes[i]);
+
+            // Parent to root object
+            newGameObject->setParent(entities[rootIdx]);
+        }
+    }
+
+    return rootObject;
 }
 
 void SceneUtils::createEmptyGameObject(entt::registry& registry, const SceneData& data) {
@@ -184,17 +185,6 @@ entt::entity SceneUtils::createGizmo(entt::registry& registry, const SceneData& 
 
     std::cerr << "[Error] createGizmo() failed to create gizmo mesh!\n";
     return entt::null;
-}
-
-void SceneUtils::createModel(entt::registry& registry, const SceneData& data, Mesh* mesh) {
-    if (!mesh) {
-        return;
-    }
-
-    entt::entity entity = registry.create();
-    GameObject* gameObject = addGameObjectComponent(registry, entity, data);
-
-    registry.emplace<Mesh*>(entity, mesh);
 }
 
 void SceneUtils::calculateMeshBounds(const std::vector<Mesh*>& meshes, glm::vec3& outMin, glm::vec3& outMax, float& outMaxSingleMeshDim) {

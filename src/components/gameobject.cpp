@@ -138,8 +138,6 @@ void GameObject::setParent(entt::entity newParent) {
         m_registry.emplace<Children>(newParent);
     }
     m_registry.get<Children>(newParent).children.push_back(m_entity);
-
-    // markTransformsDirty(m_entity);
 }
 
 glm::vec3& GameObject::getPosition() {
@@ -221,7 +219,7 @@ glm::vec3 GameObject::getRight() {
 }
 
 void GameObject::markTransformsDirty(entt::entity parent) {
-    m_registry.get<ModelMatrix>(m_entity).dirty = true;
+    m_registry.get<ModelMatrix>(parent).dirty = true;
     if (!m_registry.all_of<Children>(parent)) {
         return;
     }

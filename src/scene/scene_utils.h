@@ -57,14 +57,6 @@ public:
     static entt::entity createGizmo(entt::registry& registry, const SceneData& data, Material* mat, GizmoType type);
 
     /**
-     * Creates a model GameObject in the registry and associates it with the provided scene data and mesh.
-     * @param registry - The registry to create the GameObject in.
-     * @param data - The scene data to associate with the GameObject.
-     * @param mesh - The mesh to associate with the GameObject.
-     */
-    static void createModel(entt::registry& registry, const SceneData& data, Mesh* mesh);
-
-    /**
      * Creates a root GameObject with a mesh and any associated child GameObjects from the provided mesh file.
      *
      * @param registry The entity registry to create the GameObject hierarchy in.

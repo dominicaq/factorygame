@@ -18,6 +18,7 @@ private:
     glm::vec3 m_eulerRotation;
     float m_elaspedTime = 0.0f;
     float m_lifeTime;
+    int m_count = 0;
 
 public:
     void start() override {
@@ -40,6 +41,10 @@ public:
             // return;
         }
 
+        if (m_count > 1) {
+            return;
+        }
+        m_count += 1;
         // Calculate the rotation amount in degrees
         float rotationAmount = rotationSpeed * deltaTime;
 

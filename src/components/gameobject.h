@@ -23,9 +23,7 @@ private:
 
     void markTransformsDirty(entt::entity parent);
     glm::vec3 calculateWorldScale(entt::entity entity);
-    void GameObject::adjustChildrenPositionsForScale(entt::entity parent,
-                                                const glm::vec3& oldScale,
-                                                const glm::vec3& newScale);
+
 public:
     GameObject(entt::entity entity, entt::registry& registry);
     ~GameObject() = default;

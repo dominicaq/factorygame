@@ -206,7 +206,7 @@ void Scene::loadScene() {
         helmetObj->setScale(glm::vec3(1.0f));
         helmetObj->setPosition(glm::vec3(0.0f, 5.0f, 0.0f));
         helmetObj->setEuler(glm::vec3(90,0,0));
-        helmetObj->addScript<MoveScript>();
+        // helmetObj->addScript<MoveScript>();
     }
 
     GameObject* dragonObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "dragon/dragon.gltf");
@@ -224,7 +224,7 @@ void Scene::loadScene() {
     // The scale is 0.0008 which is causing scaling issues. however I load the entire scene correctly.
     GameObject* romanObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Sponza/glTF/Sponza.gltf");
     if (romanObj) {
-        romanObj->setScale(glm::vec3(0.5f));
+        romanObj->setScale(glm::vec3(0.01f));
         romanObj->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
         // romanObj->addScript<MoveScript>();
         // romanObj->addScript<ScaleScript>();
@@ -246,7 +246,7 @@ void Scene::loadScene() {
     createSpotLights(1, circleRadius, yPosition, basicShader);
 
     // Light balls
-    createSpheres(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
+    // createSpheres(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
 
     // Normal balls
     // createSpheres(1000, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
