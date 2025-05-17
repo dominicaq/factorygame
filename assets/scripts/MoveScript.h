@@ -41,10 +41,6 @@ public:
             // return;
         }
 
-        if (m_count > 1) {
-            return;
-        }
-        m_count += 1;
         // Calculate the rotation amount in degrees
         float rotationAmount = rotationSpeed * deltaTime;
 

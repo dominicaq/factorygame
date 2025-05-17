@@ -27,7 +27,8 @@ bool parseAccessors(
     const json& gltfDoc,
     std::vector<std::vector<uint8_t>>& buffers,
     std::vector<glTFBufferView>& bufferViews,
-    std::vector<Mesh*>& meshes);
+    std::vector<Mesh*>& meshes,
+    std::vector<int>& materialIndices);
 bool parseBuffers(const json &gltfDoc, const std::string &fileName, std::vector<std::vector<uint8_t>>& buffers);
 template <typename T>
 void parseAccessorData(
@@ -36,6 +37,12 @@ void parseAccessorData(
     const glTFBufferView& bufferView,
     std::vector<T>& targetVector);
 bool parseNodes(const json& gltfDoc, std::vector<SceneData>& nodeData);
+void loadMaterials(
+    const json& gltfDoc,
+    std::vector<Mesh*>& meshes,
+    const std::vector<int>& materialIndices,
+    Shader* shader,
+    const std::string& filePath);
 
 /*
 * Math
@@ -89,7 +96,7 @@ size_t getComponentSize(int componentType) {
 /*
 * Parsing
 */
-bool loadglTF(std::string fileName, std::vector<Mesh*>& meshes, std::vector<SceneData>& nodeData) {
+bool loadglTF(std::string fileName, std::vector<Mesh*>& meshes, std::vector<SceneData>& nodeData, Shader* shader) {
     std::ifstream file(fileName);
     if (!file.is_open()) {
         std::cerr << "Failed to open file: " << fileName << "\n";
@@ -144,7 +151,8 @@ bool loadglTF(std::string fileName, std::vector<Mesh*>& meshes, std::vector<Scen
     }
 
     // Accessors (primitive mesh data)
-    if (!parseAccessors(gltfDoc, buffers, bufferViews, meshes)) {
+    std::vector<int> materialIndices;
+    if (!parseAccessors(gltfDoc, buffers, bufferViews, meshes, materialIndices)) {
         std::cerr << "Failed to parse glTF acessors\n";
         return false;
     }
@@ -157,6 +165,7 @@ bool loadglTF(std::string fileName, std::vector<Mesh*>& meshes, std::vector<Scen
         return false;
     }
 
+    loadMaterials(gltfDoc, meshes, materialIndices, shader, fileName);
     return true;
 }
 
@@ -211,7 +220,8 @@ bool parseAccessors(
     const json& gltfDoc,
     std::vector<std::vector<uint8_t>>& buffers,
     std::vector<glTFBufferView>& bufferViews,
-    std::vector<Mesh*>& meshes) {
+    std::vector<Mesh*>& meshes,
+    std::vector<int>& materialIndices) {
 
     if (!gltfDoc.contains("accessors") || !gltfDoc["accessors"].is_array() || gltfDoc["accessors"].empty()) {
         std::cerr << "glTF file doesn't contain valid accessors array\n";
@@ -228,6 +238,7 @@ bool parseAccessors(
 
     meshes.clear();
     meshes.reserve(meshesJson.size());
+    materialIndices.reserve(meshesJson.size());
 
     for (size_t meshIdx = 0; meshIdx < meshesJson.size(); ++meshIdx) {
         const auto& meshJson = meshesJson[meshIdx];
@@ -338,14 +349,15 @@ bool parseAccessors(
                 std::cout << "[Info] Done.\n";
             }
 
-            // Material if present
+            // Material index handling
+            int materialIndex = -1;
             if (primitiveJson.contains("material")) {
-                size_t materialIdx = primitiveJson["material"];
-                // TODO: parse material indexes
-                // mesh->material = ...
+                materialIndex = primitiveJson["material"].get<int>();
             }
 
+            // Store the mesh and its corresponding material index
             meshes.push_back(mesh);
+            materialIndices.push_back(materialIndex);
         }
     }
 
@@ -496,8 +508,158 @@ bool parseNodes(const json& gltfDoc, std::vector<SceneData>& nodeData) {
     return true;
 }
 
-void loadMaterial(const json& gltfDoc, Material& material) {
+void loadMaterials(const json& gltfDoc, std::vector<Mesh*>& meshes, const std::vector<int>& materialIndices, Shader* shader, const std::string& fileName) {
+    if (!gltfDoc.contains("materials") || !gltfDoc["materials"].is_array()) {
+        // No materials defined in the glTF file
+        for (auto& mesh : meshes) {
+            Material* newMaterial = new Material(shader);
+            mesh->material = newMaterial;
+        }
+        return;
+    }
 
+    const auto& materialsJson = gltfDoc["materials"];
+
+    // Create vector of textures to store loaded textures
+    std::vector<Texture*> textures;
+    if (gltfDoc.contains("textures") && gltfDoc["textures"].is_array()) {
+        const auto& texturesJson = gltfDoc["textures"];
+        const auto& imagesJson = gltfDoc.contains("images") ? gltfDoc["images"] : json();
+
+        textures.resize(texturesJson.size(), nullptr);
+
+        for (size_t i = 0; i < texturesJson.size(); ++i) {
+            const auto& textureJson = texturesJson[i];
+
+            if (textureJson.contains("source") && !imagesJson.empty()) {
+                size_t imageIndex = textureJson["source"].get<size_t>();
+
+                if (imageIndex < imagesJson.size() && imagesJson[imageIndex].contains("uri")) {
+                    std::string imageUri = imagesJson[imageIndex]["uri"].get<std::string>();
+                    std::string imgPath = fileName.substr(0, fileName.find_last_of("/\\") + 1) + imageUri;
+                    textures[i] = new Texture(imgPath);
+                }
+            }
+        }
+    }
+
+    // Now process materials and assign them to meshes
+    for (size_t meshIdx = 0; meshIdx < meshes.size(); ++meshIdx) {
+        Mesh* mesh = meshes[meshIdx];
+        Material* newMaterial = new Material(shader);
+        mesh->material = newMaterial;
+        int materialIdx = materialIndices[meshIdx];
+
+        if (materialIdx < 0 || materialIdx >= static_cast<int>(materialsJson.size())) {
+            continue;
+        }
+
+        const auto& materialJson = materialsJson[materialIdx];
+
+        // Default albedo color (if no base color texture is specified)
+        newMaterial->albedoColor = glm::vec4(1.0f);
+
+        // Process PBR material properties
+        if (materialJson.contains("pbrMetallicRoughness")) {
+            const auto& pbrJson = materialJson["pbrMetallicRoughness"];
+
+            // Base color factor (RGBA)
+            if (pbrJson.contains("baseColorFactor") && pbrJson["baseColorFactor"].is_array() &&
+                pbrJson["baseColorFactor"].size() == 4) {
+                const auto& colorArray = pbrJson["baseColorFactor"];
+                newMaterial->albedoColor = glm::vec4(
+                    colorArray[0].get<float>(),
+                    colorArray[1].get<float>(),
+                    colorArray[2].get<float>(),
+                    colorArray[3].get<float>()
+                );
+            }
+
+            // Base color texture
+            if (pbrJson.contains("baseColorTexture") && pbrJson["baseColorTexture"].contains("index")) {
+                size_t textureIdx = pbrJson["baseColorTexture"]["index"].get<size_t>();
+                if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
+                    newMaterial->albedoMap = textures[textureIdx];
+                }
+            }
+
+            // Metallic-roughness texture
+            if (pbrJson.contains("metallicRoughnessTexture") &&
+                pbrJson["metallicRoughnessTexture"].contains("index")) {
+                size_t textureIdx = pbrJson["metallicRoughnessTexture"]["index"].get<size_t>();
+                if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
+                    newMaterial->metallicMap = textures[textureIdx];
+                    // In glTF, metallic and roughness are packed into a single texture
+                    // G channel = roughness, B channel = metallic
+                    newMaterial->roughnessMap = textures[textureIdx];
+                }
+            }
+        }
+
+        // Normal map
+        if (materialJson.contains("normalTexture") && materialJson["normalTexture"].contains("index")) {
+            size_t textureIdx = materialJson["normalTexture"]["index"].get<size_t>();
+            if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
+                newMaterial->normalMap = textures[textureIdx];
+            }
+
+            // Normal scale factor
+            // if (materialJson["normalTexture"].contains("scale")) {
+            //     newMaterial->normalScale = materialJson["normalTexture"]["scale"].get<float>();
+            // }
+        }
+
+        // Occlusion map
+        // if (materialJson.contains("occlusionTexture") && materialJson["occlusionTexture"].contains("index")) {
+        //     size_t textureIdx = materialJson["occlusionTexture"]["index"].get<size_t>();
+        //     if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
+        //         material->occlusionMap = textures[textureIdx];
+        //     }
+
+        //     // Occlusion strength
+        //     if (materialJson["occlusionTexture"].contains("strength")) {
+        //         material->occlusionStrength = materialJson["occlusionTexture"]["strength"].get<float>();
+        //     }
+        // }
+
+        // Emissive map
+        // if (materialJson.contains("emissiveTexture") && materialJson["emissiveTexture"].contains("index")) {
+        //     size_t textureIdx = materialJson["emissiveTexture"]["index"].get<size_t>();
+        //     if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
+        //         material->emissiveMap = textures[textureIdx];
+        //     }
+        // }
+
+        // Emissive factor
+        // if (materialJson.contains("emissiveFactor") && materialJson["emissiveFactor"].is_array() &&
+        //     materialJson["emissiveFactor"].size() == 3) {
+        //     const auto& emissiveArray = materialJson["emissiveFactor"];
+        //     material->emissiveColor = glm::vec3(
+        //         emissiveArray[0].get<float>(),
+        //         emissiveArray[1].get<float>(),
+        //         emissiveArray[2].get<float>()
+        //     );
+        // }
+
+        // Alpha mode and cutoff
+        // if (materialJson.contains("alphaMode")) {
+        //     std::string alphaMode = materialJson["alphaMode"].get<std::string>();
+        //     if (alphaMode == "MASK") {
+        //         material->alphaMode = Material::AlphaMode::MASK;
+        //         if (materialJson.contains("alphaCutoff")) {
+        //             material->alphaCutoff = materialJson["alphaCutoff"].get<float>();
+        //         }
+        //     } else if (alphaMode == "BLEND") {
+        //         material->alphaMode = Material::AlphaMode::BLEND;
+        //     }
+        //     // Default is OPAQUE
+        // }
+
+        // // Double-sided rendering
+        // if (materialJson.contains("doubleSided")) {
+        //     material->doubleSided = materialJson["doubleSided"].get<bool>();
+        // }
+    }
 }
 
 template <typename T>

@@ -38,7 +38,7 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
     // Parse the mesh
     std::vector<SceneData> nodeData;
     std::vector<Mesh*> meshes;
-    ResourceLoader::loadMeshVector(filePath, meshes, nodeData);
+    ResourceLoader::loadMeshVector(filePath, meshes, nodeData, shader);
     if (meshes.empty()) {
         return nullptr;
     }
@@ -78,8 +78,6 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
         // If this node has a mesh reference, use the meshIndex to connect to the right mesh
         int meshIndex = nodeData[i].meshIndex;
         if (meshIndex >= 0 && meshIndex < meshes.size() && meshes[meshIndex] != nullptr) {
-            Material* gltfMat = new Material(shader);
-            meshes[meshIndex]->material = gltfMat;
             registry.emplace<Mesh*>(entities[i], meshes[meshIndex]);
 
             // Mark this mesh as assigned
@@ -132,8 +130,6 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
         GameObject* newGameObject = SceneUtils::addGameObjectComponent(registry, newEntity, unassignedData);
 
         // Assign material and mesh
-        Material* newMat = new Material(shader);
-        meshes[i]->material = newMat;
         registry.emplace<Mesh*>(newEntity, meshes[i]);
 
         // Parent to root object

@@ -316,7 +316,7 @@ void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basic
 
         lightData.color = color;
         lightData.intensity = 5.0f;
-        lightData.castShadow = true;
+        lightData.castShadow = false;
         lightData.isActive = true;
 
         // Light type properties

@@ -33,7 +33,7 @@ struct Material {
     float time;
 
     // Flag(s)
-    bool isDeferred = false;
+    bool isDeferred = true;
 
     // Constructor
     Material(Shader* shader)
