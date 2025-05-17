@@ -104,7 +104,7 @@ std::string GameObject::getName() {
 /*
 * Transform
 */
-void GameObject::setParent(entt::entity newParent) {
+void GameObject::setParent(const entt::entity& newParent) {
     // Get current world position and rotation
     glm::vec3 childWorldPos = m_registry.get<Position>(m_entity).position;
     glm::quat childWorldRot = m_registry.get<Rotation>(m_entity).quaternion;
@@ -137,6 +137,7 @@ void GameObject::setParent(entt::entity newParent) {
     if (!m_registry.any_of<Children>(newParent)) {
         m_registry.emplace<Children>(newParent);
     }
+    // TODO: potential error since I'm not checking if the child is already in the vector
     m_registry.get<Children>(newParent).children.push_back(m_entity);
 }
 

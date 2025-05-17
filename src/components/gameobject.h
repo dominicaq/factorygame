@@ -67,7 +67,8 @@ public:
     */
     entt::entity getEntity() const { return m_entity; }
 
-    void setParent(entt::entity newParent);
+    void setParent(const entt::entity& newParent);
+    void addChild(const entt::entity& newChild);
 
     glm::vec3& getPosition();
     void setPosition(const glm::vec3& pos);

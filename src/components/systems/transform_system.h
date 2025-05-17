@@ -14,9 +14,7 @@ public:
     void updateTransformComponents();
 
 private:
-    void updateDirtyMatricesInHierarchyOrder();
-    int computeEntityDepth(entt::entity entity, std::unordered_map<entt::entity, int>& depthMap);
-    void checkDirtyParents();
+    void updateTransformRecursive(entt::entity entity, const glm::mat4& parentMatrix);
 
     entt::registry& m_registry;
 };

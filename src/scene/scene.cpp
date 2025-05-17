@@ -224,7 +224,7 @@ void Scene::loadScene() {
     // The scale is 0.0008 which is causing scaling issues. however I load the entire scene correctly.
     GameObject* romanObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Sponza/glTF/Sponza.gltf");
     if (romanObj) {
-        romanObj->setScale(glm::vec3(2.0f));
+        romanObj->setScale(glm::vec3(2.5f));
         romanObj->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
     }
 
