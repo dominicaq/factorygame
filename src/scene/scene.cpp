@@ -224,10 +224,8 @@ void Scene::loadScene() {
     // The scale is 0.0008 which is causing scaling issues. however I load the entire scene correctly.
     GameObject* romanObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Sponza/glTF/Sponza.gltf");
     if (romanObj) {
-        romanObj->setScale(glm::vec3(0.01f));
+        romanObj->setScale(glm::vec3(2.0f));
         romanObj->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
-        // romanObj->addScript<MoveScript>();
-        // romanObj->addScript<ScaleScript>();
     }
 
     // --------------------- Dummy Entity (global scripts) ------------------
@@ -241,7 +239,7 @@ void Scene::loadScene() {
     int n = 100;
     float circleRadius = 10.0f;
     float yPosition = 10.0f;
-    createSuns(1, 50.0f, 25.0f, basicShader);
+    createSuns(1, 50.0f, 50.0f, basicShader);
 
     createSpotLights(1, circleRadius, yPosition, basicShader);
 
@@ -290,13 +288,13 @@ void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basic
 
         // Light game object
         GameObject* lightObject = SceneUtils::addGameObjectComponent(registry, lightEntity, save_lightData);
-        // lightObject->addScript<CircularRotation>();
-        // CircularRotation* rotationScript = lightObject->getScript<CircularRotation>();
-        // if (rotationScript != nullptr) {
-        //     rotationScript->radius = circleRadius;
-        //     rotationScript->center = glm::vec3(0.0f, yPosition, 0.0f);
-        //     rotationScript->rotationSpeed = 0.05f;
-        // }
+        lightObject->addScript<CircularRotation>();
+        CircularRotation* rotationScript = lightObject->getScript<CircularRotation>();
+        if (rotationScript != nullptr) {
+            rotationScript->radius = circleRadius;
+            rotationScript->center = glm::vec3(0.0f, yPosition, 0.0f);
+            rotationScript->rotationSpeed = 0.05f;
+        }
 
         // Light component
         Light lightData;

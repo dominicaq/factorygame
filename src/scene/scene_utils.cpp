@@ -52,10 +52,10 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
     float boundingBoxDiagonal = glm::length(max - min);
 
     // Constants for scaling decisions
-    const float VERY_LARGE_THRESHOLD = 1000.0f;    // Models larger than this are "very large"
-    const float LARGE_MODEL_ROOT_SCALE = 0.01f;    // Root scale to use for very large models
-    const float SMALL_THRESHOLD = 0.01f;           // Models smaller than this are "small"
-    const float TARGET_SIZE = 2.0f;                // Target size for small models
+    const float VERY_LARGE_THRESHOLD = 1000.0f;  // Models larger than this are "very large"
+    const float LARGE_MODEL_ROOT_SCALE = 0.01f;  // Root scale to use for very large models
+    const float SMALL_THRESHOLD = 0.01f;         // Models smaller than this are "small"
+    const float TARGET_SIZE = 2.0f;              // Target size for small models
 
     float rootScale = 1.0f;
 
@@ -68,11 +68,9 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
 
     std::vector<entt::entity> entities(nodeData.size());
     std::vector<GameObject*> gameObjects(nodeData.size());
-
-    // Track which meshes have been assigned to GameObjects
     std::vector<bool> meshAssigned(meshes.size(), false);
 
-    // First pass: Create entities and assign meshes/materials
+    // First pass: Create entities and assign meshes
     for (size_t i = 0; i < nodeData.size(); ++i) {
         entities[i] = registry.create();
         gameObjects[i] = SceneUtils::addGameObjectComponent(registry, entities[i], nodeData[i]);
@@ -90,8 +88,10 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
     }
 
     // Second pass: Set up the hierarchy as defined by the file
+    std::unordered_set<size_t> childrenSet;
     for (size_t i = 0; i < nodeData.size(); ++i) {
         for (size_t childIdx : nodeData[i].children) {
+            childrenSet.insert(childIdx);
             if (childIdx >= entities.size())
                 continue;
 
@@ -101,14 +101,6 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
 
             // Set the proper parent according to the hierarchy
             childObj->setParent(entities[i]);
-        }
-    }
-
-    // Collect all children indices
-    std::unordered_set<size_t> childrenSet;
-    for (const auto& node : nodeData) {
-        for (size_t child : node.children) {
-            childrenSet.insert(child);
         }
     }
 
@@ -127,27 +119,25 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
 
     // Create GameObjects for any unassigned meshes and parent them to the root object
     for (size_t i = 0; i < meshes.size(); ++i) {
-        if (!meshAssigned[i] && meshes[i] != nullptr) {
-            // Create a new entity and GameObject for this unassigned mesh
-            entt::entity newEntity = registry.create();
-
-            // Create a default SceneData for the unassigned mesh
-            SceneData unassignedData;
-            unassignedData.name = "UnassignedMesh_" + std::to_string(i);
-            unassignedData.meshIndex = i;
-            unassignedData.eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
-            unassignedData.scale = glm::vec3(rootScale);
-
-            GameObject* newGameObject = SceneUtils::addGameObjectComponent(registry, newEntity, unassignedData);
-
-            // Assign material and mesh
-            Material* newMat = new Material(shader);
-            meshes[i]->material = newMat;
-            registry.emplace<Mesh*>(newEntity, meshes[i]);
-
-            // Parent to root object
-            newGameObject->setParent(entities[rootIdx]);
+        if (meshAssigned[i] || meshes[i] == nullptr) {
+            continue;
         }
+
+        // Create a default SceneData for the unassigned mesh
+        SceneData unassignedData;
+        unassignedData.name = "UnassignedMesh(" + std::to_string(i) + ")";
+
+        // Create a new entity and GameObject for this unassigned mesh
+        entt::entity newEntity = registry.create();
+        GameObject* newGameObject = SceneUtils::addGameObjectComponent(registry, newEntity, unassignedData);
+
+        // Assign material and mesh
+        Material* newMat = new Material(shader);
+        meshes[i]->material = newMat;
+        registry.emplace<Mesh*>(newEntity, meshes[i]);
+
+        // Parent to root object
+        newGameObject->setParent(entities[rootIdx]);
     }
 
     return rootObject;

@@ -14,7 +14,8 @@ public:
     void updateTransformComponents();
 
 private:
-    void updateDirtyMatrices();
+    void updateDirtyMatricesInHierarchyOrder();
+    int computeEntityDepth(entt::entity entity, std::unordered_map<entt::entity, int>& depthMap);
     void checkDirtyParents();
 
     entt::registry& m_registry;

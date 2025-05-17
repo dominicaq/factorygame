@@ -4,6 +4,8 @@
 #endif
 
 #include "transform_system.h"
+#include <unordered_map>
+#include <vector>
 
 TransformSystem::TransformSystem(entt::registry& registry)
     : m_registry(registry) {}
@@ -15,7 +17,7 @@ void TransformSystem::forceCacheUpdate() {
 
 void TransformSystem::updateTransformComponents() {
     checkDirtyParents();
-    updateDirtyMatrices();
+    updateDirtyMatricesInHierarchyOrder();
 }
 
 void TransformSystem::checkDirtyParents() {
@@ -29,8 +31,32 @@ void TransformSystem::checkDirtyParents() {
     }
 }
 
-void TransformSystem::updateDirtyMatrices() {
-    for (const auto& [entity, modelMatrix] : m_registry.view<ModelMatrix>().each()) {
+// New method that respects hierarchy order
+void TransformSystem::updateDirtyMatricesInHierarchyOrder() {
+    // First, collect all entities with ModelMatrix
+    std::vector<entt::entity> entities;
+    for (const auto entity : m_registry.view<ModelMatrix>()) {
+        entities.push_back(entity);
+    }
+
+    // Build a map of entity depths
+    std::unordered_map<entt::entity, int> entityDepths;
+
+    // Compute hierarchy depths
+    for (auto entity : entities) {
+        computeEntityDepth(entity, entityDepths);
+    }
+
+    // Sort entities by depth (root objects first)
+    std::sort(entities.begin(), entities.end(),
+        [&entityDepths](const entt::entity& a, const entt::entity& b) {
+            return entityDepths[a] < entityDepths[b];
+        });
+
+    // Update matrices in order from roots to leaves
+    for (auto entity : entities) {
+        auto& modelMatrix = m_registry.get<ModelMatrix>(entity);
+
         if (!modelMatrix.dirty) {
             continue;
         }
@@ -45,12 +71,35 @@ void TransformSystem::updateDirtyMatrices() {
         localMatrix = glm::scale(localMatrix, scale);
 
         if (m_registry.any_of<Parent>(entity)) {
-            entt::entity parent = m_registry.get<Parent>(entity).parent;
-            const auto& parentModelMatrix = m_registry.get<ModelMatrix>(parent).matrix;
+            entt::entity parentEntity = m_registry.get<Parent>(entity).parent;
+            const auto& parentModelMatrix = m_registry.get<ModelMatrix>(parentEntity).matrix;
             localMatrix = parentModelMatrix * localMatrix;
         }
 
         modelMatrix.matrix = localMatrix;
         modelMatrix.dirty = false;
     }
+}
+
+// TODO: Instead of this, create the children component
+int TransformSystem::computeEntityDepth(entt::entity entity, std::unordered_map<entt::entity, int>& depthMap) {
+    // If we've already computed this entity's depth, return it
+    auto it = depthMap.find(entity);
+    if (it != depthMap.end()) {
+        return it->second;
+    }
+
+    // If this entity has no parent, it's at depth 0 (root)
+    if (!m_registry.any_of<Parent>(entity)) {
+        depthMap[entity] = 0;
+        return 0;
+    }
+
+    // Otherwise, recursively compute parent's depth and add 1
+    entt::entity parentEntity = m_registry.get<Parent>(entity).parent;
+    int parentDepth = computeEntityDepth(parentEntity, depthMap);
+    int depth = parentDepth + 1;
+
+    depthMap[entity] = depth;
+    return depth;
 }

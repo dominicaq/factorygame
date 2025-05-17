@@ -218,13 +218,13 @@ glm::vec3 GameObject::getRight() {
     return glm::normalize(glm::cross(front, glm::vec3(0, 1, 0)));
 }
 
-void GameObject::markTransformsDirty(entt::entity parent) {
-    m_registry.get<ModelMatrix>(parent).dirty = true;
-    if (!m_registry.all_of<Children>(parent)) {
+void GameObject::markTransformsDirty(entt::entity entity) {
+    m_registry.get<ModelMatrix>(entity).dirty = true;
+    if (!m_registry.all_of<Children>(entity)) {
         return;
     }
 
-    const auto& children = m_registry.get<Children>(parent).children;
+    const auto& children = m_registry.get<Children>(entity).children;
     for (auto child : children) {
         if (m_registry.all_of<ModelMatrix>(child)) {
             auto& modelMatrix = m_registry.get<ModelMatrix>(child);

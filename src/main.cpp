@@ -34,7 +34,7 @@ int main() {
 
     // Init editor specific UI
     Profiler profiler;
-    // Editor editor(settings.display.width, settings.display.height);
+    Editor editor(settings.display.width, settings.display.height);
     std::cout << "[Info] Success. Running engine setup...\n";
 
     // ------------------------ Scene Setup --------------------------
@@ -47,22 +47,22 @@ int main() {
     Camera& camera = scene.getPrimaryCamera();
     Renderer renderer(settings, &camera);
     window.setRenderer(&renderer);
-    // editor.setRenderer(&renderer);
+    editor.setRenderer(&renderer);
 
     // Create the frame graph with scene
     FrameGraph frameGraph(scene);
     frameGraph.addRenderPass(std::make_unique<ShadowPass>());
     frameGraph.addRenderPass(std::make_unique<GeometryPass>());
 
-    // auto skyboxPass = std::make_unique<SkyboxPass>();
-    // skyboxPass->setSkyBox(scene.getSkyBox());
-    // frameGraph.addRenderPass(std::move(skyboxPass));
+    auto skyboxPass = std::make_unique<SkyboxPass>();
+    skyboxPass->setSkyBox(scene.getSkyBox());
+    frameGraph.addRenderPass(std::move(skyboxPass));
 
     frameGraph.addRenderPass(std::make_unique<ForwardPass>());
 
-    // auto lightPass = std::make_unique<LightPass>();
-    // lightPass->setSkyBox(scene.getSkyBox());
-    // frameGraph.addRenderPass(std::move(lightPass));
+    auto lightPass = std::make_unique<LightPass>();
+    lightPass->setSkyBox(scene.getSkyBox());
+    frameGraph.addRenderPass(std::move(lightPass));
 
     // Post processing passes. Debug pass is like a post process.
     frameGraph.addRenderPass(std::make_unique<DebugPass>(&camera));
@@ -139,7 +139,7 @@ int main() {
         window.beginImGuiFrame();
         profiler.record(1.0f / deltaTime);
         profiler.display();
-        // editor.drawEditorLayout(scene, renderer);
+        editor.drawEditorLayout(scene, renderer);
         window.endImGuiFrame();
 
         // Swap buffers and poll events

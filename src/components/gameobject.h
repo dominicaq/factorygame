@@ -21,7 +21,7 @@ private:
     entt::registry& m_registry;
     std::vector<std::shared_ptr<Script>> m_scripts;
 
-    void markTransformsDirty(entt::entity parent);
+    void markTransformsDirty(entt::entity entity);
     glm::vec3 calculateWorldScale(entt::entity entity);
 
 public:
