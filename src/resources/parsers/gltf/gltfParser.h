@@ -295,6 +295,10 @@ bool parseAccessors(
                 const auto& uvAccesor = accessorsJson[uvIdx];
                 size_t uvBufferViewIdx = uvAccesor["bufferView"];
                 parseAccessorData(uvAccesor, buffers, bufferViews[uvBufferViewIdx], mesh->uvs);
+                // Flip UVs for engine (glTF uses a coordinate system where (0,0) is the bottom-left, while the engine's top-left is (0,0).)
+                for (auto& uv : mesh->uvs) {
+                    uv.y = 1.0f - uv.y;
+                }
             }
 
             if (mesh->vertices.empty() || mesh->normals.empty() || mesh->indices.empty() || mesh->uvs.empty()) {

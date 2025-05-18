@@ -10,7 +10,6 @@ public:
     TransformSystem(entt::registry& registry);
     ~TransformSystem() = default;
 
-    void forceCacheUpdate();
     void updateTransformComponents();
 
 private:

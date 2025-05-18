@@ -110,8 +110,6 @@ void LightSystem::updateDirectionalLightMatrices(LightSpaceMatrixArray& lightSpa
     glm::mat4 view = m_activeCamera.getViewMatrix();
     glm::mat4 invCam = glm::inverse(projection * view);
 
-    // Source:
-    // https://johanmedestrom.wordpress.com/2016/03/18/opengl-cascaded-shadow-maps/
     float lastSplitDist = 0.0f;
     for (size_t i = 0; i < numCascades; i++) {
         float splitDist = cascadeSplits[i];
@@ -145,28 +143,44 @@ void LightSystem::updateDirectionalLightMatrices(LightSpaceMatrixArray& lightSpa
         }
         frustumCenter /= 8.0f;
 
+        // Calculate radius based on frustum corners
         float radius = 0.0f;
         for (size_t j = 0; j < 8; j++) {
             float distance = glm::length(frustumCorners[j] - frustumCenter);
             radius = glm::max(radius, distance);
         }
+
+        // Round to avoid flickering, as in your original code
         radius = std::ceil(radius * 16.0f) / 16.0f;
 
-        glm::vec3 maxExtents = glm::vec3(radius);
+        // This ensures terrain isn't clipped at cascade boundaries
+        float extraRadius = 5.0f; // Adjust based on your scene scale
+
+        // For indoor scenes, add more extra coverage to the initial cascades
+        if (i == 0) extraRadius *= 2.0f;
+
+        glm::vec3 maxExtents = glm::vec3(radius + extraRadius);
         glm::vec3 minExtents = -maxExtents;
 
-        glm::mat4 lightViewMatrix = glm::lookAt(frustumCenter - lightDir * -minExtents.z, frustumCenter, glm::vec3(0.0f, 1.0f, 0.0f));
-        glm::mat4 lightOrthoMatrix = glm::ortho(minExtents.x, maxExtents.x, minExtents.y, maxExtents.y, 0.0f, maxExtents.z - minExtents.z);
+        // Move light source further back to capture more of the scene
+        float lightDistanceMultiplier = 1.5f + i * 0.1f; // Increase for further cascades
+
+        glm::vec3 lightPos = frustumCenter - lightDir * (-minExtents.z * lightDistanceMultiplier);
+        glm::mat4 lightViewMatrix = glm::lookAt(lightPos, frustumCenter, glm::vec3(0.0f, 1.0f, 0.0f));
+
+        // CRITICAL FIX: Add extra depth range to avoid clipping shadow casters
+        float shadowNearPlane = 0.0f; // Start at frustum center
+        float shadowFarPlane = maxExtents.z - minExtents.z + extraRadius * 2.0f; // Add extra depth
+
+        glm::mat4 lightOrthoMatrix = glm::ortho(
+            minExtents.x, maxExtents.x,
+            minExtents.y, maxExtents.y,
+            shadowNearPlane, shadowFarPlane
+        );
 
         // Store split distance and matrix in cascade
         float splitDepth = (nearClip + splitDist * clipRange) * -1.0f;
         lightSpaceArray.matrices[i] = lightOrthoMatrix * lightViewMatrix;
-
-        /* Store in matrix for extraction later
-        [0][0] [0][1] [0][2] [0][3]  // x-axis transformation
-        [1][0] [1][1] [1][2] [1][3]  // y-axis transformation
-        [2][0] [2][1] [2][2] [2][3]  // z-axis transformation
-        [3][0] [3][1] [3][2] [3][3]  // homogeneous coordinates */
         lightSpaceArray.matrices[i][2][3] = splitDepth;
 
         lastSplitDist = cascadeSplits[i];

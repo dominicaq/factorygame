@@ -11,10 +11,6 @@
 TransformSystem::TransformSystem(entt::registry& registry)
     : m_registry(registry) {}
 
-void TransformSystem::forceCacheUpdate() {
-    // Optional force refresh logic
-}
-
 void TransformSystem::updateTransformComponents() {
     // Start from root entities (those without a Parent)
     auto view = m_registry.view<ModelMatrix>(entt::exclude<Parent>);

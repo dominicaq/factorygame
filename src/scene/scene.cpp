@@ -1,5 +1,6 @@
 #include "scene.h"
 #include <random>
+#include <chrono>
 
 // User scripts
 #include "CircularRotation.h"
@@ -36,7 +37,7 @@ void Scene::loadScene() {
     SceneData save_cameraData;
     save_cameraData.name = "Main Camera";
     save_cameraData.position = glm::vec3(0.0f, 10.0f, 0.0f);
-    save_cameraData.eulerAngles = glm::vec3(90.0f, 360.0f, 0.0f);
+    save_cameraData.eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
     GameObject* cameraObject = SceneUtils::addGameObjectComponent(registry, cameraEntity, save_cameraData);
     cameraObject->addScript<FreeCamera>();
 
@@ -177,7 +178,7 @@ void Scene::loadScene() {
     entt::entity diabloEntity = registry.create();
     SceneData save_diabloData;
     save_diabloData.name = "Diablo";
-    save_diabloData.position = glm::vec3(0.0f, 1.9f, -10.0f);
+    save_diabloData.position = glm::vec3(0.0f, 3.0f, 0.0f);
     save_diabloData.scale = glm::vec3(3.0f);
     GameObject* diabloObject = SceneUtils::addGameObjectComponent(registry, diabloEntity, save_diabloData);
     diabloObject->addScript<MoveScript>();
@@ -201,32 +202,51 @@ void Scene::loadScene() {
     /*
     * glTF Game Objects
     */
+    auto gltfLoadStart = std::chrono::high_resolution_clock::now();
+    auto gltfLoadEnd = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> gltfLoadElasped;
+
+    gltfLoadStart = std::chrono::high_resolution_clock::now();
     GameObject* helmetObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf");
     if (helmetObj) {
         helmetObj->setScale(glm::vec3(1.0f));
-        helmetObj->setPosition(glm::vec3(0.0f, 5.0f, 0.0f));
+        helmetObj->setPosition(glm::vec3(0.0f, 5.0f, -5.0f));
         helmetObj->setEuler(glm::vec3(90,0,0));
         // helmetObj->addScript<MoveScript>();
     }
+    gltfLoadEnd = std::chrono::high_resolution_clock::now();
+    gltfLoadElasped = gltfLoadEnd - gltfLoadStart;
+    std::cout << "createMeshGameObject(Helmet) took " << gltfLoadElasped.count() << " seconds.\n";
 
+    gltfLoadStart = std::chrono::high_resolution_clock::now();
     GameObject* dragonObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "dragon/dragon.gltf");
     if (dragonObj) {
-        dragonObj->setScale(glm::vec3(1.0f));
-        dragonObj->setPosition(glm::vec3(0.0f, 0.0f, 10.0f));
+        dragonObj->setScale(glm::vec3(0.5f));
+        dragonObj->setPosition(glm::vec3(10.0f, -0.5f, 2.5f));
     }
+    gltfLoadEnd = std::chrono::high_resolution_clock::now();
+    gltfLoadElasped = gltfLoadEnd - gltfLoadStart;
+    std::cout << "createMeshGameObject(Dragon) took " << gltfLoadElasped.count() << " seconds.\n";
 
+    gltfLoadStart = std::chrono::high_resolution_clock::now();
     GameObject* laternObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf");
     if (laternObj) {
-        laternObj->setScale(glm::vec3(1.0f));
-        laternObj->setPosition(glm::vec3(10.0f, 0.0f, 10.0f));
+        laternObj->setScale(glm::vec3(0.5f));
+        laternObj->setPosition(glm::vec3(10.0f, 0.0f, -2.5f));
     }
+    gltfLoadEnd = std::chrono::high_resolution_clock::now();
+    gltfLoadElasped = gltfLoadEnd - gltfLoadStart;
+    std::cout << "createMeshGameObject(Lantern) took " << gltfLoadElasped.count() << " seconds.\n";
 
-    // The scale is 0.0008 which is causing scaling issues. however I load the entire scene correctly.
+    gltfLoadStart = std::chrono::high_resolution_clock::now();
     GameObject* romanObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Sponza/glTF/Sponza.gltf");
     if (romanObj) {
-        romanObj->setScale(glm::vec3(2.5f));
+        romanObj->setScale(glm::vec3(3.0f));
         romanObj->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
     }
+    gltfLoadEnd = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = gltfLoadEnd - gltfLoadStart;
+    std::cout << "createMeshGameObject(Sponza) took " << elapsed.count() << " seconds.\n";
 
     // --------------------- Dummy Entity (global scripts) ------------------
     entt::entity dummyEntity = registry.create();
@@ -237,14 +257,14 @@ void Scene::loadScene() {
 
     // --------------------- Light Circle ---------------------
     int n = 100;
-    float circleRadius = 10.0f;
+    float circleRadius = 5.0f;
     float yPosition = 10.0f;
     createSuns(1, 50.0f, 50.0f, basicShader);
 
-    createSpotLights(1, circleRadius, yPosition, basicShader);
+    createSpotLights(3, circleRadius, yPosition, basicShader);
 
     // Light balls
-    // createSpheres(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
+    createSpheres(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
 
     // Normal balls
     // createSpheres(1000, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
@@ -315,8 +335,8 @@ void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basic
         }
 
         lightData.color = color;
-        lightData.intensity = 5.0f;
-        lightData.castShadow = false;
+        lightData.intensity = 15.0f;
+        lightData.castShadow = true;
         lightData.isActive = true;
 
         // Light type properties
@@ -362,7 +382,7 @@ void Scene::createSpotLights(int n, float circleRadius, float yPosition, Shader*
         if (rotationScript != nullptr) {
             rotationScript->radius = circleRadius;
             rotationScript->center = glm::vec3(0.0f, yPosition, 0.0f);
-            rotationScript->rotationSpeed = 0.05f;
+            rotationScript->rotationSpeed = 0.5f;
         }
 
         // Light component

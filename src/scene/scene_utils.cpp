@@ -112,6 +112,7 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
         }
     }
 
+    // TODO: the root object is sometimes very large and not porportional to the scene (sponza)
     GameObject* rootObject = gameObjects[rootIdx];
     rootObject->setScale(glm::vec3(rootScale));
 
