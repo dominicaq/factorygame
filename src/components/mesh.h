@@ -1,10 +1,9 @@
 #ifndef MESH_H
 #define MESH_H
 
+#include <vector>
 #include <glm/glm.hpp>
 #include "../renderer/material.h"
-
-#include <vector>
 
 struct Mesh {
     // Raw mesh data
@@ -13,7 +12,7 @@ struct Mesh {
     std::vector<glm::vec3> tangents;
     std::vector<glm::vec3> bitangents;
     std::vector<glm::vec2> uvs;
-    std::vector<unsigned int> indices;
+    std::vector<uint32_t> indices;
     Material* material = nullptr;
     int drawMode = GL_TRIANGLES;
 

@@ -218,30 +218,29 @@ void Scene::loadScene() {
     gltfLoadElasped = gltfLoadEnd - gltfLoadStart;
     std::cout << "createMeshGameObject(Helmet) took " << gltfLoadElasped.count() << " seconds.\n";
 
-    gltfLoadStart = std::chrono::high_resolution_clock::now();
     GameObject* dragonObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "dragon/dragon.gltf");
     if (dragonObj) {
         dragonObj->setScale(glm::vec3(0.5f));
         dragonObj->setPosition(glm::vec3(10.0f, -0.5f, 2.5f));
     }
-    gltfLoadEnd = std::chrono::high_resolution_clock::now();
-    gltfLoadElasped = gltfLoadEnd - gltfLoadStart;
-    std::cout << "createMeshGameObject(Dragon) took " << gltfLoadElasped.count() << " seconds.\n";
 
-    gltfLoadStart = std::chrono::high_resolution_clock::now();
     GameObject* laternObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf");
     if (laternObj) {
         laternObj->setScale(glm::vec3(0.5f));
         laternObj->setPosition(glm::vec3(10.0f, 0.0f, -2.5f));
+        laternObj->addScript<MoveScript>();
     }
-    gltfLoadEnd = std::chrono::high_resolution_clock::now();
-    gltfLoadElasped = gltfLoadEnd - gltfLoadStart;
-    std::cout << "createMeshGameObject(Lantern) took " << gltfLoadElasped.count() << " seconds.\n";
+
+    GameObject* boomBox = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/BoomBox/glTF/BoomBox.gltf");
+    if (boomBox) {
+        boomBox->setScale(glm::vec3(100.0f));
+        boomBox->setPosition(glm::vec3(0.0f, 15.0f, -5.0f));
+    }
 
     gltfLoadStart = std::chrono::high_resolution_clock::now();
     GameObject* romanObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Sponza/glTF/Sponza.gltf");
     if (romanObj) {
-        romanObj->setScale(glm::vec3(3.0f));
+        romanObj->setScale(glm::vec3(0.0003f));
         romanObj->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
     }
     gltfLoadEnd = std::chrono::high_resolution_clock::now();
@@ -256,7 +255,7 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 100;
+    int n = 2;
     float circleRadius = 5.0f;
     float yPosition = 10.0f;
     createSuns(1, 50.0f, 50.0f, basicShader);
@@ -484,10 +483,10 @@ void Scene::createSpheres(int n, float fieldSize, float minHeight, float maxHeig
         if (litSpheres) {
             Light asteroidLight;
             asteroidLight.color = glm::vec3(colorDist(gen), colorDist(gen), colorDist(gen));
-            asteroidLight.intensity = 25.0f;
-            asteroidLight.point.radius = 2.0f;
+            asteroidLight.intensity = 5.0f;
+            asteroidLight.point.radius = 30.0f;
             asteroidLight.type = LightType::Point;
-            asteroidLight.castShadow = false;
+            asteroidLight.castShadow = true;
             asteroidLight.isActive = true;
             SceneUtils::addLightComponents(registry, asteroidEntity, asteroidLight);
         }
