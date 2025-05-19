@@ -231,14 +231,18 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
     glBindTexture(GL_TEXTURE_2D, gBuffer->getColorAttachment(3));
     m_lightPassShader.setInt("gPBRParams", 3);
 
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, gBuffer->getColorAttachment(4));
+    m_lightPassShader.setInt("gEmissive", 4);
+
     // Set the shadow maps array in the shader
     for (int i = 0; i < m_shadowMapHandles.size() && i < MAX_SHADOW_MAPS; ++i) {
-        glActiveTexture(GL_TEXTURE4 + i); // Start binding from texture slot 4
+        glActiveTexture(GL_TEXTURE5 + i); // Start binding from texture slot 4
         glBindTexture(GL_TEXTURE_2D, m_shadowMapHandles[i]);
-        m_lightPassShader.setInt("shadowMaps[" + std::to_string(i) + "]", 4 + i);
+        m_lightPassShader.setInt("shadowMaps[" + std::to_string(i) + "]", 5 + i);
     }
 
-    int skyboxTextureUnit = 4 + MAX_SHADOW_MAPS;
+    int skyboxTextureUnit = 5 + MAX_SHADOW_MAPS;
 
     // Set the skybox texture
     glActiveTexture(GL_TEXTURE0 + skyboxTextureUnit);

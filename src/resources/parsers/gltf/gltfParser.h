@@ -592,10 +592,10 @@ void loadMaterials(const json& gltfDoc, std::vector<Mesh*>& meshes, const std::v
                 pbrJson["metallicRoughnessTexture"].contains("index")) {
                 size_t textureIdx = pbrJson["metallicRoughnessTexture"]["index"].get<size_t>();
                 if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
-                    newMaterial->metallicMap = textures[textureIdx];
+                    newMaterial->metallicRoughnessMap = textures[textureIdx];
                     // In glTF, metallic and roughness are packed into a single texture
                     // G channel = roughness, B channel = metallic
-                    newMaterial->roughnessMap = textures[textureIdx];
+                    // newMaterial->roughnessMap = textures[textureIdx];
                 }
             }
         }
@@ -614,36 +614,36 @@ void loadMaterials(const json& gltfDoc, std::vector<Mesh*>& meshes, const std::v
         }
 
         // Occlusion map
-        // if (materialJson.contains("occlusionTexture") && materialJson["occlusionTexture"].contains("index")) {
-        //     size_t textureIdx = materialJson["occlusionTexture"]["index"].get<size_t>();
-        //     if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
-        //         material->occlusionMap = textures[textureIdx];
-        //     }
+        if (materialJson.contains("occlusionTexture") && materialJson["occlusionTexture"].contains("index")) {
+            // size_t textureIdx = materialJson["occlusionTexture"]["index"].get<size_t>();
+            // if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
+            //     newMaterial->aoMap = textures[textureIdx];
+            // }
 
-        //     // Occlusion strength
-        //     if (materialJson["occlusionTexture"].contains("strength")) {
-        //         material->occlusionStrength = materialJson["occlusionTexture"]["strength"].get<float>();
-        //     }
-        // }
+            // Occlusion strength
+            if (materialJson["occlusionTexture"].contains("strength")) {
+                newMaterial->occlusionStrength = materialJson["occlusionTexture"]["strength"].get<float>();
+            }
+        }
 
         // Emissive map
-        // if (materialJson.contains("emissiveTexture") && materialJson["emissiveTexture"].contains("index")) {
-        //     size_t textureIdx = materialJson["emissiveTexture"]["index"].get<size_t>();
-        //     if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
-        //         material->emissiveMap = textures[textureIdx];
-        //     }
-        // }
+        if (materialJson.contains("emissiveTexture") && materialJson["emissiveTexture"].contains("index")) {
+            size_t textureIdx = materialJson["emissiveTexture"]["index"].get<size_t>();
+            if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
+                newMaterial->emissiveMap = textures[textureIdx];
+            }
+        }
 
         // Emissive factor
-        // if (materialJson.contains("emissiveFactor") && materialJson["emissiveFactor"].is_array() &&
-        //     materialJson["emissiveFactor"].size() == 3) {
-        //     const auto& emissiveArray = materialJson["emissiveFactor"];
-        //     material->emissiveColor = glm::vec3(
-        //         emissiveArray[0].get<float>(),
-        //         emissiveArray[1].get<float>(),
-        //         emissiveArray[2].get<float>()
-        //     );
-        // }
+        if (materialJson.contains("emissiveFactor") && materialJson["emissiveFactor"].is_array() &&
+            materialJson["emissiveFactor"].size() == 3) {
+            const auto& emissiveArray = materialJson["emissiveFactor"];
+            newMaterial->emissiveColor = glm::vec3(
+                emissiveArray[0].get<float>(),
+                emissiveArray[1].get<float>(),
+                emissiveArray[2].get<float>()
+            );
+        }
 
         // Alpha mode and cutoff
         // if (materialJson.contains("alphaMode")) {

@@ -4,7 +4,7 @@
 #include <memory>
 
 // Define the number of G-buffer attachments
-#define NUM_GATTACHMENTS 4
+#define NUM_GATTACHMENTS 5
 
 Renderer::Renderer(config::GraphicsSettings settings, Camera* camera) {
     config = settings;

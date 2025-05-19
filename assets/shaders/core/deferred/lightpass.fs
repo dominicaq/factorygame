@@ -10,6 +10,7 @@ uniform sampler2D gPosition;
 uniform sampler2D gNormal;
 uniform sampler2D gAlbedo;
 uniform sampler2D gPBRParams;
+uniform sampler2D gEmissive;
 
 // Camera data
 uniform vec3 u_CameraPosition;
@@ -184,9 +185,9 @@ void main() {
     // Higher for metals, lower for dielectrics
     // Higher for smooth surfaces, lower for rough surfaces
     // Higher at grazing angles (fresnel effect)
-    float baseReflectivity = mix(0.04, 0.9, metallic); // Dielectrics ~4%, metals ~90%
+    float baseReflectivity = mix(0.04, 1.0, metallic); // Increase max reflectivity for metals
     float reflectionStrength = mix(baseReflectivity, 1.0, fresnelFactor);
-    reflectionStrength *= (1.0 - roughness * roughness); // Squared for physical correctness
+    reflectionStrength *= (1.0 - roughness); // Linear falloff might look better for metals
 
     // Combine ambient and skybox reflection - physically-based mix
     vec3 ambient = mix(baseAmbient, skyboxContribution, reflectionStrength);
@@ -280,10 +281,20 @@ void main() {
 
     // More conservative tone mapping - preserve darks better
     // Use ACES-inspired filmic tone mapping that preserves deep shadows
-    vec3 x = max(vec3(0.0), lighting - 0.004);
-    vec3 mapped = (x * (6.2 * x + 0.5)) / (x * (6.2 * x + 1.7) + 0.06);
 
-    // Gamma correction
+    // Sample emissive map from G-buffer
+    vec3 emissive = texture(gEmissive, TexCoords).rgb;
+
+    // Add emissive to lighting before tone mapping
+    // Emissive light is unaffected by shadows or lighting calculations
+    // It directly contributes to the final color
+    lighting += emissive;
+
+    // Apply tone mapping to the combined result
+    vec3 x = max(vec3(0.0), lighting);
+    vec3 mapped = (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14);
+
+    // Gamma correction (commented out in your original code)
     // mapped = pow(mapped, vec3(1.0/2.2));
 
     // Final color output

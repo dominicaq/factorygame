@@ -5,152 +5,86 @@
 #include "texture.h"
 
 #include <glm/glm.hpp>
-#include <memory>
 
 struct Material {
-    // Shader ptr
     Shader* shader = nullptr;
 
-    // TODO: Maybe in the future I can reduce Texture* (8 bytes on 64bit) to just Texture (4 bytes).
-    // Texture ptr(s)
     Texture* albedoMap = nullptr;
     Texture* normalMap = nullptr;
 
-    // PBR Textures
-    Texture* roughnessMap = nullptr;
-    Texture* metallicMap = nullptr;
-    Texture* aoMap = nullptr;
+    // Combined metallic-roughness map (e.g. RGB channels: R=AO, G=Roughness, B=Metallic)
+    Texture* metallicRoughnessMap = nullptr;
+    float occlusionStrength = 1.0f;
+
+    Texture* emissiveMap = nullptr;
+    glm::vec3 emissiveColor = glm::vec3(1.0f);
+
     Texture* heightMap = nullptr;
     float heightScale = 1.0f;
 
-    // RGB Material properties
     glm::vec4 albedoColor = glm::vec4(1.0f);
 
-    // Scale for texture tiling
     glm::vec2 uvScale = glm::vec2(1.0f, 1.0f);
 
     float shininess = 32.0f;
     float time;
 
-    // Flag(s)
     bool isDeferred = true;
 
-    // Constructor
     Material(Shader* shader)
         : shader(shader),
           albedoColor(glm::vec4(1.0f)),
           shininess(32.0f),
-          isDeferred(true)
-    {}
+          isDeferred(true) {}
 
-    // Function to bind the material data to the shader
     void bind(Shader* shaderOverride = nullptr) const {
-        if (shaderOverride == nullptr) {
-            // Use default shader if no shader is passed
-            shaderOverride = shader;
-        }
+        Shader* shaderToUse = shaderOverride ? shaderOverride : shader;
 
-        // Requirement: Every material shader needs a color
-        shaderOverride->setVec4("u_AlbedoColor", albedoColor);
+        struct TextureBinding {
+            const char* uniformName;
+            const char* hasUniformName;
+            Texture* texture;
+            int textureUnit;
+            float* strength;
+        };
 
-        if (shaderOverride->hasUniform("u_Time")) {
-            shaderOverride->setFloat("u_Time", time);
-        }
+        TextureBinding bindings[] = {
+            {"u_AlbedoMap", nullptr, albedoMap, 0, nullptr},
+            {"u_NormalMap", "u_HasNormalMap", normalMap, 1, nullptr},
+            {"u_MetallicRoughnessMap", "u_HasMetallicRoughnessMap", metallicRoughnessMap, 2, nullptr},
+            {"u_HeightMap", "u_HasHeightMap", heightMap, 3, nullptr},
+            {"u_EmissiveMap", "u_HasEmissiveMap", emissiveMap, 4, nullptr}
+        };
 
-        if (shaderOverride->hasUniform("u_HeightScale")) {
-            shaderOverride->setFloat("u_HeightScale", heightScale);
-        }
-
-        // Set uv scale for tiling
-        if (shaderOverride->hasUniform("u_uvScale")) {
-            shaderOverride->setVec2("u_uvScale", uvScale);
-        }
-
-        // Bind albedo map if it exists, otherwise set default color
-        if (albedoMap) {
-            if (shaderOverride->hasUniform("u_AlbedoMap")) {
-                shaderOverride->setInt("u_AlbedoMap", 0);
-                albedoMap->bind(0);
-            }
-        }
-
-        // Bind normal map if it exists, otherwise set flag for shader
-        if (normalMap) {
-            if (shaderOverride->hasUniform("u_NormalMap")) {
-                shaderOverride->setInt("u_NormalMap", 1);
-                normalMap->bind(1);
-            }
-
-            if (shaderOverride->hasUniform("u_HasNormalMap")) {
-                shaderOverride->setBool("u_HasNormalMap", true);
-            }
-        } else {
-            if (shaderOverride->hasUniform("u_HasNormalMap")) {
-                shaderOverride->setBool("u_HasNormalMap", false);
+        for (const auto& binding : bindings) {
+            if (binding.texture) {
+                if (shaderToUse->hasUniform(binding.uniformName)) {
+                    shaderToUse->setInt(binding.uniformName, binding.textureUnit);
+                    binding.texture->bind(binding.textureUnit);
+                }
+                if (binding.hasUniformName && shaderToUse->hasUniform(binding.hasUniformName)) {
+                    shaderToUse->setBool(binding.hasUniformName, true);
+                }
+            } else {
+                if (binding.hasUniformName && shaderToUse->hasUniform(binding.hasUniformName)) {
+                    shaderToUse->setBool(binding.hasUniformName, false);
+                }
             }
         }
 
-        // Bind metallic map if it exists
-        if (metallicMap) {
-            if (shaderOverride->hasUniform("u_MetallicMap")) {
-                shaderOverride->setInt("u_MetallicMap", 2);
-                metallicMap->bind(2);
-            }
+        shaderToUse->setVec4("u_AlbedoColor", albedoColor);
 
-            if (shaderOverride->hasUniform("u_HasMetallicMap")) {
-                shaderOverride->setBool("u_HasMetallicMap", true);
-            }
-        } else {
-            if (shaderOverride->hasUniform("u_HasMetallicMap")) {
-                shaderOverride->setBool("u_HasMetallicMap", false);
-            }
+        if (shaderToUse->hasUniform("u_Time")) {
+            shaderToUse->setFloat("u_Time", time);
         }
-
-        // Bind roughness map if it exists
-        if (roughnessMap) {
-            if (shaderOverride->hasUniform("u_RoughnessMap")) {
-                shaderOverride->setInt("u_RoughnessMap", 3);
-                roughnessMap->bind(3);
-            }
-
-            if (shaderOverride->hasUniform("u_HasRoughnessMap")) {
-                shaderOverride->setBool("u_HasRoughnessMap", true);
-            }
-        } else {
-            if (shaderOverride->hasUniform("u_HasRoughnessMap")) {
-                shaderOverride->setBool("u_HasRoughnessMap", false);
-            }
+        if (shaderToUse->hasUniform("u_HeightScale")) {
+            shaderToUse->setFloat("u_HeightScale", heightScale);
         }
-
-        // Bind AO map if it exists
-        if (aoMap) {
-            if (shaderOverride->hasUniform("u_AOMap")) {
-                shaderOverride->setInt("u_AOMap", 4);
-                aoMap->bind(4);
-            }
-
-            if (shaderOverride->hasUniform("u_HasAOMap")) {
-                shaderOverride->setBool("u_HasAOMap", true);
-            }
-        } else {
-            if (shaderOverride->hasUniform("u_HasAOMap")) {
-                shaderOverride->setBool("u_HasAOMap", false);
-            }
+        if (shaderToUse->hasUniform("u_uvScale")) {
+            shaderToUse->setVec2("u_uvScale", uvScale);
         }
-
-        if (heightMap) {
-            if (shaderOverride->hasUniform("u_HeightMap")) {
-                shaderOverride->setInt("u_HeightMap", 4);
-                aoMap->bind(5);
-            }
-
-            if (shaderOverride->hasUniform("u_HasHeightMap")) {
-                shaderOverride->setBool("u_HasHeightMap", true);
-            }
-        } else {
-            if (shaderOverride->hasUniform("u_HasHeightMap")) {
-                shaderOverride->setBool("u_HasHeightMap", false);
-            }
+        if (shaderToUse->hasUniform("u_EmissiveColor")) {
+            shaderToUse->setVec3("u_EmissiveColor", emissiveColor);
         }
     }
 };

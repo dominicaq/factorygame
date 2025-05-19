@@ -43,7 +43,8 @@ public:
         m_debugShader.setInt("gNormal", 1);
         m_debugShader.setInt("gAlbedo", 2);
         m_debugShader.setInt("gPBRParams", 3);
-        m_debugShader.setInt("gDepth", 4);
+        m_debugShader.setInt("gEmissive", 4);
+        m_debugShader.setInt("gDepth", 5);
 
         // Set debug mode (defines what to visualize)
         m_debugShader.setInt("debugMode", DEBUG_CTX.mode);
@@ -64,6 +65,9 @@ public:
         glBindTexture(GL_TEXTURE_2D, gBuffer->getColorAttachment(3)); // PBR Params
 
         glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, gBuffer->getColorAttachment(4)); // Emissive
+
+        glActiveTexture(GL_TEXTURE5);
         glBindTexture(GL_TEXTURE_2D, gBuffer->getDepthAttachment()); // Depth
 
         // Draw the screen-aligned quad to visualize the debug information

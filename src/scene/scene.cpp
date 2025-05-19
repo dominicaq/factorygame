@@ -134,10 +134,7 @@ void Scene::loadScene() {
             ballMat->albedoColor = glm::vec4(1.0f);
             ballMat->albedoMap = new Texture(TEXTURE_DIR + "gold/gold.png");
             ballMat->normalMap = new Texture(TEXTURE_DIR + "gold/gold-n.png");
-            ballMat->metallicMap = new Texture(TEXTURE_DIR + "gold/gold-m.png");
-            ballMat->roughnessMap = new Texture(TEXTURE_DIR + "gold/gold-r.png");
-            // ballMat->aoMap = new Texture(TEXTURE_DIR + "gold/gold-ao.png");
-            // ballMat->heightMap = new Texture(TEXTURE_DIR + "gold/gold-h.ong");
+            ballMat->heightMap = new Texture(TEXTURE_DIR + "gold/gold-h.ong");
             ballMat->heightScale = 0.01f;
             ballMat->isDeferred = true;
             ballMat->uvScale = glm::vec2(1.0f);
@@ -163,9 +160,6 @@ void Scene::loadScene() {
         planeMaterial->albedoColor = glm::vec4(1.0f);
         planeMaterial->albedoMap = new Texture(TEXTURE_DIR + "tiles/tiles.tga");
         planeMaterial->normalMap = new Texture(TEXTURE_DIR + "tiles/tiles-n.tga");
-        planeMaterial->metallicMap = new Texture(TEXTURE_DIR + "tiles/tiles-m.tga");
-        // planeMaterial->roughnessMap = new Texture(TEXTURE_DIR + "tiles/tiles-r.tga");
-        planeMaterial->aoMap = new Texture(TEXTURE_DIR + "tiles/tiles-ao.tga");
         planeMaterial->heightMap = new Texture(TEXTURE_DIR + "tiles/tiles-h.tga");
         planeMaterial->heightScale = 0.05f;
         planeMaterial->isDeferred = true;
@@ -227,7 +221,7 @@ void Scene::loadScene() {
     GameObject* laternObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf");
     if (laternObj) {
         laternObj->setScale(glm::vec3(0.5f));
-        laternObj->setPosition(glm::vec3(10.0f, 0.0f, -2.5f));
+        laternObj->setPosition(glm::vec3(10.0f, -0.25f, -2.5f));
         laternObj->addScript<MoveScript>();
     }
 
@@ -255,12 +249,12 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 2;
+    int n = 10;
     float circleRadius = 5.0f;
     float yPosition = 10.0f;
     createSuns(1, 50.0f, 50.0f, basicShader);
 
-    createSpotLights(3, circleRadius, yPosition, basicShader);
+    createSpotLights(2, circleRadius, yPosition, basicShader);
 
     // Light balls
     createSpheres(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
@@ -440,9 +434,6 @@ void Scene::createSpheres(int n, float fieldSize, float minHeight, float maxHeig
     asteroidMaterial->albedoColor = glm::vec4(1.0f);
     asteroidMaterial->albedoMap = new Texture(TEXTURE_DIR + "gold/gold.png");
     asteroidMaterial->normalMap = new Texture(TEXTURE_DIR + "gold/gold-n.png");
-    asteroidMaterial->metallicMap = new Texture(TEXTURE_DIR + "gold/gold-m.png");
-    asteroidMaterial->roughnessMap = new Texture(TEXTURE_DIR + "gold/gold-r.png");
-    asteroidMaterial->aoMap = new Texture(TEXTURE_DIR + "gold/gold-ao.png");
     asteroidMesh->material = asteroidMaterial;
     asteroidMaterial->isDeferred = true;
     MeshInstance meshInstance = addMeshInstance(asteroidMesh);

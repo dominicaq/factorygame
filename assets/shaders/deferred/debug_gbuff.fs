@@ -8,6 +8,7 @@ uniform sampler2D gPosition;
 uniform sampler2D gNormal;
 uniform sampler2D gAlbedo;
 uniform sampler2D gPBRParams;
+uniform sampler2D gEmissive;
 uniform sampler2D gDepth;
 
 // Debug mode
@@ -56,6 +57,9 @@ void main()
         float ao = texture(gPBRParams, TexCoord).b;
         FragColor = vec4(vec3(ao), 1.0);
     } else if (debugMode == 6) {
+        vec3 emissive = texture(gEmissive, TexCoord).rgb;
+        FragColor = vec4(emissive, 1.0f);
+    } else if (debugMode == 7) {
         // Visualize the depth buffer directly
         float depth = texture(gDepth, TexCoord).r;
         float linearDepth = LinearizeDepth(depth);
@@ -66,7 +70,7 @@ void main()
 
         // Output as grayscale
         FragColor = vec4(vec3(normalizedDepth), 1.0);
-    } else if (debugMode == 7) {
+    } else if (debugMode == 8) {
         // Depth slice visualization
         float depth = texture(gDepth, TexCoord).r;
         float linearDepth = LinearizeDepth(depth);

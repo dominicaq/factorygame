@@ -6,7 +6,7 @@
 #include <cstdint>
 
 // TODO: Subject to change
-#define MAX_ATTACHMENTS 4
+#define MAX_ATTACHMENTS 5
 
 class Framebuffer {
 public:
