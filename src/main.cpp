@@ -34,7 +34,7 @@ int main() {
 
     // Init editor specific UI
     Profiler profiler;
-    Editor editor(settings.display.width, settings.display.height);
+    // Editor editor(settings.display.width, settings.display.height);
     std::cout << "[Info] Success. Running engine setup...\n";
 
     // ------------------------ Scene Setup --------------------------
@@ -47,7 +47,7 @@ int main() {
     Camera& camera = scene.getPrimaryCamera();
     Renderer renderer(settings, &camera);
     window.setRenderer(&renderer);
-    editor.setRenderer(&renderer);
+    // editor.setRenderer(&renderer);
 
     // Create the frame graph with scene
     FrameGraph frameGraph(scene);
@@ -139,7 +139,7 @@ int main() {
         window.beginImGuiFrame();
         profiler.record(1.0f / deltaTime);
         profiler.display();
-        editor.drawEditorLayout(scene, renderer);
+        // editor.drawEditorLayout(scene, renderer);
         window.endImGuiFrame();
 
         // Swap buffers and poll events

@@ -294,8 +294,8 @@ void main() {
     vec3 x = max(vec3(0.0), lighting);
     vec3 mapped = (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14);
 
-    // Gamma correction (commented out in your original code)
-    // mapped = pow(mapped, vec3(1.0/2.2));
+    // Gamma correction
+    mapped = pow(mapped, vec3(1.0/2.2));
 
     // Final color output
     FragColor = vec4(mapped, 1.0);

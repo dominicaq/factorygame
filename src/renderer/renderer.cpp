@@ -126,6 +126,16 @@ void Renderer::drawInstanced(size_t instanceID, bool wireframe) {
         return;
     }
 
+    // Ensure SSBO is bound to the shader
+    if (data.instanceSSBO != 0) {
+        // Bind the SSBO to the appropriate binding point
+        GLuint bindingPoint = 0; // Using instanceID as binding point
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingPoint, data.instanceSSBO);
+
+    } else {
+        std::cerr << "[Warning] Renderer::drawInstanced: SSBO not initialized for this instance!\n";
+    }
+
     // Add wireframe support
     if (wireframe) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -143,6 +153,9 @@ void Renderer::drawInstanced(size_t instanceID, bool wireframe) {
 
     // Unbind VAO
     glBindVertexArray(0);
+
+    // Unbind SSBO after use (optional, but good practice)
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, instanceID, 0);
 
     // Reset polygon mode if wireframe was enabled
     if (wireframe) {
@@ -358,18 +371,33 @@ void Renderer::updateInstanceBuffer(size_t instanceID, const std::vector<glm::ma
 
     MeshData& data = m_instanceMeshData[instanceID];
 
-    // Check if instance buffer exists
-    if (data.VBO == 0) {
-        std::cerr << "[Error] Renderer::updateInstanceBuffer: Instance buffer doesn't exist! Call setupInstanceAttributes first.\n";
+    if (data.instanceSSBO == 0) {
+        std::cerr << "[Error] Renderer::updateInstanceBuffer: Instance SSBO doesn't exist! Call setupInstanceAttributes first.\n";
         return;
     }
 
-    // Update the existing buffer
-    glBindBuffer(GL_ARRAY_BUFFER, data.VBO);
-    glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_DYNAMIC_DRAW);
+    size_t newSize = modelMatrices.size() * sizeof(glm::mat4);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, data.instanceSSBO);
 
-    // Update the instance count
-    data.instanceCount = (GLsizei)modelMatrices.size();
+    // Allocate or reallocate if necessary
+    if (newSize > data.instanceBufferSize) {
+        glBufferData(GL_SHADER_STORAGE_BUFFER, newSize, nullptr, GL_DYNAMIC_DRAW);
+        data.instanceBufferSize = newSize;
+    }
+
+    // Update the data using glBufferSubData instead of mapping
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, newSize, modelMatrices.data());
+
+    // For very large data sets, consider double-buffering or persistent mapping
+    // which would be another optimization beyond this initial SSBO implementation
+
+    data.instanceCount = static_cast<GLsizei>(modelMatrices.size());
+
+    // Update the binding point if needed
+    GLuint bindingPoint = 0;
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingPoint, data.instanceSSBO);
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 void Renderer::setupInstanceAttributes(size_t instanceID, const std::vector<glm::mat4>& modelMatrices) {
@@ -380,28 +408,21 @@ void Renderer::setupInstanceAttributes(size_t instanceID, const std::vector<glm:
 
     MeshData& data = m_instanceMeshData[instanceID];
 
-    // Create and set up the instance buffer
-    GLuint instanceVBO;
-    glGenBuffers(1, &instanceVBO);
-    glBindVertexArray(data.VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-    glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_STATIC_DRAW);
+    // Create SSBO
+    glGenBuffers(1, &data.instanceSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, data.instanceSSBO);
 
-    // Set up vertex attribute pointers for the model matrix (takes up 4 attribute slots)
-    // Each mat4 needs to be broken into 4 vec4s due to GLSL attribute limitations
+    // Allocate and initialize
+    size_t dataSize = modelMatrices.size() * sizeof(glm::mat4);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, dataSize, modelMatrices.data(), GL_DYNAMIC_DRAW);
+    data.instanceBufferSize = dataSize;
+    data.instanceCount = static_cast<GLsizei>(modelMatrices.size());
 
-    // For the instance matrix columns (4 vec4s)
-    for (int i = 0; i < 4; i++) {
-        glEnableVertexAttribArray(5 + i);
-        glVertexAttribPointer(5 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(sizeof(float) * 4 * i));
-        glVertexAttribDivisor(5 + i, 1); // This makes it per-instance
-    }
+    // Bind to shader binding point (you'll need to match this in your shader)
+    GLuint bindingPoint = 0; // Use instanceID as the binding point, or your own system
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingPoint, data.instanceSSBO);
 
-    glBindVertexArray(0);
-
-    // Store the instance VBO in the mesh data
-    data.VBO = instanceVBO;
-    data.instanceCount = (GLsizei)modelMatrices.size();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 void Renderer::deleteInstanceBuffer(size_t instanceID) {
