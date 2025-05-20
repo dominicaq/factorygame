@@ -306,7 +306,7 @@ void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basic
         if (rotationScript != nullptr) {
             rotationScript->radius = circleRadius;
             rotationScript->center = glm::vec3(0.0f, yPosition, 0.0f);
-            rotationScript->rotationSpeed = 0.05f;
+            rotationScript->rotationSpeed = 0.09f;
         }
 
         // Light component
