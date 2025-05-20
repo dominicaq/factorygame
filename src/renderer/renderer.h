@@ -97,7 +97,9 @@ private:
         GLsizei indexCount;
         GLsizei vertexCount;
 
-        GLsizei instanceCount;
+        GLuint instanceSSBO = 0;
+        size_t instanceBufferSize = 0;
+        GLsizei instanceCount = 0;
     };
 
     std::vector<MeshData> m_meshData;

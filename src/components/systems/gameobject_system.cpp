@@ -19,6 +19,7 @@ void GameObjectSystem::startAll() {
 }
 
 void GameObjectSystem::updateAll(const float& currentTime, const float& deltaTime) {
+    std::vector<entt::entity> destroyQueue;
     for (const auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
         if (!gameObject.isActive) {
             continue;
@@ -31,18 +32,20 @@ void GameObjectSystem::updateAll(const float& currentTime, const float& deltaTim
             }
         }
         gameObject.updateScripts(deltaTime);
+
+        if (m_registry.get<EntityStatus>(entity).status.test(EntityStatus::DESTROY_ENTITY)) {
+            destroyQueue.push_back(entity);
+        }
     }
 
     // If any objects called to destroy themselves, we clean them up
     bool updateInstanceCounts = false;
-    for (const auto& [entity] : m_registry.view<PendingDestroy>().each()) {
-        if (m_registry.valid(entity)) {
-            if (m_registry.any_of<MeshInstance>(entity)) {
-                updateInstanceCounts = true;
-            }
-
-            m_registry.destroy(entity);
+    for (auto& entity : destroyQueue) {
+        if (m_registry.any_of<MeshInstance>(entity)) {
+            updateInstanceCounts = true;
         }
+
+        m_registry.destroy(entity);
     }
 
     if (updateInstanceCounts && m_onDirtyInstance) {

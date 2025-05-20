@@ -1,9 +1,17 @@
-# Factory Game
+# Factory Engine
 
-This project is an OpenGL deferred renderer with plans to become a game engine, currently in development.
+This project is an OpenGL, PBR, deferred renderer with plans to become a game engine utilizing an ECS library.
 
-<div style="text-align: center;">
-    <img src="./resources/demo.gif" alt="Demo" style="display: block; margin: 0 auto; border: none;">
+<div align="center">
+  <div style="width: 600px; height: 300px; overflow: hidden; display: inline-block;">
+    <img src="./resources/sponza.png" alt="Banner" style="width: 100%; height: 100%; object-fit: cover;">
+  </div>
+</div>
+
+<div align="center">
+  <div style="width: 600px; height: 300px; overflow: hidden; display: inline-block;">
+    <img src="./resources/sponza2.png" alt="Demo" style="width: 100%; height: 100%; object-fit: cover;">
+  </div>
 </div>
 
 ## ✨ Features

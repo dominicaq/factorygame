@@ -27,7 +27,7 @@ private:
     void update(const float& deltaTime) override {
         timeSinceDirectionChange += deltaTime;
         timeAlive += deltaTime;
-
+        // return;
         // Smoothly interpolate between directions
         if (timeSinceDirectionChange >= directionChangeDuration) {
             setRandomDirection();

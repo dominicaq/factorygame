@@ -249,7 +249,7 @@ void Scene::loadScene() {
     dummyObject->addScript<ViewFrameBuffers>();
 
     // --------------------- Light Circle ---------------------
-    int n = 10;
+    int n = 25;
     float circleRadius = 5.0f;
     float yPosition = 10.0f;
     createSuns(1, 50.0f, 50.0f, basicShader);
@@ -260,7 +260,7 @@ void Scene::loadScene() {
     createSpheres(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
 
     // Normal balls
-    // createSpheres(1000, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
+    // createSpheres(10000, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
 
     // Gizmo Cube
     // Box dimensions
@@ -306,7 +306,7 @@ void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basic
         if (rotationScript != nullptr) {
             rotationScript->radius = circleRadius;
             rotationScript->center = glm::vec3(0.0f, yPosition, 0.0f);
-            rotationScript->rotationSpeed = 0.05f;
+            rotationScript->rotationSpeed = 0.09f;
         }
 
         // Light component
@@ -475,9 +475,9 @@ void Scene::createSpheres(int n, float fieldSize, float minHeight, float maxHeig
             Light asteroidLight;
             asteroidLight.color = glm::vec3(colorDist(gen), colorDist(gen), colorDist(gen));
             asteroidLight.intensity = 5.0f;
-            asteroidLight.point.radius = 30.0f;
+            asteroidLight.point.radius = 10.0f;
             asteroidLight.type = LightType::Point;
-            asteroidLight.castShadow = true;
+            asteroidLight.castShadow = false;
             asteroidLight.isActive = true;
             SceneUtils::addLightComponents(registry, asteroidEntity, asteroidLight);
         }
