@@ -10,8 +10,6 @@
 #include <iostream>
 #include <entt/entt.hpp>
 
-struct PendingDestroy {};
-
 class GameObject {
 public:
     bool isActive = true;

@@ -15,6 +15,9 @@ GameObject::GameObject(entt::entity entity, entt::registry& registry)
     if (!m_registry.all_of<Scale>(m_entity)) {
         m_registry.emplace<Scale>(m_entity);
     }
+    if (!m_registry.all_of<EntityStatus>(m_entity)) {
+        m_registry.emplace<EntityStatus>(m_entity);
+    }
 }
 
 /*
@@ -86,7 +89,8 @@ void GameObject::destroy() {
         entt::entity entity = *it;
         if (m_registry.valid(entity)) {
             // Queue these entities for destruction
-            m_registry.emplace_or_replace<PendingDestroy>(entity);
+            auto& entStatus = m_registry.get<EntityStatus>(entity).status;
+            entStatus.set(EntityStatus::DESTROY_ENTITY);
         }
     }
 
@@ -220,7 +224,7 @@ glm::vec3 GameObject::getRight() {
 }
 
 void GameObject::markTransformsDirty(entt::entity entity) {
-    m_registry.get<ModelMatrix>(entity).dirty = true;
+    m_registry.get<EntityStatus>(entity).status.set(EntityStatus::DIRTY_MODEL_MATRIX);
     if (!m_registry.all_of<Children>(entity)) {
         return;
     }
@@ -228,8 +232,8 @@ void GameObject::markTransformsDirty(entt::entity entity) {
     const auto& children = m_registry.get<Children>(entity).children;
     for (auto child : children) {
         if (m_registry.all_of<ModelMatrix>(child)) {
-            auto& modelMatrix = m_registry.get<ModelMatrix>(child);
-            modelMatrix.dirty = true;
+            auto& childStatus = m_registry.get<EntityStatus>(child);
+            childStatus.status.set(EntityStatus::DIRTY_MODEL_MATRIX);
         }
 
         markTransformsDirty(child);
