@@ -1,8 +1,7 @@
-#ifndef GAMEOBJECT_H
-#define GAMEOBJECT_H
+#pragma once
 
 #include "script.h"
-#include "transform_components.h"
+#include "transform.h"
 #include "metadata.h"
 
 #include <vector>
@@ -112,5 +111,3 @@ public:
         return *resourcePtr;
     }
 };
-
-#endif // GAMEOBJECT_H

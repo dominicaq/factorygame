@@ -1,8 +1,9 @@
-#ifndef LIGHTSYSTEM_H
-#define LIGHTSYSTEM_H
+#pragma once
 
+#include "../../config/settings.h"
+#include "../camera.h"
 #include "../light.h"
-#include "../transform_components.h"
+#include "../transform.h"
 #include "config/settings.h"
 
 #include <entt/entt.hpp>
@@ -25,5 +26,3 @@ private:
     void updateDirectionalLightMatrices(LightSpaceMatrixArray& lightSpaceArray, const glm::vec3& direction);
     void updatePointLightMatrices(LightSpaceMatrixArray& lightSpaceCube, const glm::vec3& position, float radius);
 };
-
-#endif // LIGHTSYSTEM_H

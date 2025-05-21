@@ -1,7 +1,4 @@
-#ifndef LIGHT_H
-#define LIGHT_H
-
-#include "engine.h"
+#pragma once
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -63,5 +60,3 @@ struct LightSpaceMatrixArray {
         glm::mat4(1.0f)  // Back face (-Z)
     };
 };
-
-#endif // LIGHT_H

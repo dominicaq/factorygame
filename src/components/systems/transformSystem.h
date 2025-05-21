@@ -1,9 +1,10 @@
-#ifndef TRANSFORM_SYSTEM_H
-#define TRANSFORM_SYSTEM_H
+#pragma once
 
-#include "../transform_components.h"
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
+
+#include "../transform.h"
+#include "../metadata.h"
 
 class TransformSystem {
 public:
@@ -17,5 +18,3 @@ private:
 
     entt::registry& m_registry;
 };
-
-#endif // TRANSFORM_SYSTEM_H

@@ -1,5 +1,5 @@
 #include "texture.h"
-#include "../resources/resource_loader.h"
+#include "../resources/resourceLoader.h"
 
 #include <iostream>
 

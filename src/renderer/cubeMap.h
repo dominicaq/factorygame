@@ -1,5 +1,4 @@
-#ifndef CUBE_MAP_H
-#define CUBE_MAP_H
+#pragma once
 
 #include <vector>
 #include <string>
@@ -9,4 +8,3 @@ namespace CubeMap {
     unsigned int createDepthMap(int mapSize);
 }
 
-#endif // CUBE_MAP_H

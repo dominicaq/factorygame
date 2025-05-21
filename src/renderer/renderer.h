@@ -1,10 +1,9 @@
-#ifndef RENDERER_H
-#define RENDERER_H
+#pragma once
 
 #include "../engine.h"
 
 #include "framebuffer.h"
-#include "cube_map.h"
+#include "cubeMap.h"
 #include "config/settings.h"
 
 #include <glad/glad.h>
@@ -98,7 +97,7 @@ private:
         GLsizei vertexCount;
 
         GLuint instanceSSBO = 0;
-        size_t instanceBufferSize = 0;
+        GLuint instanceBufferSize = 0;
         GLsizei instanceCount = 0;
     };
 
@@ -106,4 +105,3 @@ private:
     std::vector<MeshData> m_instanceMeshData;
 };
 
-#endif // RENDERER_H

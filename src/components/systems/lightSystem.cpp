@@ -1,4 +1,4 @@
-#include "light_system.h"
+#include "lightSystem.h"
 
 LightSystem::LightSystem(config::GraphicsSettings& settings, Camera& activeCamera, entt::registry& registry) : m_registry(registry), m_activeCamera{activeCamera}, m_settings(settings) {}
 

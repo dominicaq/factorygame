@@ -1,5 +1,4 @@
-#ifndef COMPUTE_SHADER_H
-#define COMPUTE_SHADER_H
+#pragma once
 
 #include <glad/glad.h>
 #include <string>
@@ -36,5 +35,3 @@ private:
     void linkProgram(unsigned int computeShader, int* status);
     GLint getUniformLocation(const std::string& name) const;
 };
-
-#endif

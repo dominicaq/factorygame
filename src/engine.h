@@ -1,12 +1,11 @@
-#ifndef ENGINE_H
-#define ENGINE_H
+#pragma once
 
-// System
+// System resources (input, window, etc)
 #include "system/window.h"
-#include "system/input_manager.h"
+#include "system/inputManager.h"
 #include "globals.h"
 
-// ECS Components
+// Engine Components
 #include "entt/entt.hpp"
 #include "components/camera.h"
 #include "components/mesh.h"
@@ -15,23 +14,20 @@
 #include "components/metadata.h"
 #include "components/script.h"
 
-#include "components/systems/gameobject_system.h"
-#include "components/systems/transform_system.h"
-#include "components/systems/light_system.h"
+// Engine Systems
+#include "components/systems/gameobjectSystem.h"
+#include "components/systems/transformSystem.h"
+#include "components/systems/lightSystem.h"
 
-#include "components/resources.h"
-
-// Resources
+// Resource serializers / creators
 #include "resources/meshgen.h"
-#include "resources/resource_loader.h"
+#include "resources/resourceLoader.h"
 
 // Renderer
 #include "renderer/shader.h"
-#include "renderer/computeshader.h"
+#include "renderer/computeShader.h"
 #include "renderer/texture.h"
 #include "renderer/renderer.h"
 
 // Runtime debugging
 #include "debugging/gizmos.h"
-
-#endif // ENGINE_H

@@ -155,7 +155,7 @@ void Renderer::drawInstanced(size_t instanceID, bool wireframe) {
     glBindVertexArray(0);
 
     // Unbind SSBO after use (optional, but good practice)
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, instanceID, 0);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, (GLuint)instanceID, 0);
 
     // Reset polygon mode if wireframe was enabled
     if (wireframe) {
@@ -376,7 +376,7 @@ void Renderer::updateInstanceBuffer(size_t instanceID, const std::vector<glm::ma
         return;
     }
 
-    size_t newSize = modelMatrices.size() * sizeof(glm::mat4);
+    GLuint newSize = (GLuint)(modelMatrices.size() * sizeof(glm::mat4));
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, data.instanceSSBO);
 
     // Allocate or reallocate if necessary
@@ -413,7 +413,7 @@ void Renderer::setupInstanceAttributes(size_t instanceID, const std::vector<glm:
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, data.instanceSSBO);
 
     // Allocate and initialize
-    size_t dataSize = modelMatrices.size() * sizeof(glm::mat4);
+    GLuint dataSize = (GLuint)(modelMatrices.size() * sizeof(glm::mat4));
     glBufferData(GL_SHADER_STORAGE_BUFFER, dataSize, modelMatrices.data(), GL_DYNAMIC_DRAW);
     data.instanceBufferSize = dataSize;
     data.instanceCount = static_cast<GLsizei>(modelMatrices.size());

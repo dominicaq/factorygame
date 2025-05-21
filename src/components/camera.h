@@ -1,10 +1,9 @@
-#ifndef CAMERA_H
-#define CAMERA_H
+#pragma once
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <entt/entt.hpp>
-#include "transform_components.h"
+#include "transform.h"
 
 class Camera {
 private:
@@ -93,5 +92,3 @@ public:
         return m_projection;
     }
 };
-
-#endif // CAMERA_H

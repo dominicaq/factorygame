@@ -1,6 +1,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
-#include "resource_loader.h"
+#include "resourceLoader.h"
 
 // Loaders
 #include "objloader.h"

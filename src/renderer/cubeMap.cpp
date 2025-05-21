@@ -1,5 +1,5 @@
 #include "../engine.h"
-#include "cube_map.h"
+#include "cubeMap.h"
 
 #include <glad/glad.h>
 #include <iostream>

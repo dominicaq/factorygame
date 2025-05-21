@@ -1,5 +1,4 @@
-#ifndef OBJLOADER_H
-#define OBJLOADER_H
+#pragma once
 
 #include "../components/mesh.h"
 #include <glm/glm.hpp>
@@ -290,5 +289,3 @@ inline void generateTangentsAndBitangents(Mesh* mesh) {
 }
 
 } // namespace ObjLoader
-
-#endif // OBJLOADER_H

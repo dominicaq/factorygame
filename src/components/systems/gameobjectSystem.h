@@ -1,5 +1,4 @@
-#ifndef GAMEOBJECTSYSTEM_H
-#define GAMEOBJECTSYSTEM_H
+#pragma once
 
 #include "../gameobject.h"
 #include <entt/entt.hpp>
@@ -23,5 +22,3 @@ private:
     entt::registry& m_registry;
     std::function<void()> m_onDirtyInstance;
 };
-
-#endif // GameObjectSystem_H

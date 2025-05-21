@@ -1,5 +1,4 @@
-#ifndef MATERIAL_H
-#define MATERIAL_H
+#pragma once
 
 #include "shader.h"
 #include "texture.h"
@@ -88,5 +87,3 @@ struct Material {
         }
     }
 };
-
-#endif

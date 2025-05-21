@@ -1,5 +1,4 @@
-#ifndef SCRIPT_H
-#define SCRIPT_H
+#pragma once
 
 #include <string>
 
@@ -30,5 +29,3 @@ public:
     // Allow GameObject to set gameObject pointer
     friend class GameObject;
 };
-
-#endif // SCRIPT_H

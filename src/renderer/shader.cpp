@@ -1,5 +1,5 @@
 #include "shader.h"
-#include "../resources/resource_loader.h"
+#include "../resources/resourceLoader.h"
 
 #include <iostream>
 #include <sstream>

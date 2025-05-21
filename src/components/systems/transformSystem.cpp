@@ -3,10 +3,11 @@
     #define GLM_FORCE_SSE2
 #endif
 
-#include "transform_system.h"
 #include <unordered_map>
 #include <vector>
 #include <algorithm>
+
+#include "transformSystem.h"
 
 TransformSystem::TransformSystem(entt::registry& registry)
     : m_registry(registry) {}

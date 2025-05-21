@@ -1,5 +1,4 @@
-#ifndef FRAMEBUFFER_H
-#define FRAMEBUFFER_H
+#pragma once
 
 #include <glad/glad.h>
 #include <iostream>
@@ -58,5 +57,3 @@ private:
 
     FramebufferData m_data;  // Holds packed data
 };
-
-#endif // FRAMEBUFFER_H

@@ -1,5 +1,4 @@
-#ifndef MESHGEN_H
-#define MESHGEN_H
+#pragma once
 
 #include "../components/mesh.h"
 
@@ -14,4 +13,3 @@ namespace MeshGen {
     const float* createCubeMapVerts();
 }
 
-#endif // MESHGEN_H

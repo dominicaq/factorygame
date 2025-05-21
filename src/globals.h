@@ -2,7 +2,7 @@
 #ifndef GLOBALS_H
 #define GLOBALS_H
 
-#include "system/input_manager.h"
+#include "system/inputManager.h"
 
 // Declare global InputManager and debug variables
 extern InputManager inputManager;
