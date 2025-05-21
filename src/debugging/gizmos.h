@@ -63,11 +63,8 @@ static Mesh* createCube() {
     mesh->uvs.push_back(glm::vec2(1.0f, 1.0f));
     mesh->uvs.push_back(glm::vec2(0.0f, 1.0f));
 
-    // Generate tangents and bitangents
-    for (size_t i = 0; i < mesh->vertices.size(); i++) {
-        mesh->tangents.push_back(glm::vec3(1.0f, 0.0f, 0.0f));
-        mesh->bitangents.push_back(glm::vec3(0.0f, 1.0f, 0.0f));
-    }
+    // Generate tangents
+    mesh->tangents.resize(mesh->vertices.size(), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 
     // Set wireframe flag to true
     mesh->wireframe = true;
@@ -108,13 +105,8 @@ static Mesh* createSquare() {
     mesh->uvs.push_back(glm::vec2(1.0f, 1.0f));  // Top right
     mesh->uvs.push_back(glm::vec2(0.0f, 1.0f));  // Top left
 
-    // Generate tangents and bitangents for the mesh
-    size_t numVertices = mesh->vertices.size();
-    std::vector<glm::vec3> tangents(numVertices, glm::vec3(1.0f, 0.0f, 0.0f));
-    std::vector<glm::vec3> bitangents(numVertices, glm::vec3(0.0f, 1.0f, 0.0f));
-
-    mesh->tangents = tangents;
-    mesh->bitangents = bitangents;
+    // Initialize tangents as vec4 (1,0,0) with w = +1 (handedness)
+    mesh->tangents.resize(mesh->vertices.size(), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 
     // Set wireframe flag
     mesh->wireframe = true;
@@ -173,12 +165,7 @@ static Mesh* createPlane(float width = 1.0f, float length = 1.0f, int widthSegme
     }
 
     // Generate tangents and bitangents
-    size_t numVertices = mesh->vertices.size();
-    std::vector<glm::vec3> tangents(numVertices, glm::vec3(1.0f, 0.0f, 0.0f));
-    std::vector<glm::vec3> bitangents(numVertices, glm::vec3(0.0f, 0.0f, 1.0f));
-
-    mesh->tangents = tangents;
-    mesh->bitangents = bitangents;
+    mesh->tangents.resize(mesh->vertices.size(), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 
     // Set wireframe flag
     mesh->wireframe = true;
@@ -225,13 +212,8 @@ static Mesh* createGrid(float size = 10.0f, int divisions = 10) {
         mesh->uvs.push_back(glm::vec2(0.0f, 0.0f));
     }
 
-    // Generate tangents and bitangents
-    size_t numVertices = mesh->vertices.size();
-    std::vector<glm::vec3> tangents(numVertices, glm::vec3(1.0f, 0.0f, 0.0f));
-    std::vector<glm::vec3> bitangents(numVertices, glm::vec3(0.0f, 0.0f, 1.0f));
-
-    mesh->tangents = tangents;
-    mesh->bitangents = bitangents;
+    // Generate tangents
+    mesh->tangents.resize(mesh->vertices.size(), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 
     // Set wireframe flag
     mesh->wireframe = true;
@@ -279,12 +261,7 @@ static Mesh* createAxis(float size = 1.0f) {
     }
 
     // Generate tangents and bitangents
-    size_t numVertices = mesh->vertices.size();
-    std::vector<glm::vec3> tangents(numVertices, glm::vec3(1.0f, 0.0f, 0.0f));
-    std::vector<glm::vec3> bitangents(numVertices, glm::vec3(0.0f, 1.0f, 0.0f));
-
-    mesh->tangents = tangents;
-    mesh->bitangents = bitangents;
+     mesh->tangents.resize(mesh->vertices.size(), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 
     // Set wireframe flag
     mesh->wireframe = true;

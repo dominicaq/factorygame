@@ -55,7 +55,7 @@ static unsigned int processVertex(VertexIdx& vi, OBJParseContext& ctx);
 static void parseOBJLine(const std::string& line, OBJParseContext& ctx);
 inline void generateNormals(Mesh* mesh);
 inline void generateUVs(Mesh* mesh);
-inline void generateTangentsAndBitangents(Mesh* mesh);
+inline void generateTangents(Mesh* mesh);
 
 /*
 *  Main OBJ Loading
@@ -85,7 +85,7 @@ static Mesh* loadOBJ(const std::string& fileContent) {
     }
 
     // For normal mapping
-    generateTangentsAndBitangents(mesh);
+    generateTangents(mesh);
     return mesh;
 }
 
@@ -236,56 +236,59 @@ inline void generateUVs(Mesh* mesh) {
     }
 }
 
-inline void generateTangentsAndBitangents(Mesh* mesh) {
+inline void generateTangents(Mesh* mesh) {
     size_t numVertices = mesh->vertices.size();
-    std::vector<glm::vec3> tangents(numVertices, glm::vec3(0.0f));
-    std::vector<glm::vec3> bitangents(numVertices, glm::vec3(0.0f));
 
-    for (size_t i = 0; i < mesh->indices.size(); i += 3) {
-        // Get the indices of the triangle's vertices
+    std::vector<glm::vec3> accumulatedTangents(numVertices, glm::vec3(0.0f));
+    std::vector<glm::vec3> accumulatedBitangents(numVertices, glm::vec3(0.0f));
+    mesh->tangents.resize(numVertices); // glm::vec4 tangent storage
+
+    for (size_t i = 0; i + 2 < mesh->indices.size(); i += 3) {
         unsigned int i0 = mesh->indices[i];
         unsigned int i1 = mesh->indices[i + 1];
         unsigned int i2 = mesh->indices[i + 2];
 
-        // Get the positions and texture coordinates of the triangle's vertices
         glm::vec3 v0 = mesh->vertices[i0];
         glm::vec3 v1 = mesh->vertices[i1];
         glm::vec3 v2 = mesh->vertices[i2];
+
         glm::vec2 uv0 = mesh->uvs[i0];
         glm::vec2 uv1 = mesh->uvs[i1];
         glm::vec2 uv2 = mesh->uvs[i2];
 
-        // Calculate the edges of the triangle
         glm::vec3 edge1 = v1 - v0;
         glm::vec3 edge2 = v2 - v0;
 
-        // Calculate the differences in texture coordinates
         glm::vec2 deltaUV1 = uv1 - uv0;
         glm::vec2 deltaUV2 = uv2 - uv0;
 
-        // Calculate the tangent and bitangent
         float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
         glm::vec3 tangent = f * (deltaUV2.y * edge1 - deltaUV1.y * edge2);
         glm::vec3 bitangent = f * (-deltaUV2.x * edge1 + deltaUV1.x * edge2);
 
-        // Accumulate the tangents and bitangents for each vertex
-        tangents[i0] += tangent;
-        tangents[i1] += tangent;
-        tangents[i2] += tangent;
-        bitangents[i0] += bitangent;
-        bitangents[i1] += bitangent;
-        bitangents[i2] += bitangent;
+        accumulatedTangents[i0] += tangent;
+        accumulatedTangents[i1] += tangent;
+        accumulatedTangents[i2] += tangent;
+
+        accumulatedBitangents[i0] += bitangent;
+        accumulatedBitangents[i1] += bitangent;
+        accumulatedBitangents[i2] += bitangent;
     }
 
-    // Normalize the tangents and bitangents
     for (size_t i = 0; i < numVertices; ++i) {
-        tangents[i] = glm::normalize(tangents[i]);
-        bitangents[i] = glm::normalize(bitangents[i]);
-    }
+        const glm::vec3& n = mesh->normals[i];
+        glm::vec3 t = accumulatedTangents[i];
+        glm::vec3 b = accumulatedBitangents[i];
 
-    // Store the calculated tangents and bitangents in the mesh
-    mesh->tangents = tangents;
-    mesh->bitangents = bitangents;
+        // Orthonormalize tangent with normal
+        t = glm::normalize(t - n * glm::dot(n, t));
+
+        // Calculate handedness (w component)
+        float handedness = (glm::dot(glm::cross(n, t), b) < 0.0f) ? -1.0f : 1.0f;
+
+        mesh->tangents[i] = glm::vec4(t, handedness);
+    }
 }
 
 } // namespace ObjLoader

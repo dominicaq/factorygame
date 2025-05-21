@@ -324,31 +324,9 @@ bool parseAccessors(
                 size_t tangentIdx = attributeJson["TANGENT"];
                 const auto& tangentAccessor = accessorsJson[tangentIdx];
                 size_t tangentBufferViewIdx = tangentAccessor["bufferView"];
-
-                // Temporary vector to hold vec4 tangents from the file
-                std::vector<glm::vec4> tempTangents;
-                parseAccessorData(tangentAccessor, buffers, bufferViews[tangentBufferViewIdx], tempTangents);
-
-                // Extract xyz components for your storage and keep w for bitangent calculation
-                mesh->tangents.resize(tempTangents.size());
-                mesh->bitangents.resize(tempTangents.size());
-
-                for (size_t i = 0; i < tempTangents.size(); ++i) {
-                    // Extract tangent XYZ for storage
-                    mesh->tangents[i] = glm::vec3(tempTangents[i].x, tempTangents[i].y, tempTangents[i].z);
-
-                    // Ensure we have normals to calculate bitangent
-                    if (i < mesh->normals.size()) {
-                        const glm::vec3& normal = mesh->normals[i];
-                        const glm::vec3& tangent = mesh->tangents[i];
-                        float handedness = tempTangents[i].w;
-
-                        // Calculate bitangent using cross product and apply handedness
-                        mesh->bitangents[i] = handedness * glm::cross(normal, tangent);
-                    }
-                }
+                parseAccessorData(tangentAccessor, buffers, bufferViews[tangentBufferViewIdx], mesh->tangents);
             } else {
-                std::cerr << "[Warning] Tangents and BiTangents not found for mesh, calculating...\n";
+                std::cerr << "[Warning] Tangents not found for mesh, calculating...\n";
                 calculateTangentSpace(mesh);
                 std::cout << "[Info] Done.\n";
             }
@@ -368,64 +346,61 @@ bool parseAccessors(
     return !meshes.empty();
 }
 
-
 void calculateTangentSpace(Mesh* mesh) {
-    // Initialize tangents and bitangents
     size_t vertexCount = mesh->vertices.size();
-    mesh->tangents.resize(vertexCount, glm::vec3(0.0f));
-    mesh->bitangents.resize(vertexCount, glm::vec3(0.0f));
+    mesh->tangents.resize(vertexCount, glm::vec4(0.0f));
 
-    // Process triangles
+    std::vector<glm::vec3> accumulatedTangents(vertexCount, glm::vec3(0.0f));
+    std::vector<glm::vec3> accumulatedBitangents(vertexCount, glm::vec3(0.0f));
+
     for (size_t i = 0; i < mesh->indices.size(); i += 3) {
-        // Get vertex indices for this triangle
         uint32_t i0 = mesh->indices[i];
         uint32_t i1 = mesh->indices[i + 1];
         uint32_t i2 = mesh->indices[i + 2];
 
-        // Skip invalid indices
-        if (i0 >= vertexCount || i1 >= vertexCount || i2 >= vertexCount) {
+        if (i0 >= vertexCount || i1 >= vertexCount || i2 >= vertexCount)
             continue;
-        }
 
-        // Get positions and UVs
-        glm::vec3 edge1 = mesh->vertices[i1] - mesh->vertices[i0];
-        glm::vec3 edge2 = mesh->vertices[i2] - mesh->vertices[i0];
-        glm::vec2 deltaUV1 = mesh->uvs[i1] - mesh->uvs[i0];
-        glm::vec2 deltaUV2 = mesh->uvs[i2] - mesh->uvs[i0];
+        glm::vec3 pos0 = mesh->vertices[i0];
+        glm::vec3 pos1 = mesh->vertices[i1];
+        glm::vec3 pos2 = mesh->vertices[i2];
 
-        // Calculate determinant
+        glm::vec2 uv0 = mesh->uvs[i0];
+        glm::vec2 uv1 = mesh->uvs[i1];
+        glm::vec2 uv2 = mesh->uvs[i2];
+
+        glm::vec3 edge1 = pos1 - pos0;
+        glm::vec3 edge2 = pos2 - pos0;
+        glm::vec2 deltaUV1 = uv1 - uv0;
+        glm::vec2 deltaUV2 = uv2 - uv0;
+
         float det = deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x;
-        if (std::abs(det) < 1e-6f) continue; // Skip degenerate triangles
+        if (std::abs(det) < 1e-6f)
+            continue;
 
         float invDet = 1.0f / det;
 
-        // Calculate and accumulate tangent/bitangent
         glm::vec3 tangent = (edge1 * deltaUV2.y - edge2 * deltaUV1.y) * invDet;
         glm::vec3 bitangent = (edge2 * deltaUV1.x - edge1 * deltaUV2.x) * invDet;
 
-        // Add to all three vertices of this triangle
-        for (uint32_t idx : {i0, i1, i2}) {
-            mesh->tangents[idx] += tangent;
-            mesh->bitangents[idx] += bitangent;
+        for (uint32_t idx : { i0, i1, i2 }) {
+            accumulatedTangents[idx] += tangent;
+            accumulatedBitangents[idx] += bitangent;
         }
     }
 
-    // Orthogonalize and normalize
     for (size_t i = 0; i < vertexCount; ++i) {
-        const glm::vec3& n = mesh->normals[i];
+        glm::vec3& n = mesh->normals[i];
+        glm::vec3 t = accumulatedTangents[i];
+        glm::vec3 b = accumulatedBitangents[i];
 
-        // Gram-Schmidt orthogonalization
-        glm::vec3& t = mesh->tangents[i];
+        // Orthonormalize tangent
         t = glm::normalize(t - n * glm::dot(n, t));
 
-        // Handle degenerate tangents
-        if (glm::length(t) < 1e-6f) {
-            // Find a vector perpendicular to the normal
-            t = glm::abs(n.x) > 0.9f ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
-            t = glm::normalize(t - n * glm::dot(n, t));
-        }
+        // Calculate handedness
+        float w = (glm::dot(glm::cross(n, t), b) < 0.0f) ? -1.0f : 1.0f;
 
-        mesh->bitangents[i] = glm::cross(n, t);
+        mesh->tangents[i] = glm::vec4(t, w);
     }
 }
 

@@ -138,7 +138,7 @@ int main() {
         // ------------------ ImGui Rendering ------------------
         window.beginImGuiFrame();
         profiler.record(1.0f / deltaTime);
-        // profiler.display();
+        profiler.display();
         // editor.drawEditorLayout(scene, renderer);
         window.endImGuiFrame();
 

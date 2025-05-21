@@ -5,6 +5,7 @@
 
 // Define the number of G-buffer attachments
 #define NUM_GATTACHMENTS 5
+#define MAX_DRAW_COMMMANDS 1024
 
 Renderer::Renderer(config::GraphicsSettings settings, Camera* camera) {
     config = settings;
@@ -25,6 +26,8 @@ Renderer::Renderer(config::GraphicsSettings settings, Camera* camera) {
 
     // Make the first mesh instance blank
     m_instanceMeshData.push_back(MeshData{0});
+
+    initIndirectDrawBuffer(MAX_DRAW_COMMMANDS);
 }
 
 Renderer::~Renderer() {
@@ -54,6 +57,17 @@ Renderer::~Renderer() {
         }
     }
 
+    // Clean up indirect draw resources
+    if (m_indirectBuffer != 0) {
+        glDeleteBuffers(1, &m_indirectBuffer);
+        m_indirectBuffer = 0;
+    }
+
+    if (m_drawCountBuffer != 0) {
+        glDeleteBuffers(1, &m_drawCountBuffer);
+        m_drawCountBuffer = 0;
+    }
+
     // Clean up quad
     if (m_quadVAO) {
         glDeleteVertexArrays(1, &m_quadVAO);
@@ -75,6 +89,108 @@ void Renderer::initOpenGLState() {
 
     // Disable Blending by default
     glDisable(GL_BLEND);
+}
+
+/*
+* Multi Indirect Draw
+*/
+void Renderer::addIndirectDrawCommand(const Mesh& mesh) {
+    if (mesh.id >= m_meshData.size() || m_meshData[mesh.id].VAO == 0) {
+        std::cerr << "[Error] Renderer::addIndirectDrawCommand: Invalid mesh ID: " << mesh.id << "\n";
+        return;
+    }
+
+    DrawElementsIndirectCommand cmd;
+
+    // Determine how many elements to draw for this mesh
+    if (mesh.count > 0) {
+        // If an explicit count was provided, use it
+        cmd.count = mesh.count;
+    } else {
+        // Otherwise, determine count based on whether the mesh uses an index buffer
+        if (m_meshData[mesh.id].EBO != 0) {
+            // Use the number of indices if an Element Buffer Object is present
+            cmd.count = m_meshData[mesh.id].indexCount;
+        } else {
+            // Fallback: use the number of vertices if drawing without indices
+            cmd.count = m_meshData[mesh.id].vertexCount;
+        }
+    }
+
+    cmd.instanceCount = mesh.instanceCount;
+    cmd.firstIndex = mesh.firstIndex;
+    cmd.baseVertex = mesh.baseVertex;
+    cmd.baseInstance = mesh.baseInstance;
+
+    m_indirectCommands.push_back(cmd);
+}
+
+void Renderer::initIndirectDrawBuffer(size_t maxDrawCommands) {
+    // Clean up existing buffer if any
+    if (m_indirectBuffer != 0) {
+        glDeleteBuffers(1, &m_indirectBuffer);
+    }
+
+    // Create the indirect buffer
+    glGenBuffers(1, &m_indirectBuffer);
+    glBindBuffer(GL_DRAW_INDIRECT_BUFFER, m_indirectBuffer);
+    glBufferData(GL_DRAW_INDIRECT_BUFFER, maxDrawCommands * sizeof(DrawElementsIndirectCommand),
+                 nullptr, GL_DYNAMIC_STORAGE_BIT);
+    glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+
+    // Reserve space for indirect commands
+    m_indirectCommands.reserve(maxDrawCommands);
+}
+
+void Renderer::updateIndirectDrawBuffer() {
+    if (m_indirectCommands.empty()) {
+        std::cerr << "[Warning] Renderer::updateIndirectDrawBuffer: No indirect commands to update\n";
+        return;
+    }
+
+    m_indirectCount = static_cast<GLuint>(m_indirectCommands.size());
+
+    // Update indirect command buffer
+    glBindBuffer(GL_DRAW_INDIRECT_BUFFER, m_indirectBuffer);
+    glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0,
+                   m_indirectCount * sizeof(DrawElementsIndirectCommand),
+                   m_indirectCommands.data());
+
+    // Update draw count in parameter buffer (if using dynamic count)
+    glBindBuffer(GL_PARAMETER_BUFFER_ARB, m_drawCountBuffer);
+    glBufferSubData(GL_PARAMETER_BUFFER_ARB, 0, sizeof(GLuint), &m_indirectCount);
+
+    glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+    glBindBuffer(GL_PARAMETER_BUFFER_ARB, 0);
+}
+
+void Renderer::drawMultiIndirect(bool indexed) {
+    if (m_indirectCount == 0 || m_indirectBuffer == 0) {
+        std::cerr << "[Warning] Renderer::drawMultiIndirect: No indirect commands or buffer not initialized\n";
+        return;
+    }
+
+    // Bind the indirect buffer
+    glBindBuffer(GL_DRAW_INDIRECT_BUFFER, m_indirectBuffer);
+
+    // Multi-draw indirect call
+    if (indexed) {
+        // For elements (indexed rendering)
+        glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, nullptr,
+                                  m_indirectCount, sizeof(DrawElementsIndirectCommand));
+    } else {
+        // For arrays (non-indexed rendering)
+        glMultiDrawArraysIndirect(GL_TRIANGLES, nullptr,
+                                m_indirectCount, sizeof(DrawElementsIndirectCommand));
+    }
+
+    // Unbind the buffer
+    glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+}
+
+void Renderer::clearIndirectCommands() {
+    m_indirectCommands.clear();
+    m_indirectCount = 0;
 }
 
 /*
@@ -154,7 +270,7 @@ void Renderer::drawInstanced(size_t instanceID, bool wireframe) {
     // Unbind VAO
     glBindVertexArray(0);
 
-    // Unbind SSBO after use (optional, but good practice)
+    // Unbind SSBO after use
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, (GLuint)instanceID, 0);
 
     // Reset polygon mode if wireframe was enabled
@@ -171,8 +287,7 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic, size_t instanceID) {
 
     if (mesh->uvs.empty() ||
         mesh->normals.empty() ||
-        mesh->tangents.empty() ||
-        mesh->bitangents.empty()) {
+        mesh->tangents.empty()) {
         std::cerr << "[Error] Renderer::initMeshBuffers: UVs, normals, and tangent space must be provided.\n";
         return;
     }
@@ -198,31 +313,28 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic, size_t instanceID) {
     glGenVertexArrays(1, &data.VAO);
     glBindVertexArray(data.VAO);
 
-    // Build mesh buffer data (14 floats per vertex)
+    // Build mesh buffer data (12 floats per vertex)
     std::vector<float> bufferData;
     size_t numVertices = mesh->vertices.size();
-    bufferData.reserve(numVertices * 14);
+    bufferData.reserve(numVertices * 12);
 
     for (size_t i = 0; i < numVertices; ++i) {
-        // Positions
+        // Positions (3)
         bufferData.push_back(mesh->vertices[i].x);
         bufferData.push_back(mesh->vertices[i].y);
         bufferData.push_back(mesh->vertices[i].z);
-        // UVs
+        // UVs (2)
         bufferData.push_back(mesh->uvs[i].x);
         bufferData.push_back(mesh->uvs[i].y);
-        // Normals
+        // Normals (3)
         bufferData.push_back(mesh->normals[i].x);
         bufferData.push_back(mesh->normals[i].y);
         bufferData.push_back(mesh->normals[i].z);
-        // Tangents
+        // Tangents (4)
         bufferData.push_back(mesh->tangents[i].x);
         bufferData.push_back(mesh->tangents[i].y);
         bufferData.push_back(mesh->tangents[i].z);
-        // Bitangents
-        bufferData.push_back(mesh->bitangents[i].x);
-        bufferData.push_back(mesh->bitangents[i].y);
-        bufferData.push_back(mesh->bitangents[i].z);
+        bufferData.push_back(mesh->tangents[i].w);
     }
 
     glGenBuffers(1, &data.VBO);
@@ -236,29 +348,25 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic, size_t instanceID) {
         data.indexCount = static_cast<GLsizei>(mesh->indices.size());
         data.vertexCount = 0;
     } else {
-        // No indices
         data.EBO = 0;
         data.indexCount = 0;
         data.vertexCount = static_cast<GLsizei>(mesh->vertices.size());
     }
 
-    // Vertex attribute pointers
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)0);
+    // Vertex attribute pointers (using 12 floats per vertex)
+    glEnableVertexAttribArray(0); // Position
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 12 * sizeof(float), (void*)0);
 
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(5 * sizeof(float)));
+    glEnableVertexAttribArray(1); // UV
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 12 * sizeof(float), (void*)(3 * sizeof(float)));
 
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2); // Normal
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 12 * sizeof(float), (void*)(5 * sizeof(float)));
 
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
+    glEnableVertexAttribArray(3); // Tangent (vec4)
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 12 * sizeof(float), (void*)(8 * sizeof(float)));
 
-    glEnableVertexAttribArray(4);
-    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
-
-    glBindVertexArray(0); // Unbind VAO
+    glBindVertexArray(0);
 
     // Store mesh data in the appropriate vector
     if (isInstance) {

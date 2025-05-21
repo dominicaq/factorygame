@@ -32,6 +32,15 @@ public:
     Camera* getCamera() const { return m_camera; }
 
     /*
+    * Indirect Mesh Drawing
+    */
+    void initIndirectDrawBuffer(size_t maxDrawCommands);
+    void addIndirectDrawCommand(const Mesh& mesh);
+    void updateIndirectDrawBuffer();
+    void drawMultiIndirect(bool indexed);
+    void clearIndirectCommands();
+
+    /*
     * Instancing
     */
     void drawInstanced(size_t instanceID, bool wireframe = false);
@@ -85,23 +94,39 @@ private:
     * Mesh preprocessing
     */
     ComputeShader m_heightCompute;
-    // ComputeShader m_meshCompute;
     void applyHeightMapCompute(Mesh* mesh);
+
+    /*
+    * Indirect draw buffers
+    */
+    struct DrawElementsIndirectCommand {
+        uint32_t count = 0;
+        uint32_t instanceCount = 0;
+        uint32_t firstIndex = 0;
+        uint32_t baseVertex = 0;
+        uint32_t baseInstance = 0;
+    };
+
+    GLuint m_indirectBuffer = 0;
+    GLuint m_indirectCount = 0;
+    GLuint m_drawCountBuffer = 0;
+    std::vector<DrawElementsIndirectCommand> m_indirectCommands;
 
     /*
      * Mesh buffer storage
      */
     struct MeshData {
-        unsigned int VAO, VBO, EBO;
+        GLuint VAO, VBO, EBO;
         GLsizei indexCount;
         GLsizei vertexCount;
+        GLuint instanceVBO = 0;
 
         GLuint instanceSSBO = 0;
         GLuint instanceBufferSize = 0;
         GLsizei instanceCount = 0;
     };
 
+    std::vector<Material> m_materials;
     std::vector<MeshData> m_meshData;
     std::vector<MeshData> m_instanceMeshData;
 };
-

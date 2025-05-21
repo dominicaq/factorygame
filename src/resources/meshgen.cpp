@@ -198,62 +198,56 @@ Mesh* MeshGen::createPlane(unsigned int resolutionX, unsigned int resolutionY, f
 
 // Helper function to compute tangent basis for normal mapping
 void MeshGen::computeTangentBasis(Mesh* mesh) {
-    // Resize tangents and bitangents arrays
-    mesh->tangents.resize(mesh->vertices.size(), glm::vec3(0.0f));
-    mesh->bitangents.resize(mesh->vertices.size(), glm::vec3(0.0f));
+    mesh->tangents.resize(mesh->vertices.size(), glm::vec4(0.0f));
 
-    // Compute tangents and bitangents for each triangle
-    for (size_t i = 0; i < mesh->indices.size(); i += 3) {
+    std::vector<glm::vec3> accumulatedTangents(mesh->vertices.size(), glm::vec3(0.0f));
+    std::vector<glm::vec3> accumulatedBitangents(mesh->vertices.size(), glm::vec3(0.0f));
+
+    for (size_t i = 0; i + 2 < mesh->indices.size(); i += 3) {
         unsigned int idx1 = mesh->indices[i];
-        unsigned int idx2 = mesh->indices[i+1];
-        unsigned int idx3 = mesh->indices[i+2];
+        unsigned int idx2 = mesh->indices[i + 1];
+        unsigned int idx3 = mesh->indices[i + 2];
 
-        // Get triangle vertices
-        const glm::vec3& v1 = mesh->vertices[idx1];
-        const glm::vec3& v2 = mesh->vertices[idx2];
-        const glm::vec3& v3 = mesh->vertices[idx3];
+        const glm::vec3& v0 = mesh->vertices[idx1];
+        const glm::vec3& v1 = mesh->vertices[idx2];
+        const glm::vec3& v2 = mesh->vertices[idx3];
 
-        // Get triangle UVs
-        const glm::vec2& uv1 = mesh->uvs[idx1];
-        const glm::vec2& uv2 = mesh->uvs[idx2];
-        const glm::vec2& uv3 = mesh->uvs[idx3];
+        const glm::vec2& uv0 = mesh->uvs[idx1];
+        const glm::vec2& uv1 = mesh->uvs[idx2];
+        const glm::vec2& uv2 = mesh->uvs[idx3];
 
-        // Edges of the triangle
-        glm::vec3 edge1 = v2 - v1;
-        glm::vec3 edge2 = v3 - v1;
-
-        // Differences in UV coordinates
-        glm::vec2 deltaUV1 = uv2 - uv1;
-        glm::vec2 deltaUV2 = uv3 - uv1;
+        glm::vec3 edge1 = v1 - v0;
+        glm::vec3 edge2 = v2 - v0;
+        glm::vec2 deltaUV1 = uv1 - uv0;
+        glm::vec2 deltaUV2 = uv2 - uv0;
 
         float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
 
-        glm::vec3 tangent;
-        tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
-        tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
-        tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
-        tangent = glm::normalize(tangent);
+        glm::vec3 tangent = f * (deltaUV2.y * edge1 - deltaUV1.y * edge2);
+        glm::vec3 bitangent = f * (-deltaUV2.x * edge1 + deltaUV1.x * edge2);
 
-        glm::vec3 bitangent;
-        bitangent.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
-        bitangent.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
-        bitangent.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
-        bitangent = glm::normalize(bitangent);
+        accumulatedTangents[idx1] += tangent;
+        accumulatedTangents[idx2] += tangent;
+        accumulatedTangents[idx3] += tangent;
 
-        // Add to all three vertices of the triangle
-        mesh->tangents[idx1] += tangent;
-        mesh->tangents[idx2] += tangent;
-        mesh->tangents[idx3] += tangent;
-
-        mesh->bitangents[idx1] += bitangent;
-        mesh->bitangents[idx2] += bitangent;
-        mesh->bitangents[idx3] += bitangent;
+        accumulatedBitangents[idx1] += bitangent;
+        accumulatedBitangents[idx2] += bitangent;
+        accumulatedBitangents[idx3] += bitangent;
     }
 
-    // Normalize the accumulated tangents and bitangents
+    // Compute orthonormal basis and handedness
     for (size_t i = 0; i < mesh->vertices.size(); ++i) {
-        mesh->tangents[i] = glm::normalize(mesh->tangents[i]);
-        mesh->bitangents[i] = glm::normalize(mesh->bitangents[i]);
+        const glm::vec3& n = mesh->normals[i];
+        glm::vec3 t = accumulatedTangents[i];
+        glm::vec3 b = accumulatedBitangents[i];
+
+        // Gram-Schmidt orthogonalization
+        t = glm::normalize(t - n * glm::dot(n, t));
+
+        // Calculate handedness
+        float handedness = (glm::dot(glm::cross(n, t), b) < 0.0f) ? -1.0f : 1.0f;
+
+        mesh->tangents[i] = glm::vec4(t, handedness);
     }
 }
 
