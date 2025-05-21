@@ -47,7 +47,7 @@ void loadMaterials(
 /*
 * Math
 */
-void calculateTangentSpace(Mesh* mesh);
+void calculateTangentSpace(Mesh* mesh, std::vector<glm::vec3>& normals, std::vector<glm::vec4>& tangents);
 
 /*
  * Utility
@@ -90,6 +90,49 @@ size_t getComponentSize(int componentType) {
         case 5123: return 2; // UNSIGNED_SHORT
         case 5126: return 4; // FLOAT
         default: return 0;
+    }
+}
+
+void packNormalTangents(Mesh* mesh, const std::vector<glm::vec3>& tempNormals,
+                        const std::vector<glm::vec4>& tempTangents) {
+    mesh->packedNormalTangents.clear();
+    mesh->packedNormalTangents.reserve(tempNormals.size());
+
+    for (size_t i = 0; i < tempNormals.size(); ++i) {
+        glm::vec3 normal = glm::normalize(tempNormals[i]);
+        glm::vec3 tangent = glm::normalize(glm::vec3(tempTangents[i]));
+        float handedness = tempTangents[i].w;
+
+        // Create orthonormal basis
+        glm::vec3 bitangent = glm::normalize(glm::cross(normal, tangent));
+        if (handedness < 0.0f) {
+            bitangent = -bitangent;
+        }
+
+        // Ensure orthogonality by re-orthogonalizing tangent
+        tangent = glm::normalize(glm::cross(bitangent, normal));
+
+        // Create TBN matrix with proper column order (columns are the basis vectors)
+        glm::mat3 tbnMatrix;
+        tbnMatrix[0] = tangent;    // First column
+        tbnMatrix[1] = bitangent; // Second column
+        tbnMatrix[2] = normal;    // Third column
+
+        // Convert to quaternion
+        glm::quat quat = glm::quat_cast(tbnMatrix);
+
+        // Ensure quaternion is in positive hemisphere (w >= 0) for consistency
+        if (quat.w < 0.0f) {
+            quat = -quat;
+        }
+
+        // Store handedness in the sign of w component
+        if (handedness < 0.0f) {
+            quat.w = -quat.w;
+        }
+
+        // Store as vec4 (x, y, z, w)
+        mesh->packedNormalTangents.push_back(glm::vec4(quat.x, quat.y, quat.z, quat.w));
     }
 }
 
@@ -264,6 +307,8 @@ bool parseAccessors(
             /*
             * Required attributes
             */
+            std::vector<glm::vec3> tempNormals;
+            std::vector<glm::vec4> tempTangents;
 
             // Process POSITION attribute
             if (attributeJson.contains("POSITION")) {
@@ -286,7 +331,7 @@ bool parseAccessors(
                 size_t normalIdx = attributeJson["NORMAL"];
                 const auto& normalAccesor = accessorsJson[normalIdx];
                 size_t normalBufferViewIdx = normalAccesor["bufferView"];
-                parseAccessorData(normalAccesor, buffers, bufferViews[normalBufferViewIdx], mesh->normals);
+                parseAccessorData(normalAccesor, buffers, bufferViews[normalBufferViewIdx], tempNormals);
             }
 
             // Process TEXCOORD_0 attribute
@@ -301,14 +346,14 @@ bool parseAccessors(
                 }
             }
 
-            if (mesh->vertices.empty() || mesh->normals.empty() || mesh->indices.empty() || mesh->uvs.empty()) {
+            if (mesh->vertices.empty() || tempNormals.empty() || mesh->indices.empty() || mesh->uvs.empty()) {
                 std::stringstream warningMsg;
                 warningMsg << "[Warning] failed to load glTF mesh at index [" << primitiveIdx
                         << "]: one or more required attributes are missing.\n"
                         << "Present data: \n"
                         << "    Vertices: " << (mesh->vertices.empty() ? "Missing" : "OK") << "\n"
                         << "    Indices: " << (mesh->indices.empty() ? "Missing" : "OK") << "\n"
-                        << "    Normals: " << (mesh->normals.empty() ? "Missing" : "OK") << "\n"
+                        << "    Normals: " << (tempNormals.empty() ? "Missing" : "OK") << "\n"
                         << "    TexCoords: " << (mesh->uvs.empty() ? "Missing" : "OK") << "\n";
                 std::cerr << warningMsg.str() << "\n";
                 meshes.clear();
@@ -324,10 +369,10 @@ bool parseAccessors(
                 size_t tangentIdx = attributeJson["TANGENT"];
                 const auto& tangentAccessor = accessorsJson[tangentIdx];
                 size_t tangentBufferViewIdx = tangentAccessor["bufferView"];
-                parseAccessorData(tangentAccessor, buffers, bufferViews[tangentBufferViewIdx], mesh->tangents);
+                parseAccessorData(tangentAccessor, buffers, bufferViews[tangentBufferViewIdx], tempTangents);
             } else {
                 std::cerr << "[Warning] Tangents not found for mesh, calculating...\n";
-                calculateTangentSpace(mesh);
+                calculateTangentSpace(mesh, tempNormals, tempTangents);
                 std::cout << "[Info] Done.\n";
             }
 
@@ -338,6 +383,7 @@ bool parseAccessors(
             }
 
             // Store the mesh and its corresponding material index
+            packNormalTangents(mesh, tempNormals, tempTangents);
             meshes.push_back(mesh);
             materialIndices.push_back(materialIndex);
         }
@@ -346,9 +392,9 @@ bool parseAccessors(
     return !meshes.empty();
 }
 
-void calculateTangentSpace(Mesh* mesh) {
+void calculateTangentSpace(Mesh* mesh, std::vector<glm::vec3>& normals, std::vector<glm::vec4>& tangents) {
     size_t vertexCount = mesh->vertices.size();
-    mesh->tangents.resize(vertexCount, glm::vec4(0.0f));
+    tangents.resize(vertexCount, glm::vec4(0.0f));
 
     std::vector<glm::vec3> accumulatedTangents(vertexCount, glm::vec3(0.0f));
     std::vector<glm::vec3> accumulatedBitangents(vertexCount, glm::vec3(0.0f));
@@ -390,7 +436,7 @@ void calculateTangentSpace(Mesh* mesh) {
     }
 
     for (size_t i = 0; i < vertexCount; ++i) {
-        glm::vec3& n = mesh->normals[i];
+        glm::vec3& n = normals[i];
         glm::vec3 t = accumulatedTangents[i];
         glm::vec3 b = accumulatedBitangents[i];
 
@@ -400,7 +446,7 @@ void calculateTangentSpace(Mesh* mesh) {
         // Calculate handedness
         float w = (glm::dot(glm::cross(n, t), b) < 0.0f) ? -1.0f : 1.0f;
 
-        mesh->tangents[i] = glm::vec4(t, w);
+        tangents[i] = glm::vec4(t, w);
     }
 }
 
@@ -643,18 +689,26 @@ void loadMaterials(const json& gltfDoc, std::vector<Mesh*>& meshes, const std::v
 
 template <typename T>
 void unpackData(const uint8_t* dataPtr, int componentType, int vecSize, T& target) {
-    // Handle scalar values (for indices)
     if constexpr (std::is_same_v<T, uint32_t>) {
         switch (componentType) {
-            case 5121: // UNSIGNED_BYTE
-                target = static_cast<uint32_t>(*dataPtr);
+            case 5121: { // UNSIGNED_BYTE
+                uint8_t value;
+                std::memcpy(&value, dataPtr, sizeof(uint8_t));
+                target = static_cast<uint32_t>(value);
                 break;
-            case 5123: // UNSIGNED_SHORT
-                target = static_cast<uint32_t>(*reinterpret_cast<const uint16_t*>(dataPtr));
+            }
+            case 5123: { // UNSIGNED_SHORT
+                uint16_t value;
+                std::memcpy(&value, dataPtr, sizeof(uint16_t));
+                target = static_cast<uint32_t>(value);
                 break;
-            case 5125: // UNSIGNED_INT
-                target = *reinterpret_cast<const uint32_t*>(dataPtr);
+            }
+            case 5125: { // UNSIGNED_INT
+                uint32_t value;
+                std::memcpy(&value, dataPtr, sizeof(uint32_t));
+                target = value;
                 break;
+            }
             default:
                 std::cerr << "Unsupported component type for indices: " << componentType << "\n";
                 break;
@@ -662,61 +716,55 @@ void unpackData(const uint8_t* dataPtr, int componentType, int vecSize, T& targe
         return;
     }
 
-    // Vector types (vec2, vec3, vec4)
     if constexpr (std::is_same_v<T, glm::vec2> || std::is_same_v<T, glm::vec3> || std::is_same_v<T, glm::vec4>) {
-        float values[4] = {0.0f, 0.0f, 0.0f, 1.0f}; // Default w=1.0 for vec4
-        float normFactor = 1.0f;
-        bool shouldNormalize = false;
+        float values[4] = {0.0f, 0.0f, 0.0f, 1.0f}; // default w = 1.0f
 
-        // Extract raw values first
         switch (componentType) {
             case 5120: { // BYTE
-                const int8_t* typedPtr = reinterpret_cast<const int8_t*>(dataPtr);
-                for (int i = 0; i < vecSize; i++) {
-                    values[i] = static_cast<float>(typedPtr[i]);
+                for (int i = 0; i < vecSize; ++i) {
+                    int8_t temp;
+                    std::memcpy(&temp, dataPtr + i * sizeof(int8_t), sizeof(int8_t));
+                    values[i] = static_cast<float>(temp);
                 }
-                normFactor = 127.0f;
-                shouldNormalize = true;
                 break;
             }
             case 5121: { // UNSIGNED_BYTE
-                const uint8_t* typedPtr = dataPtr;
-                for (int i = 0; i < vecSize; i++) {
-                    values[i] = static_cast<float>(typedPtr[i]);
+                for (int i = 0; i < vecSize; ++i) {
+                    uint8_t temp;
+                    std::memcpy(&temp, dataPtr + i * sizeof(uint8_t), sizeof(uint8_t));
+                    values[i] = static_cast<float>(temp);
                 }
-                normFactor = 255.0f;
-                shouldNormalize = true;
                 break;
             }
             case 5122: { // SHORT
-                const int16_t* typedPtr = reinterpret_cast<const int16_t*>(dataPtr);
-                for (int i = 0; i < vecSize; i++) {
-                    values[i] = static_cast<float>(typedPtr[i]);
+                for (int i = 0; i < vecSize; ++i) {
+                    int16_t temp;
+                    std::memcpy(&temp, dataPtr + i * sizeof(int16_t), sizeof(int16_t));
+                    values[i] = static_cast<float>(temp);
                 }
-                normFactor = 32767.0f;
-                shouldNormalize = true;
                 break;
             }
             case 5123: { // UNSIGNED_SHORT
-                const uint16_t* typedPtr = reinterpret_cast<const uint16_t*>(dataPtr);
-                for (int i = 0; i < vecSize; i++) {
-                    values[i] = static_cast<float>(typedPtr[i]);
-                }
-                normFactor = 65535.0f;
-                shouldNormalize = true;
-                break;
-            }
-            case 5125: { // UNSIGNED_INT - no normalization for vertex data
-                const uint32_t* typedPtr = reinterpret_cast<const uint32_t*>(dataPtr);
-                for (int i = 0; i < vecSize; i++) {
-                    values[i] = static_cast<float>(typedPtr[i]);
+                for (int i = 0; i < vecSize; ++i) {
+                    uint16_t temp;
+                    std::memcpy(&temp, dataPtr + i * sizeof(uint16_t), sizeof(uint16_t));
+                    values[i] = static_cast<float>(temp);
                 }
                 break;
             }
-            case 5126: { // FLOAT - direct copy
-                const float* typedPtr = reinterpret_cast<const float*>(dataPtr);
-                for (int i = 0; i < vecSize; i++) {
-                    values[i] = typedPtr[i];
+            case 5125: { // UNSIGNED_INT
+                for (int i = 0; i < vecSize; ++i) {
+                    uint32_t temp;
+                    std::memcpy(&temp, dataPtr + i * sizeof(uint32_t), sizeof(uint32_t));
+                    values[i] = static_cast<float>(temp);
+                }
+                break;
+            }
+            case 5126: { // FLOAT
+                for (int i = 0; i < vecSize; ++i) {
+                    float temp;
+                    std::memcpy(&temp, dataPtr + i * sizeof(float), sizeof(float));
+                    values[i] = temp;
                 }
                 break;
             }
@@ -725,21 +773,6 @@ void unpackData(const uint8_t* dataPtr, int componentType, int vecSize, T& targe
                 break;
         }
 
-        // Apply normalization after extraction (if needed)
-        if (shouldNormalize) {
-            for (int i = 0; i < vecSize; i++) {
-                // Handle signed vs unsigned normalization
-                if (componentType == 5120 || componentType == 5122) {
-                    // Signed types normalize to [-1, 1]
-                    values[i] = std::max(values[i] / normFactor, -1.0f);
-                } else {
-                    // Unsigned types normalize to [0, 1]
-                    values[i] = values[i] / normFactor;
-                }
-            }
-        }
-
-        // Assign the values to the appropriate vector type
         if constexpr (std::is_same_v<T, glm::vec2>) {
             target = glm::vec2(values[0], values[1]);
         } else if constexpr (std::is_same_v<T, glm::vec3>) {

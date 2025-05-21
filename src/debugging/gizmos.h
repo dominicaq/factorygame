@@ -3,10 +3,27 @@
 
 #include "../components/mesh.h"
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include <vector>
 
 namespace Gizmos {
+
+// Helper function to pack normal and tangent into a quaternion
+static glm::quat packNormalTangent(const glm::vec3& normal, const glm::vec3& tangent) {
+    // Normalize inputs
+    glm::vec3 n = glm::normalize(normal);
+    glm::vec3 t = glm::normalize(tangent);
+
+    // Compute bitangent
+    glm::vec3 b = glm::cross(n, t);
+
+    // Create orthonormal basis matrix
+    glm::mat3 tbn(t, b, n);
+
+    // Convert to quaternion
+    return glm::quat_cast(tbn);
+}
 
 static Mesh* createCube() {
     Mesh* mesh = new Mesh();
@@ -43,15 +60,23 @@ static Mesh* createCube() {
     mesh->indices.push_back(2); mesh->indices.push_back(6);
     mesh->indices.push_back(3); mesh->indices.push_back(7);
 
-    // Set normals (pointing outward for each vertex)
-    mesh->normals.push_back(glm::vec3(-1.0f, -1.0f, -1.0f));
-    mesh->normals.push_back(glm::vec3(1.0f, -1.0f, -1.0f));
-    mesh->normals.push_back(glm::vec3(1.0f, -1.0f, 1.0f));
-    mesh->normals.push_back(glm::vec3(-1.0f, -1.0f, 1.0f));
-    mesh->normals.push_back(glm::vec3(-1.0f, 1.0f, -1.0f));
-    mesh->normals.push_back(glm::vec3(1.0f, 1.0f, -1.0f));
-    mesh->normals.push_back(glm::vec3(1.0f, 1.0f, 1.0f));
-    mesh->normals.push_back(glm::vec3(-1.0f, 1.0f, 1.0f));
+    // Pack normals and tangents into quaternions
+    std::vector<glm::vec3> normals = {
+        glm::vec3(-1.0f, -1.0f, -1.0f),
+        glm::vec3(1.0f, -1.0f, -1.0f),
+        glm::vec3(1.0f, -1.0f, 1.0f),
+        glm::vec3(-1.0f, -1.0f, 1.0f),
+        glm::vec3(-1.0f, 1.0f, -1.0f),
+        glm::vec3(1.0f, 1.0f, -1.0f),
+        glm::vec3(1.0f, 1.0f, 1.0f),
+        glm::vec3(-1.0f, 1.0f, 1.0f)
+    };
+
+    for (size_t i = 0; i < normals.size(); i++) {
+        glm::vec3 tangent(1.0f, 0.0f, 0.0f);
+        glm::quat packed = packNormalTangent(normals[i], tangent);
+        mesh->packedNormalTangents.push_back(glm::vec4(packed.x, packed.y, packed.z, packed.w));
+    }
 
     // Set UVs
     mesh->uvs.push_back(glm::vec2(0.0f, 0.0f));
@@ -62,12 +87,6 @@ static Mesh* createCube() {
     mesh->uvs.push_back(glm::vec2(1.0f, 0.0f));
     mesh->uvs.push_back(glm::vec2(1.0f, 1.0f));
     mesh->uvs.push_back(glm::vec2(0.0f, 1.0f));
-
-    // Generate tangents
-    mesh->tangents.resize(mesh->vertices.size(), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-
-    // Set wireframe flag to true
-    mesh->wireframe = true;
 
     return mesh;
 }
@@ -94,9 +113,14 @@ static Mesh* createSquare() {
     mesh->indices.push_back(2);
     mesh->indices.push_back(3);
 
-    // Set normals (all pointing in +Z direction)
+    // Pack normals and tangents into quaternions (all pointing in +Z direction)
+    glm::vec3 normal(0.0f, 0.0f, 1.0f);
+    glm::vec3 tangent(1.0f, 0.0f, 0.0f);
+    glm::quat packed = packNormalTangent(normal, tangent);
+    glm::vec4 packedVec4(packed.x, packed.y, packed.z, packed.w);
+
     for (size_t i = 0; i < mesh->vertices.size(); i++) {
-        mesh->normals.push_back(glm::vec3(0.0f, 0.0f, 1.0f));
+        mesh->packedNormalTangents.push_back(packedVec4);
     }
 
     // Set UVs
@@ -104,12 +128,6 @@ static Mesh* createSquare() {
     mesh->uvs.push_back(glm::vec2(1.0f, 0.0f));  // Bottom right
     mesh->uvs.push_back(glm::vec2(1.0f, 1.0f));  // Top right
     mesh->uvs.push_back(glm::vec2(0.0f, 1.0f));  // Top left
-
-    // Initialize tangents as vec4 (1,0,0) with w = +1 (handedness)
-    mesh->tangents.resize(mesh->vertices.size(), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-
-    // Set wireframe flag
-    mesh->wireframe = true;
 
     return mesh;
 }
@@ -132,9 +150,6 @@ static Mesh* createPlane(float width = 1.0f, float length = 1.0f, int widthSegme
 
             // Position
             mesh->vertices.push_back(glm::vec3(xPos, 0.0f, zPos));
-
-            // Normal (pointing up)
-            mesh->normals.push_back(glm::vec3(0.0f, 1.0f, 0.0f));
 
             // UV
             mesh->uvs.push_back(glm::vec2(
@@ -164,11 +179,15 @@ static Mesh* createPlane(float width = 1.0f, float length = 1.0f, int widthSegme
         }
     }
 
-    // Generate tangents and bitangents
-    mesh->tangents.resize(mesh->vertices.size(), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    // Pack normals and tangents into quaternions (normal pointing up, tangent along X)
+    glm::vec3 normal(0.0f, 1.0f, 0.0f);
+    glm::vec3 tangent(1.0f, 0.0f, 0.0f);
+    glm::quat packed = packNormalTangent(normal, tangent);
+    glm::vec4 packedVec4(packed.x, packed.y, packed.z, packed.w);
 
-    // Set wireframe flag
-    mesh->wireframe = true;
+    for (size_t i = 0; i < mesh->vertices.size(); i++) {
+        mesh->packedNormalTangents.push_back(packedVec4);
+    }
 
     return mesh;
 }
@@ -197,26 +216,25 @@ static Mesh* createGrid(float size = 10.0f, int divisions = 10) {
         mesh->vertices.push_back(glm::vec3(pos, 0.0f, halfSize));
     }
 
-    // Set normals
-    for (size_t i = 0; i < mesh->vertices.size(); i++) {
-        mesh->normals.push_back(glm::vec3(0.0f, 1.0f, 0.0f));
-    }
-
     // Create indices (for lines)
     for (unsigned int i = 0; i < mesh->vertices.size(); i++) {
         mesh->indices.push_back(i);
     }
 
-    // Add UVs (not really needed for wireframes, but our renderer might need them)
+    // Pack normals and tangents into quaternions
+    glm::vec3 normal(0.0f, 1.0f, 0.0f);
+    glm::vec3 tangent(1.0f, 0.0f, 0.0f);
+    glm::quat packed = packNormalTangent(normal, tangent);
+    glm::vec4 packedVec4(packed.x, packed.y, packed.z, packed.w);
+
+    for (size_t i = 0; i < mesh->vertices.size(); i++) {
+        mesh->packedNormalTangents.push_back(packedVec4);
+    }
+
+    // Add UVs (not really needed for wireframes, but might be expected)
     for (size_t i = 0; i < mesh->vertices.size(); i++) {
         mesh->uvs.push_back(glm::vec2(0.0f, 0.0f));
     }
-
-    // Generate tangents
-    mesh->tangents.resize(mesh->vertices.size(), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-
-    // Set wireframe flag
-    mesh->wireframe = true;
 
     return mesh;
 }
@@ -245,26 +263,26 @@ static Mesh* createAxis(float size = 1.0f) {
         mesh->indices.push_back(i);
     }
 
-    // Set normals (not really needed for lines, but our renderer expects them)
-    mesh->normals.push_back(glm::vec3(1.0f, 0.0f, 0.0f));  // X axis
-    mesh->normals.push_back(glm::vec3(1.0f, 0.0f, 0.0f));
+    // Pack normals and tangents into quaternions
+    // X axis vertices
+    glm::quat xAxisPacked = packNormalTangent(glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    mesh->packedNormalTangents.push_back(glm::vec4(xAxisPacked.x, xAxisPacked.y, xAxisPacked.z, xAxisPacked.w));
+    mesh->packedNormalTangents.push_back(glm::vec4(xAxisPacked.x, xAxisPacked.y, xAxisPacked.z, xAxisPacked.w));
 
-    mesh->normals.push_back(glm::vec3(0.0f, 1.0f, 0.0f));  // Y axis
-    mesh->normals.push_back(glm::vec3(0.0f, 1.0f, 0.0f));
+    // Y axis vertices
+    glm::quat yAxisPacked = packNormalTangent(glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    mesh->packedNormalTangents.push_back(glm::vec4(yAxisPacked.x, yAxisPacked.y, yAxisPacked.z, yAxisPacked.w));
+    mesh->packedNormalTangents.push_back(glm::vec4(yAxisPacked.x, yAxisPacked.y, yAxisPacked.z, yAxisPacked.w));
 
-    mesh->normals.push_back(glm::vec3(0.0f, 0.0f, 1.0f));  // Z axis
-    mesh->normals.push_back(glm::vec3(0.0f, 0.0f, 1.0f));
+    // Z axis vertices
+    glm::quat zAxisPacked = packNormalTangent(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    mesh->packedNormalTangents.push_back(glm::vec4(zAxisPacked.x, zAxisPacked.y, zAxisPacked.z, zAxisPacked.w));
+    mesh->packedNormalTangents.push_back(glm::vec4(zAxisPacked.x, zAxisPacked.y, zAxisPacked.z, zAxisPacked.w));
 
     // Add UVs (not really needed for lines)
     for (size_t i = 0; i < mesh->vertices.size(); i++) {
         mesh->uvs.push_back(glm::vec2(0.0f, 0.0f));
     }
-
-    // Generate tangents and bitangents
-     mesh->tangents.resize(mesh->vertices.size(), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-
-    // Set wireframe flag
-    mesh->wireframe = true;
 
     return mesh;
 }

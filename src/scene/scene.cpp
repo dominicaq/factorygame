@@ -169,77 +169,77 @@ void Scene::loadScene() {
     }
 
     // --------------------- Diablo Model ---------------------
-    // entt::entity diabloEntity = registry.create();
-    // SceneData save_diabloData;
-    // save_diabloData.name = "Diablo";
-    // save_diabloData.position = glm::vec3(0.0f, 3.0f, 0.0f);
-    // save_diabloData.scale = glm::vec3(3.0f);
-    // GameObject* diabloObject = SceneUtils::addGameObjectComponent(registry, diabloEntity, save_diabloData);
-    // diabloObject->addScript<MoveScript>();
+    entt::entity diabloEntity = registry.create();
+    SceneData save_diabloData;
+    save_diabloData.name = "Diablo";
+    save_diabloData.position = glm::vec3(0.0f, 3.0f, 0.0f);
+    save_diabloData.scale = glm::vec3(3.0f);
+    GameObject* diabloObject = SceneUtils::addGameObjectComponent(registry, diabloEntity, save_diabloData);
+    diabloObject->addScript<MoveScript>();
 
-    // Mesh* diabloMesh = ResourceLoader::loadMesh(MODEL_DIR + "/diablo3_pose.obj");
-    // if (diabloMesh != nullptr) {
-    //     Material* diabloMaterial = new Material(basicShader);
-    //     diabloMaterial->albedoColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-    //     diabloMaterial->isDeferred = true;
+    Mesh* diabloMesh = ResourceLoader::loadMesh(MODEL_DIR + "/diablo3_pose.obj");
+    if (diabloMesh != nullptr) {
+        Material* diabloMaterial = new Material(basicShader);
+        diabloMaterial->albedoColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        diabloMaterial->isDeferred = true;
 
-    //     Texture* diabloAlbedoMap = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_diffuse.tga");
-    //     diabloMaterial->albedoMap = diabloAlbedoMap;
+        Texture* diabloAlbedoMap = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_diffuse.tga");
+        diabloMaterial->albedoMap = diabloAlbedoMap;
 
-    //     Texture* diabloNormalMap = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_nm_tangent.tga");
-    //     diabloMaterial->normalMap = diabloNormalMap;
+        Texture* diabloNormalMap = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_nm_tangent.tga");
+        diabloMaterial->normalMap = diabloNormalMap;
 
-    //     diabloMesh->material = diabloMaterial;
-    //     registry.emplace<Mesh*>(diabloEntity, diabloMesh);
-    // }
+        diabloMesh->material = diabloMaterial;
+        registry.emplace<Mesh*>(diabloEntity, diabloMesh);
+    }
 
     /*
     * glTF Game Objects
     */
-    // auto gltfLoadStart = std::chrono::high_resolution_clock::now();
-    // auto gltfLoadEnd = std::chrono::high_resolution_clock::now();
-    // std::chrono::duration<double> gltfLoadElasped;
+    auto gltfLoadStart = std::chrono::high_resolution_clock::now();
+    auto gltfLoadEnd = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> gltfLoadElasped;
 
-    // gltfLoadStart = std::chrono::high_resolution_clock::now();
-    // GameObject* helmetObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf");
-    // if (helmetObj) {
-    //     helmetObj->setScale(glm::vec3(1.0f));
-    //     helmetObj->setPosition(glm::vec3(0.0f, 5.0f, -5.0f));
-    //     helmetObj->setEuler(glm::vec3(90,0,0));
-    //     // helmetObj->addScript<MoveScript>();
-    // }
-    // gltfLoadEnd = std::chrono::high_resolution_clock::now();
-    // gltfLoadElasped = gltfLoadEnd - gltfLoadStart;
-    // std::cout << "createMeshGameObject(Helmet) took " << gltfLoadElasped.count() << " seconds.\n";
+    gltfLoadStart = std::chrono::high_resolution_clock::now();
+    GameObject* helmetObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf");
+    if (helmetObj) {
+        helmetObj->setScale(glm::vec3(1.0f));
+        helmetObj->setPosition(glm::vec3(0.0f, 5.0f, -5.0f));
+        helmetObj->setEuler(glm::vec3(90,0,0));
+        // helmetObj->addScript<MoveScript>();
+    }
+    gltfLoadEnd = std::chrono::high_resolution_clock::now();
+    gltfLoadElasped = gltfLoadEnd - gltfLoadStart;
+    std::cout << "createMeshGameObject(Helmet) took " << gltfLoadElasped.count() << " seconds.\n";
 
-    // GameObject* dragonObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "dragon/dragon.gltf");
-    // if (dragonObj) {
-    //     dragonObj->setScale(glm::vec3(0.5f));
-    //     dragonObj->setPosition(glm::vec3(10.0f, -0.5f, 2.5f));
-    // }
+    GameObject* dragonObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "dragon/dragon.gltf");
+    if (dragonObj) {
+        dragonObj->setScale(glm::vec3(0.5f));
+        dragonObj->setPosition(glm::vec3(10.0f, -0.5f, 2.5f));
+    }
 
-    // GameObject* laternObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf");
-    // if (laternObj) {
-    //     laternObj->setScale(glm::vec3(0.5f));
-    //     laternObj->setPosition(glm::vec3(10.0f, -0.25f, -2.5f));
-    //     laternObj->addScript<MoveScript>();
-    // }
+    GameObject* laternObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf");
+    if (laternObj) {
+        laternObj->setScale(glm::vec3(0.5f));
+        laternObj->setPosition(glm::vec3(10.0f, -0.25f, -2.5f));
+        laternObj->addScript<MoveScript>();
+    }
 
-    // GameObject* boomBox = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/BoomBox/glTF/BoomBox.gltf");
-    // if (boomBox) {
-    //     boomBox->setScale(glm::vec3(100.0f));
-    //     boomBox->setPosition(glm::vec3(0.0f, 15.0f, -5.0f));
-    // }
+    GameObject* boomBox = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/BoomBox/glTF/BoomBox.gltf");
+    if (boomBox) {
+        boomBox->setScale(glm::vec3(100.0f));
+        boomBox->setPosition(glm::vec3(0.0f, 15.0f, -5.0f));
+    }
 
-    // gltfLoadStart = std::chrono::high_resolution_clock::now();
-    // GameObject* romanObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Sponza/glTF/Sponza.gltf");
-    // if (romanObj) {
-    //     romanObj->setScale(glm::vec3(0.0003f));
-    //     romanObj->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
-    // }
-    // gltfLoadEnd = std::chrono::high_resolution_clock::now();
-    // std::chrono::duration<double> elapsed = gltfLoadEnd - gltfLoadStart;
-    // std::cout << "createMeshGameObject(Sponza) took " << elapsed.count() << " seconds.\n";
+    gltfLoadStart = std::chrono::high_resolution_clock::now();
+    GameObject* romanObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Sponza/glTF/Sponza.gltf");
+    if (romanObj) {
+        romanObj->setScale(glm::vec3(0.0003f));
+        romanObj->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+    }
+    gltfLoadEnd = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = gltfLoadEnd - gltfLoadStart;
+    std::cout << "createMeshGameObject(Sponza) took " << elapsed.count() << " seconds.\n";
 
     // --------------------- Dummy Entity (global scripts) ------------------
     entt::entity dummyEntity = registry.create();

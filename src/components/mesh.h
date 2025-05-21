@@ -6,27 +6,6 @@
 
 #include "../renderer/material.h"
 
-struct MeshIntermediate {
-    std::vector<glm::vec3> vertices;
-    std::vector<glm::vec3> normals;
-    std::vector<glm::vec4> tangents;
-    std::vector<glm::vec2> uvs;
-    std::vector<uint32_t> indices;
-
-    void clearData() {
-        vertices.clear();
-        uvs.clear();
-        normals.clear();
-        indices.clear();
-
-        // Resize vectors to zero
-        vertices.shrink_to_fit();
-        uvs.shrink_to_fit();
-        normals.shrink_to_fit();
-        indices.shrink_to_fit();
-    }
-};
-
 struct MeshInstance {
     uint32_t materialIndex = 0xFFFFFFFF;
     uint8_t id;
@@ -51,24 +30,22 @@ struct Mesh {
     bool wireframe = false;
 
     // Raw mesh data (TO BE WIPED)
+    std::vector<glm::vec4> packedNormalTangents;
     std::vector<glm::vec3> vertices;
-    std::vector<glm::vec3> normals;
-    std::vector<glm::vec4> tangents;
-    std::vector<glm::vec2> uvs;
     std::vector<uint32_t> indices;
+    std::vector<glm::vec2> uvs;
     Material* material = nullptr;
 
     // Method to clear CPU-side mesh data
     void clearData() {
         vertices.clear();
         uvs.clear();
-        normals.clear();
-        indices.clear();
+        packedNormalTangents.clear();
 
         // Resize vectors to zero
         vertices.shrink_to_fit();
         uvs.shrink_to_fit();
-        normals.shrink_to_fit();
+        packedNormalTangents.shrink_to_fit();
         indices.shrink_to_fit();
     }
 };

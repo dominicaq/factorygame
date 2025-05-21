@@ -9,7 +9,6 @@ namespace MeshGen {
     Mesh* createSphere(unsigned int sectorCount, unsigned int stackCount);
     Mesh* createPlane(unsigned int resolutionX, unsigned int resolutionY, float width, float height);
     Mesh* createCapsule(float radius, float height, int sectors, int stacks);
-    void computeTangentBasis(Mesh* mesh);
+    void computePackedNormalTangents(Mesh* mesh);
     const float* createCubeMapVerts();
 }
-
