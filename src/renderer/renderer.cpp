@@ -285,7 +285,7 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic, size_t instanceID) {
         return;
     }
 
-    if (mesh->uvs.empty() || mesh->packedNormalTangents.empty()) {
+    if (mesh->uvs.empty() || mesh->packedTNBFrame.empty()) {
         std::cerr << "[Error] Renderer::initMeshBuffers: UVs, normals, and tangent space must be provided.\n";
         return;
     }
@@ -311,24 +311,25 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic, size_t instanceID) {
     glGenVertexArrays(1, &data.VAO);
     glBindVertexArray(data.VAO);
 
-    // Build mesh buffer data (9 floats per vertex)
+    // Build mesh buffer data (8 floats per vertex)
     std::vector<float> bufferData;
     size_t numVertices = mesh->vertices.size();
-    bufferData.reserve(numVertices * 9);
-
+    bufferData.reserve(numVertices * 8);
     for (size_t i = 0; i < numVertices; ++i) {
         // Positions (3)
         bufferData.push_back(mesh->vertices[i].x);
         bufferData.push_back(mesh->vertices[i].y);
         bufferData.push_back(mesh->vertices[i].z);
-        // UVs (2)
-        bufferData.push_back(mesh->uvs[i].x);
-        bufferData.push_back(mesh->uvs[i].y);
-        // Packed Normal & Tangent (4)
-        bufferData.push_back(mesh->packedNormalTangents[i].x);
-        bufferData.push_back(mesh->packedNormalTangents[i].y);
-        bufferData.push_back(mesh->packedNormalTangents[i].z);
-        bufferData.push_back(mesh->packedNormalTangents[i].w);
+        // UVs (1) Packed UVs into position.w
+        uint16_t u = static_cast<uint16_t>(mesh->uvs[i].x * 65535.0f);
+        uint16_t v = static_cast<uint16_t>(mesh->uvs[i].y * 65535.0f);
+        uint32_t packedUV = (static_cast<uint32_t>(v) << 16) | u;
+        bufferData.push_back(*reinterpret_cast<float*>(&packedUV));
+        // Packed Normal & Tangent frame (4)
+        bufferData.push_back(mesh->packedTNBFrame[i].x);
+        bufferData.push_back(mesh->packedTNBFrame[i].y);
+        bufferData.push_back(mesh->packedTNBFrame[i].z);
+        bufferData.push_back(mesh->packedTNBFrame[i].w);
     }
 
     glGenBuffers(1, &data.VBO);
@@ -347,15 +348,12 @@ void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic, size_t instanceID) {
         data.vertexCount = static_cast<GLsizei>(mesh->vertices.size());
     }
 
-    // Vertex attribute pointers (using 9 floats per vertex)
+    // Vertex attribute pointers (using 8 floats per vertex)
     glEnableVertexAttribArray(0); // Position
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
 
-    glEnableVertexAttribArray(1); // UV
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(3 * sizeof(float)));
-
-    glEnableVertexAttribArray(2); // Normal and Tangents
-    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(5 * sizeof(float)));
+    glEnableVertexAttribArray(1); // Normal and Tangents
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(4 * sizeof(float)));
 
     glBindVertexArray(0);
 
@@ -589,7 +587,7 @@ void Renderer::applyHeightMapCompute(Mesh* mesh) {
     }
 
     // Make sure we have normals
-    if (mesh->packedNormalTangents.size() != mesh->vertices.size()) {
+    if (mesh->packedTNBFrame.size() != mesh->vertices.size()) {
         std::cerr << "[Error] Cannot apply height map: mesh is missing normals\n";
         return;
     }

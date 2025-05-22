@@ -75,7 +75,7 @@ static Mesh* createCube() {
     for (size_t i = 0; i < normals.size(); i++) {
         glm::vec3 tangent(1.0f, 0.0f, 0.0f);
         glm::quat packed = packNormalTangent(normals[i], tangent);
-        mesh->packedNormalTangents.push_back(glm::vec4(packed.x, packed.y, packed.z, packed.w));
+        mesh->packedTNBFrame.push_back(glm::vec4(packed.x, packed.y, packed.z, packed.w));
     }
 
     // Set UVs
@@ -120,7 +120,7 @@ static Mesh* createSquare() {
     glm::vec4 packedVec4(packed.x, packed.y, packed.z, packed.w);
 
     for (size_t i = 0; i < mesh->vertices.size(); i++) {
-        mesh->packedNormalTangents.push_back(packedVec4);
+        mesh->packedTNBFrame.push_back(packedVec4);
     }
 
     // Set UVs
@@ -186,7 +186,7 @@ static Mesh* createPlane(float width = 1.0f, float length = 1.0f, int widthSegme
     glm::vec4 packedVec4(packed.x, packed.y, packed.z, packed.w);
 
     for (size_t i = 0; i < mesh->vertices.size(); i++) {
-        mesh->packedNormalTangents.push_back(packedVec4);
+        mesh->packedTNBFrame.push_back(packedVec4);
     }
 
     return mesh;
@@ -228,7 +228,7 @@ static Mesh* createGrid(float size = 10.0f, int divisions = 10) {
     glm::vec4 packedVec4(packed.x, packed.y, packed.z, packed.w);
 
     for (size_t i = 0; i < mesh->vertices.size(); i++) {
-        mesh->packedNormalTangents.push_back(packedVec4);
+        mesh->packedTNBFrame.push_back(packedVec4);
     }
 
     // Add UVs (not really needed for wireframes, but might be expected)
@@ -266,18 +266,18 @@ static Mesh* createAxis(float size = 1.0f) {
     // Pack normals and tangents into quaternions
     // X axis vertices
     glm::quat xAxisPacked = packNormalTangent(glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    mesh->packedNormalTangents.push_back(glm::vec4(xAxisPacked.x, xAxisPacked.y, xAxisPacked.z, xAxisPacked.w));
-    mesh->packedNormalTangents.push_back(glm::vec4(xAxisPacked.x, xAxisPacked.y, xAxisPacked.z, xAxisPacked.w));
+    mesh->packedTNBFrame.push_back(glm::vec4(xAxisPacked.x, xAxisPacked.y, xAxisPacked.z, xAxisPacked.w));
+    mesh->packedTNBFrame.push_back(glm::vec4(xAxisPacked.x, xAxisPacked.y, xAxisPacked.z, xAxisPacked.w));
 
     // Y axis vertices
     glm::quat yAxisPacked = packNormalTangent(glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    mesh->packedNormalTangents.push_back(glm::vec4(yAxisPacked.x, yAxisPacked.y, yAxisPacked.z, yAxisPacked.w));
-    mesh->packedNormalTangents.push_back(glm::vec4(yAxisPacked.x, yAxisPacked.y, yAxisPacked.z, yAxisPacked.w));
+    mesh->packedTNBFrame.push_back(glm::vec4(yAxisPacked.x, yAxisPacked.y, yAxisPacked.z, yAxisPacked.w));
+    mesh->packedTNBFrame.push_back(glm::vec4(yAxisPacked.x, yAxisPacked.y, yAxisPacked.z, yAxisPacked.w));
 
     // Z axis vertices
     glm::quat zAxisPacked = packNormalTangent(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    mesh->packedNormalTangents.push_back(glm::vec4(zAxisPacked.x, zAxisPacked.y, zAxisPacked.z, zAxisPacked.w));
-    mesh->packedNormalTangents.push_back(glm::vec4(zAxisPacked.x, zAxisPacked.y, zAxisPacked.z, zAxisPacked.w));
+    mesh->packedTNBFrame.push_back(glm::vec4(zAxisPacked.x, zAxisPacked.y, zAxisPacked.z, zAxisPacked.w));
+    mesh->packedTNBFrame.push_back(glm::vec4(zAxisPacked.x, zAxisPacked.y, zAxisPacked.z, zAxisPacked.w));
 
     // Add UVs (not really needed for lines)
     for (size_t i = 0; i < mesh->vertices.size(); i++) {

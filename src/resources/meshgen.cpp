@@ -6,7 +6,7 @@
 void MeshGen::packTBNframe(Mesh* mesh, const std::vector<glm::vec3>& normals,
              const std::vector<glm::vec4>& tangents) {
     size_t count = std::min(normals.size(), tangents.size());
-    mesh->packedNormalTangents.reserve(mesh->packedNormalTangents.size() + count);
+    mesh->packedTNBFrame.reserve(mesh->packedTNBFrame.size() + count);
 
     constexpr int storageSize = 2; // sizeof(int16_t)
     constexpr float bias = 1.0f / ((1 << (storageSize * 8 - 1)) - 1);
@@ -59,7 +59,7 @@ void MeshGen::packTBNframe(Mesh* mesh, const std::vector<glm::vec3>& normals,
         }
 
         // Store packed quaternion
-        mesh->packedNormalTangents.push_back(glm::vec4(q.x, q.y, q.z, q.w));
+        mesh->packedTNBFrame.push_back(glm::vec4(q.x, q.y, q.z, q.w));
     }
 }
 
@@ -115,7 +115,7 @@ Mesh* MeshGen::createCube() {
     };
 
     // Generate packed normal-tangents
-    computePackedNormalTangents(cubeMesh);
+    computepackedTNBFrame(cubeMesh);
 
     return cubeMesh;
 }
@@ -146,7 +146,7 @@ Mesh* MeshGen::createQuad(float scale) {
     };
 
     // Generate packed normal-tangents
-    computePackedNormalTangents(quadMesh);
+    computepackedTNBFrame(quadMesh);
 
     return quadMesh;
 }
@@ -216,7 +216,7 @@ Mesh* MeshGen::createSphere(unsigned int sectorCount, unsigned int stackCount) {
     }
 
     // Generate packed normal-tangents
-    computePackedNormalTangents(sphere);
+    computepackedTNBFrame(sphere);
 
     return sphere;
 }
@@ -269,13 +269,13 @@ Mesh* MeshGen::createPlane(unsigned int resolutionX, unsigned int resolutionY, f
     }
 
     // Generate packed normal-tangents
-    computePackedNormalTangents(plane);
+    computepackedTNBFrame(plane);
 
     return plane;
 }
 
 // Helper function to compute packed normal-tangent quaternions
-void MeshGen::computePackedNormalTangents(Mesh* mesh) {
+void MeshGen::computepackedTNBFrame(Mesh* mesh) {
     size_t vertexCount = mesh->vertices.size();
 
     // Temporary storage for normals and tangents
@@ -382,8 +382,8 @@ void MeshGen::computePackedNormalTangents(Mesh* mesh) {
     }
 
     // Pack normals and tangents into quaternions
-    mesh->packedNormalTangents.clear();
-    mesh->packedNormalTangents.reserve(vertexCount);
+    mesh->packedTNBFrame.clear();
+    mesh->packedTNBFrame.reserve(vertexCount);
 
     packTBNframe(mesh, normals, tangents);
 }

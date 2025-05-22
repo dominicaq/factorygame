@@ -56,7 +56,7 @@ static void parseVertexString(const std::string& vertex_string, unsigned int& ve
 static unsigned int processVertex(VertexIdx& vi, OBJParseContext& ctx);
 static void parseOBJLine(const std::string& line, OBJParseContext& ctx);
 inline void generateUVs(Mesh* mesh);
-inline void computePackedNormalTangents(Mesh* mesh);
+inline void computepackedTNBFrame(Mesh* mesh);
 
 /*
 *  Main OBJ Loading
@@ -92,7 +92,7 @@ static Mesh* loadOBJ(const std::string& fileContent) {
         generateUVs(mesh);
     }
 
-    computePackedNormalTangents(mesh);
+    computepackedTNBFrame(mesh);
     return mesh;
 }
 
@@ -240,7 +240,7 @@ inline void generateUVs(Mesh* mesh) {
 inline void packTBNframe(Mesh* mesh, const std::vector<glm::vec3>& normals,
              const std::vector<glm::vec4>& tangents) {
     size_t count = std::min(normals.size(), tangents.size());
-    mesh->packedNormalTangents.reserve(mesh->packedNormalTangents.size() + count);
+    mesh->packedTNBFrame.reserve(mesh->packedTNBFrame.size() + count);
 
     constexpr int storageSize = 2; // sizeof(int16_t)
     constexpr float bias = 1.0f / ((1 << (storageSize * 8 - 1)) - 1);
@@ -293,11 +293,11 @@ inline void packTBNframe(Mesh* mesh, const std::vector<glm::vec3>& normals,
         }
 
         // Store packed quaternion
-        mesh->packedNormalTangents.push_back(glm::vec4(q.x, q.y, q.z, q.w));
+        mesh->packedTNBFrame.push_back(glm::vec4(q.x, q.y, q.z, q.w));
     }
 }
 
-void computePackedNormalTangents(Mesh* mesh) {
+void computepackedTNBFrame(Mesh* mesh) {
     size_t vertexCount = mesh->vertices.size();
 
     // Temporary storage for normals and tangents
@@ -404,8 +404,8 @@ void computePackedNormalTangents(Mesh* mesh) {
     }
 
     // Pack normals and tangents into quaternions
-    mesh->packedNormalTangents.clear();
-    mesh->packedNormalTangents.reserve(vertexCount);
+    mesh->packedTNBFrame.clear();
+    mesh->packedTNBFrame.reserve(vertexCount);
 
     packTBNframe(mesh, normals, tangents);
 }

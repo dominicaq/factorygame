@@ -30,7 +30,7 @@ struct Mesh {
     bool wireframe = false;
 
     // Raw mesh data (TO BE WIPED)
-    std::vector<glm::vec4> packedNormalTangents;
+    std::vector<glm::vec4> packedTNBFrame;
     std::vector<glm::vec3> vertices;
     std::vector<uint32_t> indices;
     std::vector<glm::vec2> uvs;
@@ -40,12 +40,12 @@ struct Mesh {
     void clearData() {
         vertices.clear();
         uvs.clear();
-        packedNormalTangents.clear();
+        packedTNBFrame.clear();
 
         // Resize vectors to zero
         vertices.shrink_to_fit();
         uvs.shrink_to_fit();
-        packedNormalTangents.shrink_to_fit();
+        packedTNBFrame.shrink_to_fit();
         indices.shrink_to_fit();
     }
 };

@@ -100,11 +100,18 @@ private:
     * Indirect draw buffers
     */
     struct DrawElementsIndirectCommand {
-        uint32_t count = 0;
-        uint32_t instanceCount = 0;
-        uint32_t firstIndex = 0;
-        uint32_t baseVertex = 0;
-        uint32_t baseInstance = 0;
+        GLuint count;         // Number of elements (indices) to draw
+        GLuint instanceCount; // Number of instances to draw
+        GLuint firstIndex;    // Base index within the index buffer
+        GLuint baseVertex;    // Value added to each index
+        GLuint baseInstance;  // Base instance for this draw command
+    };
+
+    struct DrawArraysIndirectCommand {
+        GLuint count;         // Number of vertices to draw
+        GLuint instanceCount; // Number of instances to draw
+        GLuint first;         // Starting vertex index
+        GLuint baseInstance;  // Base instance for this draw command
     };
 
     GLuint m_indirectBuffer = 0;

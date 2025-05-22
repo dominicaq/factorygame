@@ -96,7 +96,7 @@ size_t getComponentSize(int componentType) {
 void packTBNframe(Mesh* mesh, const std::vector<glm::vec3>& gltfNormals,
              const std::vector<glm::vec4>& gltfTangents) {
     size_t count = std::min(gltfNormals.size(), gltfTangents.size());
-    mesh->packedNormalTangents.reserve(mesh->packedNormalTangents.size() + count);
+    mesh->packedTNBFrame.reserve(mesh->packedTNBFrame.size() + count);
 
     constexpr int storageSize = 2; // sizeof(int16_t)
     constexpr float bias = 1.0f / ((1 << (storageSize * 8 - 1)) - 1);
@@ -149,7 +149,7 @@ void packTBNframe(Mesh* mesh, const std::vector<glm::vec3>& gltfNormals,
         }
 
         // Store packed quaternion
-        mesh->packedNormalTangents.push_back(glm::vec4(q.x, q.y, q.z, q.w));
+        mesh->packedTNBFrame.push_back(glm::vec4(q.x, q.y, q.z, q.w));
     }
 }
 

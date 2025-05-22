@@ -9,7 +9,7 @@ namespace MeshGen {
     Mesh* createSphere(unsigned int sectorCount, unsigned int stackCount);
     Mesh* createPlane(unsigned int resolutionX, unsigned int resolutionY, float width, float height);
     Mesh* createCapsule(float radius, float height, int sectors, int stacks);
-    void computePackedNormalTangents(Mesh* mesh);
+    void computepackedTNBFrame(Mesh* mesh);
     const float* createCubeMapVerts();
     void packTBNframe(Mesh* mesh, const std::vector<glm::vec3>& normals,
              const std::vector<glm::vec4>& tangents);

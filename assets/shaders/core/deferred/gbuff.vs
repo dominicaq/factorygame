@@ -1,7 +1,6 @@
 #version 460 core
-layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec2 aTexCoords;
-layout (location = 2) in vec4 aPackedNormalTangent;
+layout(location = 0) in vec4 aPosition;  // xyz = position, w = packed UVs
+layout(location = 1) in vec4 aPackedTNB;
 
 // Instance matrix block (SSBO)
 layout (std430, binding = 0) buffer InstanceMatrices {
@@ -44,12 +43,20 @@ vec3 unpackTangent(vec4 q) {
 
 void main() {
     mat4 modelMatrix = (gl_InstanceID > 0) ? models[gl_InstanceID - 1] : u_Model;
+    vec3 position = aPosition.xyz;
 
-    FragPos = vec3(modelMatrix * vec4(aPos, 1.0));
-    TexCoords = aTexCoords * u_uvScale;
+    // Unpack UVs from position.w
+    uint packedUV = floatBitsToUint(aPosition.w);
+    vec2 uv = vec2(
+        float(packedUV & 0xFFFFu) / 65535.0,
+        float(packedUV >> 16) / 65535.0
+    );
+
+    FragPos = vec3(modelMatrix * vec4(position, 1.0));
+    TexCoords = uv * u_uvScale;
 
     // Normalize the packed quaternion
-    vec4 q = normalize(aPackedNormalTangent);
+    vec4 q = normalize(aPackedTNB);
 
     // Ensure consistent handedness
     if (q.w < 0.0) {
