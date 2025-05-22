@@ -53,16 +53,15 @@ vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir) {
     vec2 currentTexCoords = texCoords;
     float currentDepthMapValue = texture(u_HeightMap, currentTexCoords).r;
 
-    // Flip heightmap interpretation
-    while (currentLayerDepth < (1.0 - currentDepthMapValue)) {
+    while (currentLayerDepth < currentDepthMapValue) {
         currentTexCoords -= deltaTexCoords;
         currentDepthMapValue = texture(u_HeightMap, currentTexCoords).r;
         currentLayerDepth += layerDepth;
     }
 
     vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
-    float afterDepth = (1.0 - currentDepthMapValue) - currentLayerDepth;
-    float beforeDepth = (1.0 - texture(u_HeightMap, prevTexCoords).r) - currentLayerDepth + layerDepth;
+    float afterDepth = currentDepthMapValue - currentLayerDepth;
+    float beforeDepth = texture(u_HeightMap, prevTexCoords).r - currentLayerDepth + layerDepth;
     float weight = afterDepth / (afterDepth - beforeDepth);
     return prevTexCoords * weight + currentTexCoords * (1.0 - weight);
 }

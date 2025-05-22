@@ -93,46 +93,63 @@ size_t getComponentSize(int componentType) {
     }
 }
 
-void packNormalTangents(Mesh* mesh, const std::vector<glm::vec3>& tempNormals,
-                        const std::vector<glm::vec4>& tempTangents) {
-    mesh->packedNormalTangents.clear();
-    mesh->packedNormalTangents.reserve(tempNormals.size());
+void packTBNframe(Mesh* mesh, const std::vector<glm::vec3>& gltfNormals,
+             const std::vector<glm::vec4>& gltfTangents) {
+    size_t count = std::min(gltfNormals.size(), gltfTangents.size());
+    mesh->packedNormalTangents.reserve(mesh->packedNormalTangents.size() + count);
 
-    for (size_t i = 0; i < tempNormals.size(); ++i) {
-        glm::vec3 normal = glm::normalize(tempNormals[i]);
-        glm::vec3 tangent = glm::normalize(glm::vec3(tempTangents[i]));
-        float handedness = tempTangents[i].w;
+    constexpr int storageSize = 2; // sizeof(int16_t)
+    constexpr float bias = 1.0f / ((1 << (storageSize * 8 - 1)) - 1);
 
-        // Create orthonormal basis
-        glm::vec3 bitangent = glm::normalize(glm::cross(normal, tangent));
-        if (handedness < 0.0f) {
-            bitangent = -bitangent;
+    for (size_t i = 0; i < count; ++i) {
+        const glm::vec3& n = gltfNormals[i];
+        const glm::vec4& t = gltfTangents[i];
+        glm::vec3 tangent(t.x, t.y, t.z);
+
+        // Compute cross product: c = n × t (CRITICAL: this is the correct order)
+        glm::vec3 c = glm::cross(n, tangent);
+
+        // Construct matrix in COLUMN-MAJOR order: [tangent, c, normal]
+        // This matches the JavaScript toMat3 function exactly
+        glm::mat3 tbn(
+            tangent.x, tangent.y, tangent.z,  // First column: tangent
+            c.x,       c.y,       c.z,        // Second column: cross product
+            n.x,       n.y,       n.z         // Third column: normal
+        );
+
+        // Extract quaternion and normalize
+        glm::quat q = glm::normalize(glm::quat_cast(tbn));
+
+        // Ensure positive quaternion (w >= 0)
+        if (q.w < 0.0f) {
+            q = -q;
         }
 
-        // Ensure orthogonality by re-orthogonalizing tangent
-        tangent = glm::normalize(glm::cross(bitangent, normal));
-
-        // Create TBN matrix with proper column order (columns are the basis vectors)
-        glm::mat3 tbnMatrix;
-        tbnMatrix[0] = tangent;    // First column
-        tbnMatrix[1] = bitangent; // Second column
-        tbnMatrix[2] = normal;    // Third column
-
-        // Convert to quaternion
-        glm::quat quat = glm::quat_cast(tbnMatrix);
-
-        // Ensure quaternion is in positive hemisphere (w >= 0) for consistency
-        if (quat.w < 0.0f) {
-            quat = -quat;
+        // Apply bias to prevent w from being zero
+        if (q.w < bias) {
+            q.w = bias;
+            float factor = std::sqrt(1.0f - bias * bias);
+            q.x *= factor;
+            q.y *= factor;
+            q.z *= factor;
         }
 
-        // Store handedness in the sign of w component
-        if (handedness < 0.0f) {
-            quat.w = -quat.w;
+        // Compute bitangent based on handedness for reflection check
+        glm::vec3 b;
+        if (t.w > 0.0f) {
+            b = glm::cross(tangent, n);
+        } else {
+            b = glm::cross(n, tangent);
         }
 
-        // Store as vec4 (x, y, z, w)
-        mesh->packedNormalTangents.push_back(glm::vec4(quat.x, quat.y, quat.z, quat.w));
+        // Reflection check: if (n × t) · b < 0, negate quaternion
+        glm::vec3 cc = glm::cross(tangent, n);
+        if (glm::dot(cc, b) < 0.0f) {
+            q = -q;
+        }
+
+        // Store packed quaternion
+        mesh->packedNormalTangents.push_back(glm::vec4(q.x, q.y, q.z, q.w));
     }
 }
 
@@ -383,7 +400,7 @@ bool parseAccessors(
             }
 
             // Store the mesh and its corresponding material index
-            packNormalTangents(mesh, tempNormals, tempTangents);
+            packTBNframe(mesh, tempNormals, tempTangents);
             meshes.push_back(mesh);
             materialIndices.push_back(materialIndex);
         }
@@ -429,22 +446,28 @@ void calculateTangentSpace(Mesh* mesh, std::vector<glm::vec3>& normals, std::vec
         glm::vec3 tangent = (edge1 * deltaUV2.y - edge2 * deltaUV1.y) * invDet;
         glm::vec3 bitangent = (edge2 * deltaUV1.x - edge1 * deltaUV2.x) * invDet;
 
-        for (uint32_t idx : { i0, i1, i2 }) {
-            accumulatedTangents[idx] += tangent;
-            accumulatedBitangents[idx] += bitangent;
-        }
+        accumulatedTangents[i0] += tangent;
+        accumulatedTangents[i1] += tangent;
+        accumulatedTangents[i2] += tangent;
+
+        accumulatedBitangents[i0] += bitangent;
+        accumulatedBitangents[i1] += bitangent;
+        accumulatedBitangents[i2] += bitangent;
     }
 
     for (size_t i = 0; i < vertexCount; ++i) {
-        glm::vec3& n = normals[i];
+        glm::vec3 n = glm::normalize(normals[i]);  // normalize normal here
         glm::vec3 t = accumulatedTangents[i];
         glm::vec3 b = accumulatedBitangents[i];
 
-        // Orthonormalize tangent
+        // Orthonormalize the tangent vector using Gram-Schmidt
         t = glm::normalize(t - n * glm::dot(n, t));
 
-        // Calculate handedness
-        float w = (glm::dot(glm::cross(n, t), b) < 0.0f) ? -1.0f : 1.0f;
+        // Recalculate bitangent from orthonormal basis
+        glm::vec3 computedB = glm::cross(n, t);
+
+        // Compute handedness: compare computed bitangent with accumulated one
+        float w = (glm::dot(computedB, glm::normalize(b)) < 0.0f) ? -1.0f : 1.0f;
 
         tangents[i] = glm::vec4(t, w);
     }

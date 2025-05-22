@@ -22,28 +22,24 @@ uniform mat4 u_View;
 uniform mat4 u_Projection;
 uniform vec2 u_uvScale;
 
-void unpackTBN(vec4 packedData, out vec3 tangent, out vec3 bitangent, out vec3 normal) {
-    vec3 q = packedData.xyz;
-    float qw = abs(packedData.w);
-    float h = sign(packedData.w);
+// Unpack normal from quaternion using Filament's method
+vec3 unpackNormal(vec4 q) {
+    // Constants from JavaScript: F0, F1, F2
+    vec3 n0 = vec3(0.0, 0.0, 1.0);
+    vec3 n1 = vec3(2.0, -2.0, -2.0) * q.x * vec3(q.z, q.w, q.x);
+    vec3 n2 = vec3(2.0, 2.0, -2.0) * q.y * vec3(q.w, q.z, q.y);
 
-    // All computations in minimal steps
-    float x2 = q.x + q.x, y2 = q.y + q.y, z2 = q.z + q.z;
-    float xx = q.x * x2, yy = q.y * y2, zz = q.z * z2;
-    float xy = q.x * y2, xz = q.x * z2, yz = q.y * z2;
-    float wx = qw * x2, wy = qw * y2, wz = qw * z2;
+    return n0 + n1 + n2;
+}
 
-    tangent.x = 1.0 - yy - zz;
-    tangent.y = xy + wz;
-    tangent.z = xz - wy;
+// Unpack tangent from quaternion using Filament's method
+vec3 unpackTangent(vec4 q) {
+    // Constants from JavaScript: Q0, Q1, Q2
+    vec3 t0 = vec3(1.0, 0.0, 0.0);
+    vec3 t1 = vec3(-2.0, 2.0, -2.0) * q.y * vec3(q.y, q.x, q.w);
+    vec3 t2 = vec3(-2.0, 2.0, 2.0) * q.z * vec3(q.z, q.w, q.x);
 
-    bitangent.x = (xy - wz) * h;
-    bitangent.y = (1.0 - xx - zz) * h;
-    bitangent.z = (yz + wx) * h;
-
-    normal.x = xz + wy;
-    normal.y = yz - wx;
-    normal.z = 1.0 - xx - yy;
+    return t0 + t1 + t2;
 }
 
 void main() {
@@ -52,9 +48,20 @@ void main() {
     FragPos = vec3(modelMatrix * vec4(aPos, 1.0));
     TexCoords = aTexCoords * u_uvScale;
 
-    // Unpack TBN using optimized function
-    vec3 localTangent, localBitangent, localNormal;
-    unpackTBN(aPackedNormalTangent, localTangent, localBitangent, localNormal);
+    // Normalize the packed quaternion
+    vec4 q = normalize(aPackedNormalTangent);
+
+    // Ensure consistent handedness
+    if (q.w < 0.0) {
+        q = -q;
+    }
+
+    // Unpack normal and tangent using Filament's formulas
+    vec3 localNormal = unpackNormal(q);
+    vec3 localTangent = unpackTangent(q);
+
+    // Compute bitangent as cross product
+    vec3 localBitangent = cross(localNormal, localTangent);
 
     // Transform to world space
     mat3 normalMatrix = mat3(modelMatrix);

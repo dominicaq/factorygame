@@ -3,6 +3,66 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+void MeshGen::packTBNframe(Mesh* mesh, const std::vector<glm::vec3>& normals,
+             const std::vector<glm::vec4>& tangents) {
+    size_t count = std::min(normals.size(), tangents.size());
+    mesh->packedNormalTangents.reserve(mesh->packedNormalTangents.size() + count);
+
+    constexpr int storageSize = 2; // sizeof(int16_t)
+    constexpr float bias = 1.0f / ((1 << (storageSize * 8 - 1)) - 1);
+
+    for (size_t i = 0; i < count; ++i) {
+        const glm::vec3& n = normals[i];
+        const glm::vec4& t = tangents[i];
+        glm::vec3 tangent(t.x, t.y, t.z);
+
+        // Compute cross product: c = n × t (CRITICAL: this is the correct order)
+        glm::vec3 c = glm::cross(n, tangent);
+
+        // Construct matrix in COLUMN-MAJOR order: [tangent, c, normal]
+        // This matches the JavaScript toMat3 function exactly
+        glm::mat3 tbn(
+            tangent.x, tangent.y, tangent.z,  // First column: tangent
+            c.x,       c.y,       c.z,        // Second column: cross product
+            n.x,       n.y,       n.z         // Third column: normal
+        );
+
+        // Extract quaternion and normalize
+        glm::quat q = glm::normalize(glm::quat_cast(tbn));
+
+        // Ensure positive quaternion (w >= 0)
+        if (q.w < 0.0f) {
+            q = -q;
+        }
+
+        // Apply bias to prevent w from being zero
+        if (q.w < bias) {
+            q.w = bias;
+            float factor = std::sqrt(1.0f - bias * bias);
+            q.x *= factor;
+            q.y *= factor;
+            q.z *= factor;
+        }
+
+        // Compute bitangent based on handedness for reflection check
+        glm::vec3 b;
+        if (t.w > 0.0f) {
+            b = glm::cross(tangent, n);
+        } else {
+            b = glm::cross(n, tangent);
+        }
+
+        // Reflection check: if (n × t) · b < 0, negate quaternion
+        glm::vec3 cc = glm::cross(tangent, n);
+        if (glm::dot(cc, b) < 0.0f) {
+            q = -q;
+        }
+
+        // Store packed quaternion
+        mesh->packedNormalTangents.push_back(glm::vec4(q.x, q.y, q.z, q.w));
+    }
+}
+
 Mesh* MeshGen::createCube() {
     Mesh* cubeMesh = new Mesh();
 
@@ -325,40 +385,7 @@ void MeshGen::computePackedNormalTangents(Mesh* mesh) {
     mesh->packedNormalTangents.clear();
     mesh->packedNormalTangents.reserve(vertexCount);
 
-    for (size_t i = 0; i < vertexCount; ++i) {
-        glm::vec3 normal = glm::normalize(normals[i]);
-        glm::vec3 tangent = glm::normalize(glm::vec3(tangents[i]));
-        float handedness = tangents[i].w;
-
-        // Create orthonormal basis - bitangent should be computed as cross(normal, tangent)
-        // This gives us the "default" bitangent direction
-        glm::vec3 bitangent = glm::normalize(glm::cross(normal, tangent));
-
-        // Create TBN matrix with proper column order
-        // Each column represents a basis vector in world space
-        glm::mat3 tbnMatrix;
-        tbnMatrix[0] = tangent;   // First column: tangent
-        tbnMatrix[1] = bitangent; // Second column: bitangent
-        tbnMatrix[2] = normal;    // Third column: normal
-
-        // Convert to quaternion
-        glm::quat quat = glm::quat_cast(tbnMatrix);
-
-        // Ensure quaternion is in positive hemisphere for consistent encoding
-        if (quat.w < 0.0f) {
-            quat = -quat;
-        }
-
-        // Encode handedness in the sign of the w component
-        if (handedness < 0.0f) {
-            quat.w = -std::abs(quat.w);  // Make w negative to encode negative handedness
-        } else {
-            quat.w = std::abs(quat.w);   // Ensure w is positive for positive handedness
-        }
-
-        // Store quaternion components
-        mesh->packedNormalTangents.push_back(glm::vec4(quat.x, quat.y, quat.z, quat.w));
-    }
+    packTBNframe(mesh, normals, tangents);
 }
 
 Mesh* MeshGen::createCapsule(float radius, float height, int sectors, int stacks) {

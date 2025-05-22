@@ -11,4 +11,6 @@ namespace MeshGen {
     Mesh* createCapsule(float radius, float height, int sectors, int stacks);
     void computePackedNormalTangents(Mesh* mesh);
     const float* createCubeMapVerts();
+    void packTBNframe(Mesh* mesh, const std::vector<glm::vec3>& normals,
+             const std::vector<glm::vec4>& tangents);
 }
