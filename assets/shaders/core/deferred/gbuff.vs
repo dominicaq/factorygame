@@ -22,56 +22,41 @@ uniform mat4 u_View;
 uniform mat4 u_Projection;
 uniform vec2 u_uvScale;
 
+void unpackTBN(vec4 packedData, out vec3 tangent, out vec3 bitangent, out vec3 normal) {
+    vec3 q = packedData.xyz;
+    float qw = abs(packedData.w);
+    float h = sign(packedData.w);
+
+    // All computations in minimal steps
+    float x2 = q.x + q.x, y2 = q.y + q.y, z2 = q.z + q.z;
+    float xx = q.x * x2, yy = q.y * y2, zz = q.z * z2;
+    float xy = q.x * y2, xz = q.x * z2, yz = q.y * z2;
+    float wx = qw * x2, wy = qw * y2, wz = qw * z2;
+
+    tangent.x = 1.0 - yy - zz;
+    tangent.y = xy + wz;
+    tangent.z = xz - wy;
+
+    bitangent.x = (xy - wz) * h;
+    bitangent.y = (1.0 - xx - zz) * h;
+    bitangent.z = (yz + wx) * h;
+
+    normal.x = xz + wy;
+    normal.y = yz - wx;
+    normal.z = 1.0 - xx - yy;
+}
+
 void main() {
     mat4 modelMatrix = (gl_InstanceID > 0) ? models[gl_InstanceID - 1] : u_Model;
 
     FragPos = vec3(modelMatrix * vec4(aPos, 1.0));
     TexCoords = aTexCoords * u_uvScale;
 
-    // Unpack the quaternion-encoded normal and tangent inline
-    float handedness = sign(aPackedNormalTangent.w);
-    vec4 q = vec4(aPackedNormalTangent.xyz, abs(aPackedNormalTangent.w));
+    // Unpack TBN using optimized function
+    vec3 localTangent, localBitangent, localNormal;
+    unpackTBN(aPackedNormalTangent, localTangent, localBitangent, localNormal);
 
-    // Normalize quaternion to ensure it's unit length
-    q = normalize(q);
-
-    // Convert quaternion to rotation matrix and extract basis vectors
-    float xx = q.x * q.x;
-    float yy = q.y * q.y;
-    float zz = q.z * q.z;
-    float xy = q.x * q.y;
-    float xz = q.x * q.z;
-    float yz = q.y * q.z;
-    float wx = q.w * q.x;
-    float wy = q.w * q.y;
-    float wz = q.w * q.z;
-
-    // Extract tangent (first column of rotation matrix)
-    vec3 localTangent = vec3(
-        1.0 - 2.0 * (yy + zz),
-        2.0 * (xy + wz),
-        2.0 * (xz - wy)
-    );
-
-    // Extract bitangent (second column of rotation matrix)
-    vec3 localBitangent = vec3(
-        2.0 * (xy - wz),
-        1.0 - 2.0 * (xx + zz),
-        2.0 * (yz + wx)
-    );
-
-    // Extract normal (third column of rotation matrix)
-    vec3 localNormal = vec3(
-        2.0 * (xz + wy),
-        2.0 * (yz - wx),
-        1.0 - 2.0 * (xx + yy)
-    );
-
-    // Apply handedness to bitangent
-    if (handedness < 0.0) {
-        localBitangent = -localBitangent;
-    }
-
+    // Transform to world space
     mat3 normalMatrix = mat3(modelMatrix);
     Normal = normalize(normalMatrix * localNormal);
     Tangent = normalize(normalMatrix * localTangent);
@@ -80,7 +65,6 @@ void main() {
     // Create TBN matrix for tangent space calculations
     mat3 TBN = mat3(Tangent, Bitangent, Normal);
 
-    // Compute the view position in tangent space
     TangentViewPos = TBN * u_ViewPos;
     TangentFragPos = TBN * FragPos;
 
