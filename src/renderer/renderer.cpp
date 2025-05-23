@@ -48,9 +48,8 @@ void Renderer::addDrawCommand(const Mesh& mesh) {
     cmd.useIndices = (meshData.EBO != 0);
 
     if (cmd.useIndices) {
-        // FIXED: Better default handling for indexed drawing
-        GLsizei requestedCount = mesh.count > 0 ? mesh.count : meshData.indexCount;
-        GLuint requestedFirst = mesh.firstIndex;
+        uint32_t requestedCount = mesh.count > 0 ? mesh.count : meshData.indexCount;
+        uint32_t requestedFirst = mesh.firstIndex;
 
         if (requestedFirst >= meshData.indexCount) {
             return;
@@ -66,10 +65,9 @@ void Renderer::addDrawCommand(const Mesh& mesh) {
         cmd.elements.baseVertex = mesh.baseVertex;
         cmd.elements.baseInstance = mesh.baseInstance;
     } else {
-        GLsizei requestedCount = mesh.count > 0 ? mesh.count : meshData.vertexCount;
-        GLuint requestedFirst = mesh.firstIndex;
+        uint32_t requestedCount = mesh.count > 0 ? mesh.count : meshData.vertexCount;
+        uint32_t requestedFirst = mesh.firstIndex;
 
-        // FIXED: Proper bounds validation
         if (requestedFirst >= meshData.vertexCount) {
             return;
         }
@@ -355,47 +353,78 @@ void Renderer::executeIndirectDraw(const std::vector<IndirectDrawCommand>& comma
         return;
     }
 
-    // FIXED: The original version had serious buffer layout problems
-    // We need to handle elements and arrays commands properly in a single buffer
-
     glBindBuffer(GL_DRAW_INDIRECT_BUFFER, indirectBuffer);
 
-    // Process each command individually to avoid buffer layout confusion
-    size_t bufferOffset = 0;
+    // Since we now have separate buffers, all commands are the same type
+    bool isIndexed = commands[0].useIndices;
 
-    for (const auto& cmd : commands) {
-        GLuint vao = getMeshVAO(cmd.meshId);
-        if (vao == 0) {
-            std::cerr << "[Error] Invalid VAO for mesh " << cmd.meshId << "\n";
-            continue;
+    if (isIndexed) {
+        // Upload elements commands
+        std::vector<DrawElementsIndirectCommand> elementCommands;
+        elementCommands.reserve(commands.size());
+        for (const auto& cmd : commands) {
+            elementCommands.push_back(cmd.elements);
         }
 
-        glBindVertexArray(vao);
+        glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0,
+                       elementCommands.size() * sizeof(DrawElementsIndirectCommand),
+                       elementCommands.data());
 
-        if (cmd.useIndices) {
-            // Upload this specific elements command
-            glBufferSubData(GL_DRAW_INDIRECT_BUFFER,
-                           static_cast<GLintptr>(bufferOffset),
-                           sizeof(DrawElementsIndirectCommand),
-                           &cmd.elements);
+        // Draw in batches by VAO
+        GLuint currentVAO = 0;
+        size_t batchStart = 0;
 
-            // Draw this command
-            glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT,
-                                 reinterpret_cast<const void*>(bufferOffset));
+        for (size_t i = 0; i <= commands.size(); ++i) {
+            GLuint nextVAO = (i < commands.size()) ? getMeshVAO(commands[i].meshId) : 0;
 
-            bufferOffset += sizeof(DrawElementsIndirectCommand);
-        } else {
-            // Upload this specific arrays command
-            glBufferSubData(GL_DRAW_INDIRECT_BUFFER,
-                           static_cast<GLintptr>(bufferOffset),
-                           sizeof(DrawArraysIndirectCommand),
-                           &cmd.arrays);
+            // Draw current batch if VAO changes or we're at the end
+            if ((nextVAO != currentVAO || i == commands.size()) && currentVAO != 0) {
+                glBindVertexArray(currentVAO);
 
-            // Draw this command
-            glDrawArraysIndirect(GL_TRIANGLES,
-                               reinterpret_cast<const void*>(bufferOffset));
+                size_t batchSize = i - batchStart;
+                size_t offsetBytes = batchStart * sizeof(DrawElementsIndirectCommand);
 
-            bufferOffset += sizeof(DrawArraysIndirectCommand);
+                glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT,
+                                          reinterpret_cast<const void*>(offsetBytes),
+                                          static_cast<GLsizei>(batchSize),
+                                          sizeof(DrawElementsIndirectCommand));
+                batchStart = i;
+            }
+            currentVAO = nextVAO;
+        }
+    } else {
+        // Upload arrays commands
+        std::vector<DrawArraysIndirectCommand> arrayCommands;
+        arrayCommands.reserve(commands.size());
+        for (const auto& cmd : commands) {
+            arrayCommands.push_back(cmd.arrays);
+        }
+
+        glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0,
+                       arrayCommands.size() * sizeof(DrawArraysIndirectCommand),
+                       arrayCommands.data());
+
+        // Draw in batches by VAO
+        GLuint currentVAO = 0;
+        size_t batchStart = 0;
+
+        for (size_t i = 0; i <= commands.size(); ++i) {
+            GLuint nextVAO = (i < commands.size()) ? getMeshVAO(commands[i].meshId) : 0;
+
+            // Draw current batch if VAO changes or we're at the end
+            if ((nextVAO != currentVAO || i == commands.size()) && currentVAO != 0) {
+                glBindVertexArray(currentVAO);
+
+                size_t batchSize = i - batchStart;
+                size_t offsetBytes = batchStart * sizeof(DrawArraysIndirectCommand);
+
+                glMultiDrawArraysIndirect(GL_TRIANGLES,
+                                        reinterpret_cast<const void*>(offsetBytes),
+                                        static_cast<GLsizei>(batchSize),
+                                        sizeof(DrawArraysIndirectCommand));
+                batchStart = i;
+            }
+            currentVAO = nextVAO;
         }
     }
 

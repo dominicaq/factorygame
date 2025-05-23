@@ -5,7 +5,8 @@
 
 RenderBatch::RenderBatch(size_t initialCapacity) {
     m_instances.reserve(initialCapacity);
-    m_drawCommands.reserve(initialCapacity);
+    m_elementsCommands.reserve(initialCapacity);
+    m_arraysCommands.reserve(initialCapacity);
     m_objectData.reserve(initialCapacity);
     initBuffers(initialCapacity);
 }
@@ -19,7 +20,9 @@ void RenderBatch::addInstance(const Mesh& mesh, const glm::mat4& modelMatrix, co
 }
 
 void RenderBatch::prepare(Renderer& renderer) {
-    m_drawCommands.clear();
+    // Clear both command vectors
+    m_elementsCommands.clear();
+    m_arraysCommands.clear();
     m_objectData.clear();
 
     if (m_instances.empty()) return;
@@ -47,7 +50,8 @@ void RenderBatch::prepare(Renderer& renderer) {
             DrawInstance gpuInstance;
             gpuInstance.modelMatrix = instance.modelMatrix;
             gpuInstance.uvScale = instance.uvScale;
-            gpuInstance.padding = glm::vec2(0.0f);
+            gpuInstance.materialId = 1;
+            gpuInstance.padding = 1;
 
             m_objectData.push_back(gpuInstance);
         }
@@ -59,14 +63,22 @@ void RenderBatch::prepare(Renderer& renderer) {
 }
 
 void RenderBatch::render(Renderer& renderer) {
-    if (m_drawCommands.empty()) {
+    if (m_elementsCommands.empty() && m_arraysCommands.empty()) {
         return;
     }
 
-    // FIXED: Ensure the SSBO is bound before rendering
+    // Bind SSBO once for the entire batch
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_drawInstanceSSBO);
 
-    renderer.executeIndirectDraw(m_drawCommands, m_indirectBuffer);
+    // Render elements commands if any
+    if (!m_elementsCommands.empty()) {
+        renderer.executeIndirectDraw(m_elementsCommands, m_elementsIndirectBuffer);
+    }
+
+    // Render arrays commands if any
+    if (!m_arraysCommands.empty()) {
+        renderer.executeIndirectDraw(m_arraysCommands, m_arraysIndirectBuffer);
+    }
 
     // Unbind SSBO after rendering
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
@@ -77,17 +89,25 @@ void RenderBatch::clear() {
 }
 
 void RenderBatch::initBuffers(size_t capacity) {
-    // FIXED: Ensure proper buffer sizing for mixed command types
-    glGenBuffers(1, &m_indirectBuffer);
-    glBindBuffer(GL_DRAW_INDIRECT_BUFFER, m_indirectBuffer);
-    // Size for the larger of the two command types to handle both
-    size_t commandSize = std::max(sizeof(DrawElementsIndirectCommand), sizeof(DrawArraysIndirectCommand));
+    // Create separate buffer for elements commands
+    glGenBuffers(1, &m_elementsIndirectBuffer);
+    glBindBuffer(GL_DRAW_INDIRECT_BUFFER, m_elementsIndirectBuffer);
     glBufferData(GL_DRAW_INDIRECT_BUFFER,
-                 capacity * commandSize,
+                 capacity * sizeof(DrawElementsIndirectCommand),
                  nullptr, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
-    m_indirectBufferCapacity = capacity;
+    m_elementsBufferCapacity = capacity;
 
+    // Create separate buffer for arrays commands
+    glGenBuffers(1, &m_arraysIndirectBuffer);
+    glBindBuffer(GL_DRAW_INDIRECT_BUFFER, m_arraysIndirectBuffer);
+    glBufferData(GL_DRAW_INDIRECT_BUFFER,
+                 capacity * sizeof(DrawArraysIndirectCommand),
+                 nullptr, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+    m_arraysBufferCapacity = capacity;
+
+    // Create instance data SSBO (unchanged)
     glGenBuffers(1, &m_drawInstanceSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_drawInstanceSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER,
@@ -99,18 +119,29 @@ void RenderBatch::initBuffers(size_t capacity) {
 }
 
 void RenderBatch::updateBuffers() {
-    // FIXED: Handle buffer resizing for mixed command types
-    if (m_drawCommands.size() > m_indirectBufferCapacity) {
-        size_t newCapacity = m_drawCommands.size() * 3 / 2;
-        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, m_indirectBuffer);
-        size_t commandSize = std::max(sizeof(DrawElementsIndirectCommand), sizeof(DrawArraysIndirectCommand));
+    // Handle elements buffer resizing
+    if (m_elementsCommands.size() > m_elementsBufferCapacity) {
+        size_t newCapacity = m_elementsCommands.size() * 3 / 2;
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, m_elementsIndirectBuffer);
         glBufferData(GL_DRAW_INDIRECT_BUFFER,
-                     newCapacity * commandSize,
+                     newCapacity * sizeof(DrawElementsIndirectCommand),
                      nullptr, GL_DYNAMIC_DRAW);
-        m_indirectBufferCapacity = newCapacity;
+        m_elementsBufferCapacity = newCapacity;
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
     }
 
+    // Handle arrays buffer resizing
+    if (m_arraysCommands.size() > m_arraysBufferCapacity) {
+        size_t newCapacity = m_arraysCommands.size() * 3 / 2;
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, m_arraysIndirectBuffer);
+        glBufferData(GL_DRAW_INDIRECT_BUFFER,
+                     newCapacity * sizeof(DrawArraysIndirectCommand),
+                     nullptr, GL_DYNAMIC_DRAW);
+        m_arraysBufferCapacity = newCapacity;
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+    }
+
+    // Handle instance data buffer resizing
     if (m_objectData.size() > m_drawInstanceSSBOCapacity) {
         size_t newCapacity = m_objectData.size() * 3 / 2;
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_drawInstanceSSBO);
@@ -122,10 +153,7 @@ void RenderBatch::updateBuffers() {
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
 
-    // FIXED: Don't upload IndirectDrawCommand directly - let executeIndirectDraw handle it
-    // The IndirectDrawCommand contains both types, but OpenGL expects specific command types
-
-    // Upload instance data
+    // Upload instance data to SSBO
     if (!m_objectData.empty()) {
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_drawInstanceSSBO);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0,
@@ -152,6 +180,8 @@ void RenderBatch::buildDrawCommand(const Mesh& mesh, Renderer& renderer, GLuint 
         cmd.elements.firstIndex = mesh.firstIndex;
         cmd.elements.baseVertex = mesh.baseVertex;
         cmd.elements.baseInstance = baseInstance; // Starting instance index
+
+        m_elementsCommands.push_back(cmd);
     } else {
         GLsizei actualVertexCount = renderer.getMeshVertexCount(mesh.id);
         if (actualVertexCount == 0) {
@@ -163,15 +193,19 @@ void RenderBatch::buildDrawCommand(const Mesh& mesh, Renderer& renderer, GLuint 
         cmd.arrays.instanceCount = instanceCount; // Set to actual instance count
         cmd.arrays.first = mesh.firstIndex;
         cmd.arrays.baseInstance = baseInstance; // Starting instance index
-    }
 
-    m_drawCommands.push_back(cmd);
+        m_arraysCommands.push_back(cmd);
+    }
 }
 
 void RenderBatch::cleanup() {
-    if (m_indirectBuffer) {
-        glDeleteBuffers(1, &m_indirectBuffer);
-        m_indirectBuffer = 0;
+    if (m_elementsIndirectBuffer) {
+        glDeleteBuffers(1, &m_elementsIndirectBuffer);
+        m_elementsIndirectBuffer = 0;
+    }
+    if (m_arraysIndirectBuffer) {
+        glDeleteBuffers(1, &m_arraysIndirectBuffer);
+        m_arraysIndirectBuffer = 0;
     }
     if (m_drawInstanceSSBO) {
         glDeleteBuffers(1, &m_drawInstanceSSBO);

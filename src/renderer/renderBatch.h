@@ -30,7 +30,7 @@ struct IndirectDrawCommand {
         DrawElementsIndirectCommand elements;
         DrawArraysIndirectCommand arrays;
     };
-    GLuint meshId;
+    size_t meshId;
     bool useIndices;
 
     IndirectDrawCommand() : meshId(0), useIndices(false) {
@@ -40,11 +40,11 @@ struct IndirectDrawCommand {
 
 class RenderBatch {
 public:
-    // This matches the shader's InstanceData struct
     struct DrawInstance {
         glm::mat4 modelMatrix;
         glm::vec2 uvScale;
-        glm::vec2 padding; // For 16-byte alignment
+        uint32_t materialId;
+        uint32_t padding;
     };
 
     // Internal storage for CPU-side data
@@ -64,16 +64,24 @@ public:
 
 private:
     std::vector<InstanceInfo> m_instances;      // CPU-side data with Mesh info
-    std::vector<IndirectDrawCommand> m_drawCommands;
     std::vector<DrawInstance> m_objectData;     // GPU-side data for SSBO
 
-    GLuint m_indirectBuffer = 0;
+    // Separate command vectors for different draw types
+    std::vector<IndirectDrawCommand> m_elementsCommands;
+    std::vector<IndirectDrawCommand> m_arraysCommands;
+
+    // Separate buffers for different command types
+    GLuint m_elementsIndirectBuffer = 0;
+    GLuint m_arraysIndirectBuffer = 0;
     GLuint m_drawInstanceSSBO = 0;
-    size_t m_indirectBufferCapacity = 0;
+
+    // Buffer capacities
+    size_t m_elementsBufferCapacity = 0;
+    size_t m_arraysBufferCapacity = 0;
     size_t m_drawInstanceSSBOCapacity = 0;
 
     void initBuffers(size_t capacity);
     void updateBuffers();
-    void buildDrawCommand(const Mesh& mesh, Renderer& renderer, GLuint instanceIndex, GLuint instanceCount);
+    void buildDrawCommand(const Mesh& mesh, Renderer& renderer, GLuint baseInstance, GLuint instanceCount);
     void cleanup();
 };

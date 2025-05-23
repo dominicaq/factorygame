@@ -96,8 +96,8 @@ private:
         GLuint VAO = 0;
         GLuint VBO = 0;
         GLuint EBO = 0;
-        GLsizei indexCount = 0;
-        GLsizei vertexCount = 0;
+        uint32_t indexCount = 0;
+        uint32_t vertexCount = 0;
     };
     std::vector<MeshData> m_meshData;
 
