@@ -3,7 +3,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-void MeshGen::packTBNframe(Mesh* mesh, const std::vector<glm::vec3>& normals,
+void MeshGen::packTBNframe(RawMeshData* mesh, const std::vector<glm::vec3>& normals,
              const std::vector<glm::vec4>& tangents) {
     size_t count = std::min(normals.size(), tangents.size());
     mesh->packedTNBFrame.reserve(mesh->packedTNBFrame.size() + count);
@@ -63,8 +63,8 @@ void MeshGen::packTBNframe(Mesh* mesh, const std::vector<glm::vec3>& normals,
     }
 }
 
-Mesh* MeshGen::createCube() {
-    Mesh* cubeMesh = new Mesh();
+RawMeshData* MeshGen::createCube() {
+    RawMeshData* cubeMesh = new RawMeshData();
 
     // Positions for the cube (properly organized by face)
     cubeMesh->vertices = {
@@ -120,8 +120,8 @@ Mesh* MeshGen::createCube() {
     return cubeMesh;
 }
 
-Mesh* MeshGen::createQuad(float scale) {
-    Mesh* quadMesh = new Mesh();
+RawMeshData* MeshGen::createQuad(float scale) {
+    RawMeshData* quadMesh = new RawMeshData();
 
     // Positions for the quad (a flat square in the XY plane, scaled)
     quadMesh->vertices = {
@@ -151,8 +151,8 @@ Mesh* MeshGen::createQuad(float scale) {
     return quadMesh;
 }
 
-Mesh* MeshGen::createSphere(unsigned int sectorCount, unsigned int stackCount) {
-    Mesh* sphere = new Mesh();
+RawMeshData* MeshGen::createSphere(unsigned int sectorCount, unsigned int stackCount) {
+    RawMeshData* sphere = new RawMeshData();
 
     const float radius = 1.0f;
     const float PI = 3.14159265358979323846f;
@@ -221,8 +221,8 @@ Mesh* MeshGen::createSphere(unsigned int sectorCount, unsigned int stackCount) {
     return sphere;
 }
 
-Mesh* MeshGen::createPlane(unsigned int resolutionX, unsigned int resolutionY, float width, float height) {
-    Mesh* plane = new Mesh();
+RawMeshData* MeshGen::createPlane(unsigned int resolutionX, unsigned int resolutionY, float width, float height) {
+    RawMeshData* plane = new RawMeshData();
 
     // Clear any existing data
     plane->vertices.clear();
@@ -275,7 +275,7 @@ Mesh* MeshGen::createPlane(unsigned int resolutionX, unsigned int resolutionY, f
 }
 
 // Helper function to compute packed normal-tangent quaternions
-void MeshGen::computepackedTNBFrame(Mesh* mesh) {
+void MeshGen::computepackedTNBFrame(RawMeshData* mesh) {
     size_t vertexCount = mesh->vertices.size();
 
     // Temporary storage for normals and tangents
@@ -388,8 +388,8 @@ void MeshGen::computepackedTNBFrame(Mesh* mesh) {
     packTBNframe(mesh, normals, tangents);
 }
 
-Mesh* MeshGen::createCapsule(float radius, float height, int sectors, int stacks) {
-    Mesh* capsule = new Mesh();
+RawMeshData* MeshGen::createCapsule(float radius, float height, int sectors, int stacks) {
+    RawMeshData* capsule = new RawMeshData();
 
     // TODO: Implement capsule generation
     // For now, return an empty mesh

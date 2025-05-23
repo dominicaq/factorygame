@@ -11,6 +11,7 @@ enum class GizmoType {
     CUBE,
     PLANE
 };
+using MeshEntityPair = std::pair<std::unique_ptr<RawMeshData>, entt::entity>;
 
 class SceneUtils {
 public:
@@ -64,7 +65,8 @@ public:
      * @param filePath Path to the mesh file to load. The file may contain multiple mesh parts, which will be created as child GameObjects.
      * @return Pointer to the root GameObject. Child GameObjects will be attached as part of its hierarchy.
      */
-    static GameObject* createMeshGameObject(entt::registry& registry, Shader* shader, const std::string& filePath);
+    static GameObject* createMeshGameObject(entt::registry& registry, Shader* shader, const std::string& filePath,
+                                           std::vector<MeshEntityPair>& meshEntityPairs);
 
     static void calculateMeshBounds(const std::vector<Mesh*>& meshes, glm::vec3& outMin, glm::vec3& outMax, float& outMaxSingleMeshDim);
 };

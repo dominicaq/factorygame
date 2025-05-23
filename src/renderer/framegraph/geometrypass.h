@@ -32,36 +32,20 @@ public:
         m_gBufferShader.setMat4("u_View", viewMatrix);
         m_gBufferShader.setMat4("u_Projection", camera->getProjectionMatrix());
 
-        // Render regular meshes
-        registry.view<Mesh*, ModelMatrix>().each([&](Mesh* mesh, const ModelMatrix& modelMatrix) {
-            if (!mesh->material->isDeferred) {
-                return;
-            }
+        // Clear and build draw commands for indirect rendering
+        renderer.clearDrawCommands();
 
-            m_gBufferShader.setMat4("u_Model", modelMatrix.matrix);
-            m_gBufferShader.setVec2("u_uvScale", mesh->material->uvScale);
-            mesh->material->bind(&m_gBufferShader);
-            renderer.draw(mesh);
+        // Batch draw
+        RenderBatch batch;
+        registry.view<Mesh, ModelMatrix>().each([&](const Mesh& mesh, const ModelMatrix& modelMatrix) {
+            if (mesh.material->isDeferred) {
+                batch.addInstance(mesh, modelMatrix.matrix, mesh.material->uvScale);
+            }
         });
 
-        // Get scene data for rendering
-        const auto& meshInstances = m_scene->getMeshInstances();
-
-        // Render all instances using the shared instance map
-        for (const auto& [meshId, matrices] : m_scene->getInstanceMap()) {
-            if (matrices.empty() || meshId >= meshInstances.size() ||
-                !meshInstances[meshId]->material->isDeferred) {
-                continue;
-            }
-
-            renderer.updateInstanceBuffer(meshId, matrices);
-
-            // Set the first matrix as the model uniform (for gl_InstanceID == 0)
-            m_gBufferShader.setMat4("u_Model", matrices[0]);
-            m_gBufferShader.setVec2("u_uvScale", meshInstances[meshId]->material->uvScale);
-            meshInstances[meshId]->material->bind(&m_gBufferShader);
-            renderer.drawInstanced(meshId);
-        }
+        // Draw scene
+        batch.prepare(renderer);
+        batch.render(renderer);
 
         std::pair<int, int> dimensions = renderer.getScreenDimensions();
         int width = dimensions.first;

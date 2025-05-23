@@ -58,32 +58,34 @@ int main() {
     skyboxPass->setSkyBox(scene.getSkyBox());
     frameGraph.addRenderPass(std::move(skyboxPass));
 
-    frameGraph.addRenderPass(std::make_unique<ForwardPass>());
+    // frameGraph.addRenderPass(std::make_unique<ForwardPass>());
 
-    auto lightPass = std::make_unique<LightPass>();
-    lightPass->setSkyBox(scene.getSkyBox());
-    frameGraph.addRenderPass(std::move(lightPass));
+    // auto lightPass = std::make_unique<LightPass>();
+    // lightPass->setSkyBox(scene.getSkyBox());
+    // frameGraph.addRenderPass(std::move(lightPass));
 
     // Post processing passes. Debug pass is like a post process.
     frameGraph.addRenderPass(std::make_unique<DebugPass>(&camera));
 
     // ----------------------- Renderer Setup -----------------------
-    // Init all meshses
-    scene.registry.view<Mesh*, ModelMatrix>().each([&](entt::entity entity, Mesh* mesh, const ModelMatrix& modelMatrix) {
-        renderer.initMeshBuffers(mesh);
-    });
+    // Init all meshes
+    for (auto& [meshPtr, entity] : scene.meshEntityPairs) {
+        Mesh& mesh = renderer.initMeshBuffers(meshPtr);
+        mesh.material = meshPtr.get()->material;
+        scene.registry.emplace<Mesh>(entity, mesh);
+    }
 
     // Init mesh buffers for each vector of model matrices
-    auto& meshInstances = scene.getMeshInstances();
-    for (const auto& pair : scene.getInstanceMap()) {
-        size_t instanceID = pair.first;
-        const std::vector<glm::mat4>& matrices = pair.second;
+    // auto& meshInstances = scene.getMeshInstances();
+    // for (const auto& pair : scene.getInstanceMap()) {
+    //     size_t instanceID = pair.first;
+    //     const std::vector<glm::mat4>& matrices = pair.second;
 
-        // Initialize mesh buffers with the instanceID
-        renderer.initMeshBuffers(meshInstances[instanceID], false, instanceID);
-        // Set up instance attributes with the vector of matrices
-        renderer.setupInstanceAttributes(instanceID, matrices);
-    }
+    //     // Initialize mesh buffers with the instanceID
+    //     renderer.initMeshBuffers(meshInstances[instanceID], false, instanceID);
+    //     // Set up instance attributes with the vector of matrices
+    //     renderer.setupInstanceAttributes(instanceID, matrices);
+    // }
 
     // -------------------- Start Game -------------------
     frameGraph.setupPasses();

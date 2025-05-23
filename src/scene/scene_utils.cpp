@@ -34,10 +34,12 @@ GameObject* SceneUtils::addGameObjectComponent(entt::registry& registry, entt::e
     return &registry.emplace<GameObject>(entity, entity, registry);
 }
 
-GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* shader, const std::string& filePath) {
+GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* shader, const std::string& filePath,
+                                           std::vector<MeshEntityPair>& meshEntityPairs) {
     std::vector<SceneData> nodeData;
-    std::vector<Mesh*> meshes;
+    std::vector<std::unique_ptr<RawMeshData>> meshes;
     ResourceLoader::loadMeshVector(filePath, meshes, nodeData, shader);
+
     if (meshes.empty()) {
         return nullptr;
     }
@@ -49,10 +51,11 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
     for (size_t i = 0; i < nodeData.size(); ++i) {
         entities[i] = registry.create();
 
-        // Assign meshes to nodes where applicable
+        // Check if this node has a mesh
         int meshIndex = nodeData[i].meshIndex;
-        if (meshIndex >= 0 && meshIndex < meshes.size() && meshes[meshIndex] != nullptr) {
-            registry.emplace<Mesh*>(entities[i], meshes[meshIndex]);
+        if (meshIndex >= 0 && meshIndex < static_cast<int>(meshes.size()) && meshes[meshIndex] != nullptr) {
+            // Store the mesh-entity pair for later initialization
+            meshEntityPairs.emplace_back(std::move(meshes[meshIndex]), entities[i]);
             meshAssigned[meshIndex] = true;
         }
 
@@ -64,7 +67,7 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
     for (size_t i = 0; i < nodeData.size(); ++i) {
         for (size_t childIdx : nodeData[i].children) {
             if (childIdx >= entities.size() || !gameObjects[childIdx])
-            continue;
+                continue;
 
             childrenSet.insert(childIdx);
             GameObject* childObj = gameObjects[childIdx];
@@ -72,7 +75,7 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
         }
     }
 
-    // Find the root node (node without a parent)
+    // Find the root node
     size_t rootIdx = 0;
     for (size_t i = 0; i < nodeData.size(); ++i) {
         if (childrenSet.find(i) == childrenSet.end()) {
@@ -81,7 +84,7 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
         }
     }
 
-    // Create objects for any unassigned meshes and parent them to the root
+    // Handle unassigned meshes
     for (size_t i = 0; i < meshes.size(); ++i) {
         if (meshAssigned[i] || meshes[i] == nullptr) {
             continue;
@@ -90,14 +93,14 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
         SceneData unassignedData;
         unassignedData.name = "UnassignedMesh(" + std::to_string(i) + ")";
 
-        // Create new entity, assign the mesh and parent to root
         entt::entity newEntity = registry.create();
         GameObject* newGameObject = SceneUtils::addGameObjectComponent(registry, newEntity, unassignedData);
-        registry.emplace<Mesh*>(newEntity, meshes[i]);
+
+        meshEntityPairs.emplace_back(std::move(meshes[i]), newEntity);
+
         newGameObject->setParent(entities[rootIdx]);
     }
 
-    // Return the root object
     return gameObjects[rootIdx];
 }
 
@@ -107,30 +110,30 @@ void SceneUtils::createEmptyGameObject(entt::registry& registry, const SceneData
 }
 
 entt::entity SceneUtils::createGizmo(entt::registry& registry, const SceneData& data, Material* mat, GizmoType type) {
-    entt::entity entity = registry.create();
-    GameObject* gameObject = addGameObjectComponent(registry, entity, data);
+    // entt::entity entity = registry.create();
+    // GameObject* gameObject = addGameObjectComponent(registry, entity, data);
 
-    Mesh* gizmoMesh = nullptr;
-    switch (type) {
-        case GizmoType::AXIS:
-            gizmoMesh = Gizmos::createAxis();
-            break;
-        case GizmoType::CUBE:
-            gizmoMesh = Gizmos::createCube();
-            break;
-        case GizmoType::PLANE:
-            gizmoMesh = Gizmos::createPlane();
-            break;
-    }
+    // Mesh* gizmoMesh = nullptr;
+    // switch (type) {
+    //     case GizmoType::AXIS:
+    //         gizmoMesh = Gizmos::createAxis();
+    //         break;
+    //     case GizmoType::CUBE:
+    //         gizmoMesh = Gizmos::createCube();
+    //         break;
+    //     case GizmoType::PLANE:
+    //         gizmoMesh = Gizmos::createPlane();
+    //         break;
+    // }
 
-    if (gizmoMesh != nullptr) {
-        mat->isDeferred = false;
-        gizmoMesh->material = mat;
-        gizmoMesh->wireframe = true;
-        registry.emplace<Mesh*>(entity, gizmoMesh);
-        return entity;
-    }
+    // if (gizmoMesh != nullptr) {
+    //     mat->isDeferred = false;
+    //     gizmoMesh->material = mat;
+    //     gizmoMesh->wireframe = true;
+    //     registry.emplace<Mesh*>(entity, gizmoMesh);
+    //     return entity;
+    // }
 
-    std::cerr << "[Error] createGizmo() failed to create gizmo mesh!\n";
+    // std::cerr << "[Error] createGizmo() failed to create gizmo mesh!\n";
     return entt::null;
 }

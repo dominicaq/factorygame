@@ -148,29 +148,19 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 }
 
 void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) {
-    // Normal rendering of non-instanced meshes
-    registry.view<Mesh*, ModelMatrix>().each([&](Mesh* mesh, const ModelMatrix& modelMatrix) {
-        if (mesh->wireframe) {
-            return;
-        }
-        m_shadowShader.setMat4("u_Model", modelMatrix.matrix);
-        renderer.draw(mesh);
+    // Create batch for shadow rendering
+    RenderBatch shadowBatch;
+
+    // Add all non-wireframe meshes to the shadow batch
+    registry.view<Mesh, ModelMatrix>().each([&](const Mesh& mesh, const ModelMatrix& modelMatrix) {
+        // For shadow rendering, UV scale doesn't matter much, use default
+        glm::vec2 defaultUVScale(1.0f, 1.0f);
+        shadowBatch.addInstance(mesh, modelMatrix.matrix, defaultUVScale);
     });
 
-    // Get scene data for instanced rendering
-    const auto& instanceMap = m_scene->getInstanceMap();
-    const auto& meshInstances = m_scene->getMeshInstances();
-
-    // Render all instances using the shared instance map
-    for (const auto& [meshId, matrices] : instanceMap) {
-        if (matrices.empty() || meshId >= meshInstances.size() || meshInstances[meshId]->wireframe) {
-            continue;
-        }
-
-        // Set the first matrix as the model uniform (for gl_InstanceID == 0)
-        m_shadowShader.setMat4("u_Model", matrices[0]);
-        renderer.drawInstanced(meshId);
-    }
+    // Render all shadows in one batch
+    shadowBatch.prepare(renderer);
+    shadowBatch.render(renderer);
 }
 
 void ShadowPass::cleanupLightResources(entt::entity lightEntity) {

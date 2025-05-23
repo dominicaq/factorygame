@@ -27,7 +27,7 @@ bool parseAccessors(
     const json& gltfDoc,
     std::vector<std::vector<uint8_t>>& buffers,
     std::vector<glTFBufferView>& bufferViews,
-    std::vector<Mesh*>& meshes,
+    std::vector<std::unique_ptr<RawMeshData>>& meshes,
     std::vector<int>& materialIndices);
 bool parseBuffers(const json &gltfDoc, const std::string &fileName, std::vector<std::vector<uint8_t>>& buffers);
 template <typename T>
@@ -37,17 +37,16 @@ void parseAccessorData(
     const glTFBufferView& bufferView,
     std::vector<T>& targetVector);
 bool parseNodes(const json& gltfDoc, std::vector<SceneData>& nodeData);
-void loadMaterials(
-    const json& gltfDoc,
-    std::vector<Mesh*>& meshes,
+void loadMaterials(const json& gltfDoc,
+    std::vector<std::unique_ptr<RawMeshData>>& meshes,
     const std::vector<int>& materialIndices,
     Shader* shader,
-    const std::string& filePath);
+    const std::string& fileName);
 
 /*
 * Math
 */
-void calculateTangentSpace(Mesh* mesh, std::vector<glm::vec3>& normals, std::vector<glm::vec4>& tangents);
+void calculateTangentSpace(RawMeshData* mesh, std::vector<glm::vec3>& normals, std::vector<glm::vec4>& tangents);
 
 /*
  * Utility
@@ -93,7 +92,7 @@ size_t getComponentSize(int componentType) {
     }
 }
 
-void packTBNframe(Mesh* mesh, const std::vector<glm::vec3>& gltfNormals,
+void packTBNframe(RawMeshData* mesh, const std::vector<glm::vec3>& gltfNormals,
              const std::vector<glm::vec4>& gltfTangents) {
     size_t count = std::min(gltfNormals.size(), gltfTangents.size());
     mesh->packedTNBFrame.reserve(mesh->packedTNBFrame.size() + count);
@@ -156,7 +155,7 @@ void packTBNframe(Mesh* mesh, const std::vector<glm::vec3>& gltfNormals,
 /*
 * Parsing
 */
-bool loadglTF(std::string fileName, std::vector<Mesh*>& meshes, std::vector<SceneData>& nodeData, Shader* shader) {
+bool loadglTF(const std::string& fileName, std::vector<std::unique_ptr<RawMeshData>>& meshes, std::vector<SceneData>& nodeData, Shader* shader) {
     std::ifstream file(fileName);
     if (!file.is_open()) {
         std::cerr << "Failed to open file: " << fileName << "\n";
@@ -166,8 +165,9 @@ bool loadglTF(std::string fileName, std::vector<Mesh*>& meshes, std::vector<Scen
     std::stringstream buffer;
     buffer << file.rdbuf();
 
-    bool isBinary = (fileName.substr(fileName.size() - 3) == "glb");
+    bool isBinary = (fileName.size() >= 3 && fileName.substr(fileName.size() - 3) == "glb");
     if (isBinary) {
+        // Binary .glb not supported
         return false;
     }
 
@@ -201,7 +201,7 @@ bool loadglTF(std::string fileName, std::vector<Mesh*>& meshes, std::vector<Scen
     for (size_t i = 0; i < bufferViewsJson.size(); ++i) {
         const auto& bufferViewJson = bufferViewsJson[i];
 
-        glTFBufferView bufferView {0};
+        glTFBufferView bufferView{0};
         parseJsonProperty(bufferViewJson, "buffer", bufferView.index);
         parseJsonProperty(bufferViewJson, "byteOffset", bufferView.byteOffset);
         parseJsonProperty(bufferViewJson, "byteLength", bufferView.size);
@@ -212,8 +212,10 @@ bool loadglTF(std::string fileName, std::vector<Mesh*>& meshes, std::vector<Scen
 
     // Accessors (primitive mesh data)
     std::vector<int> materialIndices;
+
+    // Note: You will have to update parseAccessors to fill meshes as vector of unique_ptr
     if (!parseAccessors(gltfDoc, buffers, bufferViews, meshes, materialIndices)) {
-        std::cerr << "Failed to parse glTF acessors\n";
+        std::cerr << "Failed to parse glTF accessors\n";
         return false;
     }
 
@@ -280,7 +282,7 @@ bool parseAccessors(
     const json& gltfDoc,
     std::vector<std::vector<uint8_t>>& buffers,
     std::vector<glTFBufferView>& bufferViews,
-    std::vector<Mesh*>& meshes,
+    std::vector<std::unique_ptr<RawMeshData>>& meshes,
     std::vector<int>& materialIndices) {
 
     if (!gltfDoc.contains("accessors") || !gltfDoc["accessors"].is_array() || gltfDoc["accessors"].empty()) {
@@ -309,7 +311,7 @@ bool parseAccessors(
 
         const auto& primitivesJson = meshJson["primitives"];
         for (size_t primitiveIdx = 0; primitiveIdx < primitivesJson.size(); ++primitiveIdx) {
-            Mesh* mesh = new Mesh();
+            auto mesh = std::make_unique<RawMeshData>();
             const auto& primitiveJson = primitivesJson[primitiveIdx];
             if (!primitiveJson.contains("attributes")) {
                 continue;
@@ -389,7 +391,7 @@ bool parseAccessors(
                 parseAccessorData(tangentAccessor, buffers, bufferViews[tangentBufferViewIdx], tempTangents);
             } else {
                 std::cerr << "[Warning] Tangents not found for mesh, calculating...\n";
-                calculateTangentSpace(mesh, tempNormals, tempTangents);
+                calculateTangentSpace(mesh.get(), tempNormals, tempTangents);
                 std::cout << "[Info] Done.\n";
             }
 
@@ -399,9 +401,12 @@ bool parseAccessors(
                 materialIndex = primitiveJson["material"].get<int>();
             }
 
+            // CRITICAL FIX: Call packTBNframe BEFORE moving the unique_ptr
             // Store the mesh and its corresponding material index
-            packTBNframe(mesh, tempNormals, tempTangents);
-            meshes.push_back(mesh);
+            packTBNframe(mesh.get(), tempNormals, tempTangents);
+
+            // Now it's safe to move the mesh to the container
+            meshes.push_back(std::move(mesh));
             materialIndices.push_back(materialIndex);
         }
     }
@@ -409,7 +414,7 @@ bool parseAccessors(
     return !meshes.empty();
 }
 
-void calculateTangentSpace(Mesh* mesh, std::vector<glm::vec3>& normals, std::vector<glm::vec4>& tangents) {
+void calculateTangentSpace(RawMeshData* mesh, std::vector<glm::vec3>& normals, std::vector<glm::vec4>& tangents) {
     size_t vertexCount = mesh->vertices.size();
     tangents.resize(vertexCount, glm::vec4(0.0f));
 
@@ -556,19 +561,22 @@ bool parseNodes(const json& gltfDoc, std::vector<SceneData>& nodeData) {
     return true;
 }
 
-void loadMaterials(const json& gltfDoc, std::vector<Mesh*>& meshes, const std::vector<int>& materialIndices, Shader* shader, const std::string& fileName) {
+void loadMaterials(const json& gltfDoc, std::vector<std::unique_ptr<RawMeshData>>& meshes,
+                   const std::vector<int>& materialIndices, Shader* shader, const std::string& fileName)
+{
     if (!gltfDoc.contains("materials") || !gltfDoc["materials"].is_array()) {
         // No materials defined in the glTF file
         for (auto& mesh : meshes) {
-            Material* newMaterial = new Material(shader);
-            mesh->material = newMaterial;
+            if (mesh) { // Add null check
+                Material* newMaterial = new Material(shader);
+                mesh->material = newMaterial;
+            }
         }
         return;
     }
 
     const auto& materialsJson = gltfDoc["materials"];
 
-    // Create vector of textures to store loaded textures
     std::vector<Texture*> textures;
     if (gltfDoc.contains("textures") && gltfDoc["textures"].is_array()) {
         const auto& texturesJson = gltfDoc["textures"];
@@ -593,9 +601,19 @@ void loadMaterials(const json& gltfDoc, std::vector<Mesh*>& meshes, const std::v
 
     // Now process materials and assign them to meshes
     for (size_t meshIdx = 0; meshIdx < meshes.size(); ++meshIdx) {
-        Mesh* mesh = meshes[meshIdx];
+        if (!meshes[meshIdx]) { // Add null check
+            continue;
+        }
+
+        RawMeshData* mesh = meshes[meshIdx].get();
         Material* newMaterial = new Material(shader);
         mesh->material = newMaterial;
+
+        // Add bounds check for materialIndices
+        if (meshIdx >= materialIndices.size()) {
+            continue;
+        }
+
         int materialIdx = materialIndices[meshIdx];
 
         if (materialIdx < 0 || materialIdx >= static_cast<int>(materialsJson.size())) {
@@ -604,14 +622,11 @@ void loadMaterials(const json& gltfDoc, std::vector<Mesh*>& meshes, const std::v
 
         const auto& materialJson = materialsJson[materialIdx];
 
-        // Default albedo color (if no base color texture is specified)
         newMaterial->albedoColor = glm::vec4(1.0f);
 
-        // Process PBR material properties
         if (materialJson.contains("pbrMetallicRoughness")) {
             const auto& pbrJson = materialJson["pbrMetallicRoughness"];
 
-            // Base color factor (RGBA)
             if (pbrJson.contains("baseColorFactor") && pbrJson["baseColorFactor"].is_array() &&
                 pbrJson["baseColorFactor"].size() == 4) {
                 const auto& colorArray = pbrJson["baseColorFactor"];
@@ -623,7 +638,6 @@ void loadMaterials(const json& gltfDoc, std::vector<Mesh*>& meshes, const std::v
                 );
             }
 
-            // Base color texture
             if (pbrJson.contains("baseColorTexture") && pbrJson["baseColorTexture"].contains("index")) {
                 size_t textureIdx = pbrJson["baseColorTexture"]["index"].get<size_t>();
                 if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
@@ -631,46 +645,28 @@ void loadMaterials(const json& gltfDoc, std::vector<Mesh*>& meshes, const std::v
                 }
             }
 
-            // Metallic-roughness texture
             if (pbrJson.contains("metallicRoughnessTexture") &&
                 pbrJson["metallicRoughnessTexture"].contains("index")) {
                 size_t textureIdx = pbrJson["metallicRoughnessTexture"]["index"].get<size_t>();
                 if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
                     newMaterial->metallicRoughnessMap = textures[textureIdx];
-                    // In glTF, metallic and roughness are packed into a single texture
-                    // G channel = roughness, B channel = metallic
-                    // newMaterial->roughnessMap = textures[textureIdx];
                 }
             }
         }
 
-        // Normal map
         if (materialJson.contains("normalTexture") && materialJson["normalTexture"].contains("index")) {
             size_t textureIdx = materialJson["normalTexture"]["index"].get<size_t>();
             if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
                 newMaterial->normalMap = textures[textureIdx];
             }
-
-            // Normal scale factor
-            // if (materialJson["normalTexture"].contains("scale")) {
-            //     newMaterial->normalScale = materialJson["normalTexture"]["scale"].get<float>();
-            // }
         }
 
-        // Occlusion map
         if (materialJson.contains("occlusionTexture") && materialJson["occlusionTexture"].contains("index")) {
-            // size_t textureIdx = materialJson["occlusionTexture"]["index"].get<size_t>();
-            // if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
-            //     newMaterial->aoMap = textures[textureIdx];
-            // }
-
-            // Occlusion strength
             if (materialJson["occlusionTexture"].contains("strength")) {
                 newMaterial->occlusionStrength = materialJson["occlusionTexture"]["strength"].get<float>();
             }
         }
 
-        // Emissive map
         if (materialJson.contains("emissiveTexture") && materialJson["emissiveTexture"].contains("index")) {
             size_t textureIdx = materialJson["emissiveTexture"]["index"].get<size_t>();
             if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
@@ -678,7 +674,6 @@ void loadMaterials(const json& gltfDoc, std::vector<Mesh*>& meshes, const std::v
             }
         }
 
-        // Emissive factor
         if (materialJson.contains("emissiveFactor") && materialJson["emissiveFactor"].is_array() &&
             materialJson["emissiveFactor"].size() == 3) {
             const auto& emissiveArray = materialJson["emissiveFactor"];
@@ -688,25 +683,6 @@ void loadMaterials(const json& gltfDoc, std::vector<Mesh*>& meshes, const std::v
                 emissiveArray[2].get<float>()
             );
         }
-
-        // Alpha mode and cutoff
-        // if (materialJson.contains("alphaMode")) {
-        //     std::string alphaMode = materialJson["alphaMode"].get<std::string>();
-        //     if (alphaMode == "MASK") {
-        //         material->alphaMode = Material::AlphaMode::MASK;
-        //         if (materialJson.contains("alphaCutoff")) {
-        //             material->alphaCutoff = materialJson["alphaCutoff"].get<float>();
-        //         }
-        //     } else if (alphaMode == "BLEND") {
-        //         material->alphaMode = Material::AlphaMode::BLEND;
-        //     }
-        //     // Default is OPAQUE
-        // }
-
-        // // Double-sided rendering
-        // if (materialJson.contains("doubleSided")) {
-        //     material->doubleSided = materialJson["doubleSided"].get<bool>();
-        // }
     }
 }
 

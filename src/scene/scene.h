@@ -18,10 +18,12 @@
 static const std::string SHADER_DIR = ASSET_DIR "shaders/";
 static const std::string MODEL_DIR = ASSET_DIR "models/";
 static const std::string TEXTURE_DIR = ASSET_DIR "textures/";
+using MeshEntityPair = std::pair<std::unique_ptr<RawMeshData>, entt::entity>;
 
 class Scene {
 public:
     entt::registry registry;
+    std::vector<MeshEntityPair> meshEntityPairs;
 
     // =========================================================================
     // Scene Management

@@ -6,37 +6,16 @@
 
 #include "../renderer/material.h"
 
-struct MeshInstance {
-    uint32_t materialIndex = 0xFFFFFFFF;
-    uint8_t id;
-
-    // Raw mesh data (TO BE WIPED)
-    Material* material;
-};
-
-struct Mesh {
-    uint32_t count = 0;
-    uint32_t instanceCount = 0;
-    uint32_t firstIndex = 0;
-    uint32_t baseVertex = 0;
-    uint32_t baseInstance = 0;
-    uint32_t materialIndex = 0xFFFFFFFF;
-    int drawMode = GL_TRIANGLES;
-
-    /*
-    * WARNING: DO NOT set the Mesh ID yourself. It will be overwritten anyway.
-    */
-    size_t id = SIZE_MAX;
-    bool wireframe = false;
-
-    // Raw mesh data (TO BE WIPED)
+struct RawMeshData {
     std::vector<glm::vec4> packedTNBFrame;
     std::vector<glm::vec3> vertices;
     std::vector<uint32_t> indices;
     std::vector<glm::vec2> uvs;
-    Material* material = nullptr;
+    int drawMode = GL_TRIANGLES;
 
-    // Method to clear CPU-side mesh data
+    // (TO BE MODFIED)
+    Material* material;
+
     void clearData() {
         vertices.clear();
         uvs.clear();
@@ -48,4 +27,31 @@ struct Mesh {
         packedTNBFrame.shrink_to_fit();
         indices.shrink_to_fit();
     }
+};
+
+struct Mesh {
+    /*
+    * WARNING: DO NOT set the Mesh ID yourself. It will be overwritten anyway.
+    */
+    size_t id = SIZE_MAX;
+
+    // Optional overrides
+    uint32_t count = 0;
+    uint32_t instanceCount = 1;
+    uint32_t firstIndex = 0;
+    uint32_t baseVertex = 0;
+    uint32_t baseInstance = 0;
+    uint32_t materialIndex = 0xFFFFFFFF;
+    int drawMode = GL_TRIANGLES;
+
+    // (TO BE REMOVED)
+    Material* material = nullptr;
+};
+
+struct MeshInstance {
+    uint32_t materialIndex = 0xFFFFFFFF;
+    uint8_t id;
+
+    // Raw mesh data (TO BE REMOVED)
+    Material* material;
 };
