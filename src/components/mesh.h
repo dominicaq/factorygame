@@ -13,9 +13,6 @@ struct RawMeshData {
     std::vector<glm::vec2> uvs;
     int drawMode = GL_TRIANGLES;
 
-    // (TO BE MODFIED)
-    Material* material;
-
     void clearData() {
         vertices.clear();
         uvs.clear();
@@ -43,9 +40,26 @@ struct Mesh {
     uint32_t baseInstance = 0;
     uint32_t materialIndex = 0xFFFFFFFF;
     int drawMode = GL_TRIANGLES;
+};
 
-    // (TO BE REMOVED)
-    Material* material = nullptr;
+struct EntityMeshDefinition {
+    std::unique_ptr<RawMeshData> rawMeshData;
+    std::unique_ptr<MaterialDefinition> materialDef;
+    entt::entity entity;
+
+    // Constructor to make creation easier
+    EntityMeshDefinition(entt::entity ent) : entity(ent) {
+        rawMeshData = std::make_unique<RawMeshData>();
+        materialDef = std::make_unique<MaterialDefinition>();
+    }
+
+    // Move semantics
+    EntityMeshDefinition(EntityMeshDefinition&&) = default;
+    EntityMeshDefinition& operator=(EntityMeshDefinition&&) = default;
+
+    // Delete copy
+    EntityMeshDefinition(const EntityMeshDefinition&) = delete;
+    EntityMeshDefinition& operator=(const EntityMeshDefinition&) = delete;
 };
 
 struct MeshInstance {
@@ -55,6 +69,21 @@ struct MeshInstance {
 
 struct InstancedMeshGroup {
     std::unique_ptr<RawMeshData> meshData;
+    std::unique_ptr<MaterialDefinition> materialDef;
     std::vector<entt::entity> entities;
     Mesh* initializedMesh = nullptr;
+
+    // Constructor
+    InstancedMeshGroup() {
+        meshData = std::make_unique<RawMeshData>();
+        materialDef = std::make_unique<MaterialDefinition>();
+    }
+
+    // Move semantics
+    InstancedMeshGroup(InstancedMeshGroup&&) = default;
+    InstancedMeshGroup& operator=(InstancedMeshGroup&&) = default;
+
+    // Delete copy
+    InstancedMeshGroup(const InstancedMeshGroup&) = delete;
+    InstancedMeshGroup& operator=(const InstancedMeshGroup&) = delete;
 };

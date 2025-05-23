@@ -38,9 +38,9 @@ public:
 
         // Batch draw
         registry.view<Mesh, ModelMatrix>().each([&](const Mesh& mesh, const ModelMatrix& modelMatrix) {
-            if (mesh.material->isDeferred) {
-                m_geometryBatch.addInstance(mesh, modelMatrix.matrix, mesh.material->uvScale);
-            }
+            // if (mesh.material->isDeferred) {
+            //     m_geometryBatch.addInstance(mesh, modelMatrix.matrix, mesh.material->uvScale);
+            // }
         });
 
         // Draw scene

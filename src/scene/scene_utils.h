@@ -11,7 +11,6 @@ enum class GizmoType {
     CUBE,
     PLANE
 };
-using MeshEntityPair = std::pair<std::unique_ptr<RawMeshData>, entt::entity>;
 
 class SceneUtils {
 public:
@@ -55,7 +54,7 @@ public:
      * @param type - The type of primitive to create (Axis, Cube, or Plane).
      * @return The entity handle of the created gizmo.
      */
-    static entt::entity createGizmo(entt::registry& registry, const SceneData& data, Material* mat, GizmoType type);
+    // static entt::entity createGizmo(entt::registry& registry, const SceneData& data, Material* mat, GizmoType type);
 
     /**
      * Creates a root GameObject with a mesh and any associated child GameObjects from the provided mesh file.
@@ -65,10 +64,11 @@ public:
      * @param filePath Path to the mesh file to load. The file may contain multiple mesh parts, which will be created as child GameObjects.
      * @return Pointer to the root GameObject. Child GameObjects will be attached as part of its hierarchy.
      */
-    static GameObject* createMeshGameObject(entt::registry& registry, Shader* shader, const std::string& filePath,
-                                           std::vector<MeshEntityPair>& meshEntityPairs);
-
-    static void calculateMeshBounds(const std::vector<Mesh*>& meshes, glm::vec3& outMin, glm::vec3& outMax, float& outMaxSingleMeshDim);
+    static GameObject* createMeshGameObject(
+        entt::registry& registry,
+        std::vector<EntityMeshDefinition>& meshEntityPairs,
+        const std::string& filePath,
+        const std::string& vertPath, const std::string& fragPath);
 };
 
 #endif // SCENE_UTILS_H

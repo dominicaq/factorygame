@@ -18,12 +18,10 @@ namespace ResourceLoader {
     */
     RawMeshData* loadMesh(const std::string& filepath);
 
-    void loadMeshVector(
-        const std::string& filepath,
-        std::vector<std::unique_ptr<RawMeshData>>& meshes,
-        std::vector<SceneData>& nodeData,
-        Shader* shader
-    );
+    void loadMeshVector(const std::string& filepath,
+                        std::vector<std::unique_ptr<RawMeshData>>& meshes,
+                        std::vector<std::unique_ptr<MaterialDefinition>>& materialDefs,
+                        std::vector<SceneData>& nodeData);
 
     /*
     * Image functions

@@ -84,7 +84,11 @@ RawMeshData* ResourceLoader::loadMesh(const std::string& filepath) {
     }
 }
 
-void ResourceLoader::loadMeshVector(const std::string& filepath, std::vector<std::unique_ptr<RawMeshData>>& meshes, std::vector<SceneData>& nodeData, Shader* shader) {
+void ResourceLoader::loadMeshVector(
+    const std::string& filepath,
+    std::vector<std::unique_ptr<RawMeshData>>& meshes,
+    std::vector<std::unique_ptr<MaterialDefinition>>& materialDefs,
+    std::vector<SceneData>& nodeData) {
     std::string fileContent = readFile(filepath);
     if (fileContent.empty()) {
         std::cerr << "[Error] ResourceLoader::loadMeshVector: File contents empty: " << filepath << "\n";
@@ -108,9 +112,10 @@ void ResourceLoader::loadMeshVector(const std::string& filepath, std::vector<std
         return;
     }
 
-    if (!loadglTF(filepath, meshes, nodeData, shader)) {
-        std::cerr << "[Error] ResourceLoader::loadMeshVector: Failed to load glTF mesh: \n" << filepath << "\n";
+    if (!loadglTF(filepath, meshes, materialDefs, nodeData)) {
+        std::cerr << "[Error] ResourceLoader::loadMeshVector: Failed to load glTF mesh: " << filepath << "\n";
         meshes.clear();
+        materialDefs.clear();
         nodeData.clear();
         return;
     }

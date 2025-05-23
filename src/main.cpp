@@ -69,16 +69,19 @@ int main() {
 
     // ----------------------- Renderer Setup -----------------------
     // Init all meshes
-    for (auto& [meshPtr, entity] : scene.meshEntityPairs) {
-        Mesh& mesh = renderer.initMeshBuffers(meshPtr);
-        mesh.material = meshPtr.get()->material;
-        scene.registry.emplace<Mesh>(entity, mesh);
+    for (auto& meshDef : scene.meshEntityPairs) {
+        // Debug: Print albedo file path
+        // std::cout << "[Debug] Mesh Entity: " << static_cast<uint32_t>(meshDef.entity)
+        //         << " - Albedo Path: '" << meshDef.materialDef->albedoMapPath << "'" << "\n";
+
+        Mesh& mesh = renderer.initMeshBuffers(meshDef.rawMeshData);
+        scene.registry.emplace<Mesh>(meshDef.entity, mesh);
     }
 
+    // Instanced mesh groups
     for (auto& instanceGroup : scene.instancedMeshGroups) {
         // Initialize the mesh buffers once for the entire group
         Mesh& instancedMesh = renderer.initMeshBuffers(instanceGroup.meshData);
-        instancedMesh.material = instanceGroup.meshData->material;
 
         // Store reference to initialized mesh in the group
         instanceGroup.initializedMesh = &instancedMesh;

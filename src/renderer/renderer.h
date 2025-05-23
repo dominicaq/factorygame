@@ -86,11 +86,11 @@ private:
     Camera* m_camera;
     std::unique_ptr<Framebuffer> m_gBuffer;
 
-    // Screen quad for post-processing
+    // Screen quad for deferred rendering
     GLuint m_quadVAO = 0;
 
     /*
-     * Mesh data storage (from your original code)
+     * Mesh data storage
      */
     struct MeshData {
         GLuint VAO = 0;
@@ -102,12 +102,16 @@ private:
     std::vector<MeshData> m_meshData;
 
     /*
-     * Indirect draw buffers (from your original code)
+     * Indirect draw buffers
      */
     GLuint m_indirectBuffer = 0;
     GLuint m_indirectCount = 0;
     GLuint m_drawCountBuffer = 0;
     std::vector<IndirectDrawCommand> m_commandBuffer;
+
+    /*
+    * Material storage
+    */
 
     /*
      * Initialization

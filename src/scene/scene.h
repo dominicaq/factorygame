@@ -18,12 +18,11 @@
 static const std::string SHADER_DIR = ASSET_DIR "shaders/";
 static const std::string MODEL_DIR = ASSET_DIR "models/";
 static const std::string TEXTURE_DIR = ASSET_DIR "textures/";
-using MeshEntityPair = std::pair<std::unique_ptr<RawMeshData>, entt::entity>;
 
 class Scene {
 public:
     entt::registry registry;
-    std::vector<MeshEntityPair> meshEntityPairs;
+    std::vector<EntityMeshDefinition> meshEntityPairs;
     std::vector<InstancedMeshGroup> instancedMeshGroups;
 
     // =========================================================================
@@ -83,9 +82,9 @@ public:
     // =========================================================================
     // TODO: TEMP, PENDING REMOVAL
     // =========================================================================
-    void createSpheres(int n, float fieldSize, float minHeight, float maxHeight, Shader* basicShader, bool litSpheres);
-    void createSpotLights(int n, float circleRadius, float yPosition, Shader* basicShader);
-    void createSuns(int n, float circleRadius, float yPosition, Shader* basicShader);
+    void createSpheres(int n, float fieldSize, float minHeight, float maxHeight, std::string vertexPath, std::string fragPath, bool litSpheres);
+    void createSpotLights(int n, float circleRadius, float yPosition, std::string vertexPath, std::string fragPath);
+    void createSuns(int n, float circleRadius, float yPosition, std::string vertexPath, std::string fragPath);
 
 private:
     // Scene Instancing
@@ -95,9 +94,6 @@ private:
     std::unordered_map<size_t, size_t> m_currentIndices;
     unsigned int m_skyboxHandle;
     bool m_instanceCountsDirty = true;
-
-    // Misc
-    Material* m_wireframeMaterial;
 
     // Scene Management
     std::unique_ptr<Octree<entt::entity>> m_octree;

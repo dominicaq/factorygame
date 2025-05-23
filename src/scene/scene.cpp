@@ -17,9 +17,9 @@
 // TODO: In the future, this will be user generated through UI, not code.
 void Scene::loadScene() {
     // ------------------------ Wireframe Setup ------------------------
-    Shader* wireframeShader = new Shader(SHADER_DIR + "debug/wireframe.vs", SHADER_DIR + "debug/wireframe.fs");
-    m_wireframeMaterial = new Material(wireframeShader);
-    m_wireframeMaterial->albedoColor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+    // Shader* wireframeShader = new Shader(SHADER_DIR + "debug/wireframe.vs", SHADER_DIR + "debug/wireframe.fs");
+    // m_wireframeMaterial = new Material(wireframeShader);
+    // m_wireframeMaterial->albedoColor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
 
     // ------------------------ Skybox Setup ------------------------
     std::vector<std::string> skyboxPaths = {
@@ -59,9 +59,8 @@ void Scene::loadScene() {
     setPrimaryCamera(cameraEntity);
 
     // ------------------------ Shader Setup ------------------------
-    std::string vertexPath = SHADER_DIR + "default.vs";
-    std::string fragmentPath = SHADER_DIR + "default.fs";
-    Shader* basicShader = new Shader(vertexPath, fragmentPath);
+    std::string defaultVertexPath = SHADER_DIR + "default.vs";
+    std::string defaultFragPath = SHADER_DIR + "default.fs";
 
     // --------------------- Beetle Car ---------------------
     const int numRows = 5;  // Adjust for more rows
@@ -153,19 +152,19 @@ void Scene::loadScene() {
     save_planeData.eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
     save_planeData.scale = glm::vec3(1.0f, 1.0f, 1.0f);
     GameObject* planeObject = SceneUtils::addGameObjectComponent(registry, planeEntity, save_planeData);
-
     RawMeshData* planeMesh = MeshGen::createPlane(2,2,200,200);
     if (planeMesh != nullptr) {
-        Material* planeMaterial = new Material(basicShader);
-        planeMaterial->albedoColor = glm::vec4(1.0f);
-        planeMaterial->albedoMap = new Texture(TEXTURE_DIR + "tiles/tiles.tga");
-        planeMaterial->normalMap = new Texture(TEXTURE_DIR + "tiles/tiles-n.tga");
-        planeMaterial->heightMap = new Texture(TEXTURE_DIR + "tiles/tiles-h.tga");
-        planeMaterial->heightScale = 0.05f;
-        planeMaterial->isDeferred = true;
-        planeMaterial->uvScale = glm::vec2(4.0f);
-        planeMesh->material = planeMaterial;
-        meshEntityPairs.emplace_back(std::move(planeMesh), planeObject->getEntity());
+        EntityMeshDefinition planeMeshDef{planeObject->getEntity()};
+        planeMeshDef.materialDef->vertexShaderPath = defaultVertexPath;
+        planeMeshDef.materialDef->fragmentShaderPath = defaultFragPath;
+        planeMeshDef.materialDef->albedoColor = glm::vec4(1.0f);
+        planeMeshDef.materialDef->isDeferred = true;
+        planeMeshDef.materialDef->albedoMapPath = TEXTURE_DIR + "tiles/tiles.tga";
+        planeMeshDef.materialDef->normalMapPath = TEXTURE_DIR + "tiles/tiles-n.tga";
+        planeMeshDef.materialDef->heightMapPath = TEXTURE_DIR + "tiles/tiles-h.tga";
+        planeMeshDef.materialDef->heightScale = 0.05f;
+        planeMeshDef.materialDef->uvScale= glm::vec2(4.0f);
+        meshEntityPairs.emplace_back(std::move(planeMeshDef));
     }
 
     // --------------------- Diablo Model ---------------------
@@ -179,18 +178,14 @@ void Scene::loadScene() {
 
     RawMeshData* diabloMesh = ResourceLoader::loadMesh(MODEL_DIR + "/diablo3_pose.obj");
     if (diabloMesh != nullptr) {
-        Material* diabloMaterial = new Material(basicShader);
-        diabloMaterial->albedoColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-        diabloMaterial->isDeferred = true;
-
-        Texture* diabloAlbedoMap = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_diffuse.tga");
-        diabloMaterial->albedoMap = diabloAlbedoMap;
-
-        Texture* diabloNormalMap = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_nm_tangent.tga");
-        diabloMaterial->normalMap = diabloNormalMap;
-
-        diabloMesh->material = diabloMaterial;
-        meshEntityPairs.emplace_back(std::move(diabloMesh), diabloObject->getEntity());
+        EntityMeshDefinition diabloMeshDef{diabloObject->getEntity()};
+        diabloMeshDef.materialDef->vertexShaderPath = defaultVertexPath;
+        diabloMeshDef.materialDef->fragmentShaderPath = defaultFragPath;
+        diabloMeshDef.materialDef->albedoColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        diabloMeshDef.materialDef->isDeferred = true;
+        diabloMeshDef.materialDef->albedoMapPath = TEXTURE_DIR + "diablo/diablo3_pose_diffuse.tga";
+        diabloMeshDef.materialDef->normalMapPath = TEXTURE_DIR + "diablo/diablo3_pose_nm_tangent.tga";
+        meshEntityPairs.emplace_back(std::move(diabloMeshDef));
     }
 
     /*
@@ -201,7 +196,7 @@ void Scene::loadScene() {
     std::chrono::duration<double> gltfLoadElasped;
 
     gltfLoadStart = std::chrono::high_resolution_clock::now();
-    GameObject* helmetObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf", meshEntityPairs);
+    GameObject* helmetObj = SceneUtils::createMeshGameObject(registry, meshEntityPairs, ASSET_DIR "gltf-assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf", defaultVertexPath, defaultFragPath);
     if (helmetObj) {
         helmetObj->setScale(glm::vec3(1.0f));
         helmetObj->setPosition(glm::vec3(0.0f, 5.0f, -5.0f));
@@ -212,27 +207,27 @@ void Scene::loadScene() {
     gltfLoadElasped = gltfLoadEnd - gltfLoadStart;
     std::cout << "createMeshGameObject(Helmet) took " << gltfLoadElasped.count() << " seconds.\n";
 
-    GameObject* dragonObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "dragon/dragon.gltf", meshEntityPairs);
+    GameObject* dragonObj = SceneUtils::createMeshGameObject(registry, meshEntityPairs, ASSET_DIR "dragon/dragon.gltf", defaultVertexPath, defaultFragPath);
     if (dragonObj) {
         dragonObj->setScale(glm::vec3(0.5f));
         dragonObj->setPosition(glm::vec3(10.0f, -0.5f, 2.5f));
     }
 
-    GameObject* laternObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf", meshEntityPairs);
+    GameObject* laternObj = SceneUtils::createMeshGameObject(registry, meshEntityPairs, ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf", defaultVertexPath, defaultFragPath);
     if (laternObj) {
         laternObj->setScale(glm::vec3(0.5f));
         laternObj->setPosition(glm::vec3(10.0f, -0.25f, -2.5f));
         laternObj->addScript<MoveScript>();
     }
 
-    GameObject* boomBox = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/BoomBox/glTF/BoomBox.gltf", meshEntityPairs);
+    GameObject* boomBox = SceneUtils::createMeshGameObject(registry, meshEntityPairs, ASSET_DIR "gltf-assets/Models/BoomBox/glTF/BoomBox.gltf", defaultVertexPath, defaultFragPath);
     if (boomBox) {
         boomBox->setScale(glm::vec3(100.0f));
         boomBox->setPosition(glm::vec3(0.0f, 15.0f, -5.0f));
     }
 
     gltfLoadStart = std::chrono::high_resolution_clock::now();
-    GameObject* romanObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Sponza/glTF/Sponza.gltf", meshEntityPairs);
+    GameObject* romanObj = SceneUtils::createMeshGameObject(registry, meshEntityPairs, ASSET_DIR "gltf-assets/Models/Sponza/glTF/Sponza.gltf", defaultVertexPath, defaultFragPath);
     if (romanObj) {
         romanObj->setScale(glm::vec3(0.0003f));
         romanObj->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
@@ -252,15 +247,15 @@ void Scene::loadScene() {
     int n = 25;
     float circleRadius = 5.0f;
     float yPosition = 10.0f;
-    createSuns(1, 50.0f, 50.0f, basicShader);
+    createSuns(1, 50.0f, 50.0f, defaultVertexPath, defaultFragPath);
 
-    createSpotLights(2, circleRadius, yPosition, basicShader);
+    createSpotLights(2, circleRadius, yPosition, defaultVertexPath, defaultFragPath);
 
     // // Light balls
-    // createSpheres(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
+    // createSpheres(n, circleRadius * 10.0f, 0, 1.0f, defaultVertexPath, defaultFragPath, true);
 
     // // Normal balls
-    createSpheres(10000, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
+    createSpheres(10000, circleRadius * 10.0f, 0, 1.0f, defaultVertexPath, defaultFragPath, false);
 
     // // Gizmo Cube
     // // Box dimensions
@@ -281,7 +276,7 @@ void Scene::loadScene() {
     // }
 }
 
-void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basicShader) {
+void Scene::createSuns(int n, float circleRadius, float yPosition, std::string vertexPath, std::string fragPath) {
     for (int i = 0; i < n; ++i) {
         float angle = i * (360.0f / n);
         float radians = glm::radians(angle);
@@ -350,7 +345,7 @@ void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basic
     }
 }
 
-void Scene::createSpotLights(int n, float circleRadius, float yPosition, Shader* basicShader) {
+void Scene::createSpotLights(int n, float circleRadius, float yPosition, std::string vertexPath, std::string fragPath) {
     for (int i = 0; i < n; ++i) {
         float angle = i * (360.0f / n);
         float radians = glm::radians(angle);
@@ -410,31 +405,23 @@ void Scene::createSpotLights(int n, float circleRadius, float yPosition, Shader*
         // Cube mesh
         RawMeshData* spotlightMesh = ResourceLoader::loadMesh(MODEL_DIR + "/spotlight.obj");
         if (spotlightMesh != nullptr) {
-            Material* cubeMaterial = new Material(basicShader);
-            cubeMaterial->albedoColor = glm::vec4(1.0f);
-            cubeMaterial->albedoMap = new Texture(TEXTURE_DIR + "gold/gold.png");
-            cubeMaterial->normalMap = nullptr;
-            cubeMaterial->isDeferred = true;
-            spotlightMesh->material = cubeMaterial;
-            meshEntityPairs.emplace_back(std::move(spotlightMesh), lightObject->getEntity());
+            EntityMeshDefinition cubeMeshDef{lightObject->getEntity()};
+            cubeMeshDef.materialDef->vertexShaderPath = vertexPath;
+            cubeMeshDef.materialDef->fragmentShaderPath = fragPath;
+            cubeMeshDef.materialDef->albedoColor = glm::vec4(1.0f);
+            cubeMeshDef.materialDef->albedoMapPath = TEXTURE_DIR + "gold/gold.png";
+            cubeMeshDef.materialDef->isDeferred = true;
+            meshEntityPairs.emplace_back(std::move(cubeMeshDef));
         }
     }
 }
 
-void Scene::createSpheres(int n, float fieldSize, float minHeight, float maxHeight, Shader* basicShader, bool litSpheres) {
+void Scene::createSpheres(int n, float fieldSize, float minHeight, float maxHeight, std::string vertexPath, std::string fragPath, bool litSpheres) {
     // Create the mesh data once
     std::unique_ptr<RawMeshData> asteroidMesh(MeshGen::createSphere(25, 25));
     if (!asteroidMesh) {
         return;
     }
-
-    // Set up material
-    Material* asteroidMaterial = new Material(basicShader);
-    asteroidMaterial->albedoColor = glm::vec4(1.0f);
-    asteroidMaterial->albedoMap = new Texture(TEXTURE_DIR + "gold/gold.png");
-    asteroidMaterial->normalMap = new Texture(TEXTURE_DIR + "gold/gold-n.png");
-    asteroidMaterial->isDeferred = true;
-    asteroidMesh->material = asteroidMaterial;
 
     // Get the group ID for this instanced mesh
     size_t groupId = instancedMeshGroups.size();
@@ -443,6 +430,12 @@ void Scene::createSpheres(int n, float fieldSize, float minHeight, float maxHeig
     InstancedMeshGroup instanceGroup;
     instanceGroup.meshData = std::move(asteroidMesh);
     instanceGroup.entities.reserve(n);
+
+    // Set up material
+    instanceGroup.materialDef->albedoColor = glm::vec4(1.0f);
+    instanceGroup.materialDef->albedoMapPath = TEXTURE_DIR + "gold/gold.png";
+    instanceGroup.materialDef->normalMapPath = TEXTURE_DIR + "gold/gold-n.png";
+    instanceGroup.materialDef->isDeferred = true;
 
     // Randomization setup
     std::random_device rd;

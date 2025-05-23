@@ -37,10 +37,10 @@ void parseAccessorData(
     const glTFBufferView& bufferView,
     std::vector<T>& targetVector);
 bool parseNodes(const json& gltfDoc, std::vector<SceneData>& nodeData);
-void loadMaterials(const json& gltfDoc,
-    std::vector<std::unique_ptr<RawMeshData>>& meshes,
+void loadMaterialDefinitions(
+    const json& gltfDoc,
+    std::vector<std::unique_ptr<MaterialDefinition>>& materialDefs,
     const std::vector<int>& materialIndices,
-    Shader* shader,
     const std::string& fileName);
 
 /*
@@ -155,7 +155,10 @@ void packTBNframe(RawMeshData* mesh, const std::vector<glm::vec3>& gltfNormals,
 /*
 * Parsing
 */
-bool loadglTF(const std::string& fileName, std::vector<std::unique_ptr<RawMeshData>>& meshes, std::vector<SceneData>& nodeData, Shader* shader) {
+bool loadglTF(const std::string& fileName,
+              std::vector<std::unique_ptr<RawMeshData>>& meshes,
+              std::vector<std::unique_ptr<MaterialDefinition>>& materialDefs,
+              std::vector<SceneData>& nodeData) {
     std::ifstream file(fileName);
     if (!file.is_open()) {
         std::cerr << "Failed to open file: " << fileName << "\n";
@@ -227,7 +230,7 @@ bool loadglTF(const std::string& fileName, std::vector<std::unique_ptr<RawMeshDa
         return false;
     }
 
-    loadMaterials(gltfDoc, meshes, materialIndices, shader, fileName);
+    loadMaterialDefinitions(gltfDoc, materialDefs, materialIndices, fileName);
     return true;
 }
 
@@ -561,28 +564,39 @@ bool parseNodes(const json& gltfDoc, std::vector<SceneData>& nodeData) {
     return true;
 }
 
-void loadMaterials(const json& gltfDoc, std::vector<std::unique_ptr<RawMeshData>>& meshes,
-                   const std::vector<int>& materialIndices, Shader* shader, const std::string& fileName)
-{
+void loadMaterialDefinitions(
+    const json& gltfDoc,
+    std::vector<std::unique_ptr<MaterialDefinition>>& materialDefs,
+    const std::vector<int>& materialIndices,
+    const std::string& fileName) {
+
+    // Resize to match the number of meshes
+    materialDefs.clear();
+    materialDefs.resize(materialIndices.size());
+
+    // Create default material definitions for all meshes
+    for (size_t i = 0; i < materialIndices.size(); ++i) {
+        materialDefs[i] = std::make_unique<MaterialDefinition>();
+        materialDefs[i]->vertexShaderPath = "";
+        materialDefs[i]->fragmentShaderPath = "";
+        materialDefs[i]->albedoColor = glm::vec4(1.0f);
+        materialDefs[i]->isDeferred = true;
+    }
+
     if (!gltfDoc.contains("materials") || !gltfDoc["materials"].is_array()) {
-        // No materials defined in the glTF file
-        for (auto& mesh : meshes) {
-            if (mesh) { // Add null check
-                Material* newMaterial = new Material(shader);
-                mesh->material = newMaterial;
-            }
-        }
+        // No materials defined in the glTF file, use defaults
         return;
     }
 
     const auto& materialsJson = gltfDoc["materials"];
 
-    std::vector<Texture*> textures;
+    // Collect texture file paths
+    std::vector<std::string> texturePaths;
     if (gltfDoc.contains("textures") && gltfDoc["textures"].is_array()) {
         const auto& texturesJson = gltfDoc["textures"];
         const auto& imagesJson = gltfDoc.contains("images") ? gltfDoc["images"] : json();
 
-        textures.resize(texturesJson.size(), nullptr);
+        texturePaths.resize(texturesJson.size());
 
         for (size_t i = 0; i < texturesJson.size(); ++i) {
             const auto& textureJson = texturesJson[i];
@@ -592,24 +606,14 @@ void loadMaterials(const json& gltfDoc, std::vector<std::unique_ptr<RawMeshData>
 
                 if (imageIndex < imagesJson.size() && imagesJson[imageIndex].contains("uri")) {
                     std::string imageUri = imagesJson[imageIndex]["uri"].get<std::string>();
-                    std::string imgPath = fileName.substr(0, fileName.find_last_of("/\\") + 1) + imageUri;
-                    textures[i] = new Texture(imgPath);
+                    texturePaths[i] = fileName.substr(0, fileName.find_last_of("/\\") + 1) + imageUri;
                 }
             }
         }
     }
 
-    // Now process materials and assign them to meshes
-    for (size_t meshIdx = 0; meshIdx < meshes.size(); ++meshIdx) {
-        if (!meshes[meshIdx]) { // Add null check
-            continue;
-        }
-
-        RawMeshData* mesh = meshes[meshIdx].get();
-        Material* newMaterial = new Material(shader);
-        mesh->material = newMaterial;
-
-        // Add bounds check for materialIndices
+    // Process materials and assign them to material definitions
+    for (size_t meshIdx = 0; meshIdx < materialDefs.size(); ++meshIdx) {
         if (meshIdx >= materialIndices.size()) {
             continue;
         }
@@ -621,16 +625,19 @@ void loadMaterials(const json& gltfDoc, std::vector<std::unique_ptr<RawMeshData>
         }
 
         const auto& materialJson = materialsJson[materialIdx];
+        auto& matDef = materialDefs[meshIdx];
 
-        newMaterial->albedoColor = glm::vec4(1.0f);
+        // Set default albedo color
+        matDef->albedoColor = glm::vec4(1.0f);
 
         if (materialJson.contains("pbrMetallicRoughness")) {
             const auto& pbrJson = materialJson["pbrMetallicRoughness"];
 
+            // Parse base color factor
             if (pbrJson.contains("baseColorFactor") && pbrJson["baseColorFactor"].is_array() &&
                 pbrJson["baseColorFactor"].size() == 4) {
                 const auto& colorArray = pbrJson["baseColorFactor"];
-                newMaterial->albedoColor = glm::vec4(
+                matDef->albedoColor = glm::vec4(
                     colorArray[0].get<float>(),
                     colorArray[1].get<float>(),
                     colorArray[2].get<float>(),
@@ -638,46 +645,52 @@ void loadMaterials(const json& gltfDoc, std::vector<std::unique_ptr<RawMeshData>
                 );
             }
 
+            // Parse base color texture (albedo map)
             if (pbrJson.contains("baseColorTexture") && pbrJson["baseColorTexture"].contains("index")) {
                 size_t textureIdx = pbrJson["baseColorTexture"]["index"].get<size_t>();
-                if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
-                    newMaterial->albedoMap = textures[textureIdx];
+                if (textureIdx < texturePaths.size() && !texturePaths[textureIdx].empty()) {
+                    matDef->albedoMapPath = texturePaths[textureIdx];
                 }
             }
 
+            // Parse metallic-roughness texture
             if (pbrJson.contains("metallicRoughnessTexture") &&
                 pbrJson["metallicRoughnessTexture"].contains("index")) {
                 size_t textureIdx = pbrJson["metallicRoughnessTexture"]["index"].get<size_t>();
-                if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
-                    newMaterial->metallicRoughnessMap = textures[textureIdx];
+                if (textureIdx < texturePaths.size() && !texturePaths[textureIdx].empty()) {
+                    matDef->metallicRoughnessMapPath = texturePaths[textureIdx];
                 }
             }
         }
 
+        // Parse normal texture
         if (materialJson.contains("normalTexture") && materialJson["normalTexture"].contains("index")) {
             size_t textureIdx = materialJson["normalTexture"]["index"].get<size_t>();
-            if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
-                newMaterial->normalMap = textures[textureIdx];
+            if (textureIdx < texturePaths.size() && !texturePaths[textureIdx].empty()) {
+                matDef->normalMapPath = texturePaths[textureIdx];
             }
         }
 
+        // Parse occlusion texture and strength
         if (materialJson.contains("occlusionTexture") && materialJson["occlusionTexture"].contains("index")) {
             if (materialJson["occlusionTexture"].contains("strength")) {
-                newMaterial->occlusionStrength = materialJson["occlusionTexture"]["strength"].get<float>();
+                matDef->occlusionStrength = materialJson["occlusionTexture"]["strength"].get<float>();
             }
         }
 
+        // Parse emissive texture
         if (materialJson.contains("emissiveTexture") && materialJson["emissiveTexture"].contains("index")) {
             size_t textureIdx = materialJson["emissiveTexture"]["index"].get<size_t>();
-            if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
-                newMaterial->emissiveMap = textures[textureIdx];
+            if (textureIdx < texturePaths.size() && !texturePaths[textureIdx].empty()) {
+                matDef->emissiveMapPath = texturePaths[textureIdx];
             }
         }
 
+        // Parse emissive factor
         if (materialJson.contains("emissiveFactor") && materialJson["emissiveFactor"].is_array() &&
             materialJson["emissiveFactor"].size() == 3) {
             const auto& emissiveArray = materialJson["emissiveFactor"];
-            newMaterial->emissiveColor = glm::vec3(
+            matDef->emissiveColor = glm::vec3(
                 emissiveArray[0].get<float>(),
                 emissiveArray[1].get<float>(),
                 emissiveArray[2].get<float>()

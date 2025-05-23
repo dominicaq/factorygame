@@ -34,11 +34,19 @@ GameObject* SceneUtils::addGameObjectComponent(entt::registry& registry, entt::e
     return &registry.emplace<GameObject>(entity, entity, registry);
 }
 
-GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* shader, const std::string& filePath,
-                                           std::vector<MeshEntityPair>& meshEntityPairs) {
+GameObject* SceneUtils::createMeshGameObject(
+    entt::registry& registry,
+    std::vector<EntityMeshDefinition>& meshEntityPairs,
+    const std::string& filePath,
+    const std::string& vertPath,
+    const std::string& fragPath) {
+
     std::vector<SceneData> nodeData;
     std::vector<std::unique_ptr<RawMeshData>> meshes;
-    ResourceLoader::loadMeshVector(filePath, meshes, nodeData, shader);
+    std::vector<std::unique_ptr<MaterialDefinition>> materialDefs;
+
+    // Load glTF with material definitions
+    ResourceLoader::loadMeshVector(filePath, meshes, materialDefs, nodeData);
 
     if (meshes.empty()) {
         return nullptr;
@@ -54,8 +62,20 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
         // Check if this node has a mesh
         int meshIndex = nodeData[i].meshIndex;
         if (meshIndex >= 0 && meshIndex < static_cast<int>(meshes.size()) && meshes[meshIndex] != nullptr) {
-            // Store the mesh-entity pair for later initialization
-            meshEntityPairs.emplace_back(std::move(meshes[meshIndex]), entities[i]);
+            // Create EntityMeshDefinition with both mesh and material data
+            EntityMeshDefinition newPair{entities[i]};
+            newPair.rawMeshData = std::move(meshes[meshIndex]);
+
+            // Copy material definition if available FIRST
+            if (meshIndex < static_cast<int>(materialDefs.size()) && materialDefs[meshIndex]) {
+                *newPair.materialDef = *materialDefs[meshIndex];
+            }
+
+            // THEN set shader paths (after copying material data)
+            newPair.materialDef->vertexShaderPath = vertPath;
+            newPair.materialDef->fragmentShaderPath = fragPath;
+
+            meshEntityPairs.emplace_back(std::move(newPair));
             meshAssigned[meshIndex] = true;
         }
 
@@ -96,8 +116,19 @@ GameObject* SceneUtils::createMeshGameObject(entt::registry& registry, Shader* s
         entt::entity newEntity = registry.create();
         GameObject* newGameObject = SceneUtils::addGameObjectComponent(registry, newEntity, unassignedData);
 
-        meshEntityPairs.emplace_back(std::move(meshes[i]), newEntity);
+        // Create EntityMeshDefinition for unassigned mesh
+        EntityMeshDefinition unassignedPair{newEntity};
+        unassignedPair.rawMeshData = std::move(meshes[i]);
 
+        // Copy material definition if available
+        if (i < materialDefs.size() && materialDefs[i]) {
+            *unassignedPair.materialDef = *materialDefs[i];
+        }
+
+        unassignedPair.materialDef->vertexShaderPath = vertPath;
+        unassignedPair.materialDef->fragmentShaderPath = fragPath;
+
+        meshEntityPairs.emplace_back(std::move(unassignedPair));
         newGameObject->setParent(entities[rootIdx]);
     }
 
@@ -109,7 +140,7 @@ void SceneUtils::createEmptyGameObject(entt::registry& registry, const SceneData
     addGameObjectComponent(registry, entity, data);
 }
 
-entt::entity SceneUtils::createGizmo(entt::registry& registry, const SceneData& data, Material* mat, GizmoType type) {
+// entt::entity SceneUtils::createGizmo(entt::registry& registry, const SceneData& data, Material* mat, GizmoType type) {
     // entt::entity entity = registry.create();
     // GameObject* gameObject = addGameObjectComponent(registry, entity, data);
 
@@ -135,5 +166,5 @@ entt::entity SceneUtils::createGizmo(entt::registry& registry, const SceneData& 
     // }
 
     // std::cerr << "[Error] createGizmo() failed to create gizmo mesh!\n";
-    return entt::null;
-}
+//     return entt::null;
+// }
