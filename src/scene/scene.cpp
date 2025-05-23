@@ -146,52 +146,52 @@ void Scene::loadScene() {
     // }
 
     // --------------------- Ground Plane ---------------------
-    // entt::entity planeEntity = registry.create();
-    // SceneData save_planeData;
-    // save_planeData.name = "Ground Plane";
-    // save_planeData.position = glm::vec3(0.0f, -1.1f, 0.0f);
-    // save_planeData.eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
-    // save_planeData.scale = glm::vec3(1.0f, 1.0f, 1.0f);
-    // GameObject* planeObject = SceneUtils::addGameObjectComponent(registry, planeEntity, save_planeData);
+    entt::entity planeEntity = registry.create();
+    SceneData save_planeData;
+    save_planeData.name = "Ground Plane";
+    save_planeData.position = glm::vec3(0.0f, -1.1f, 0.0f);
+    save_planeData.eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
+    save_planeData.scale = glm::vec3(1.0f, 1.0f, 1.0f);
+    GameObject* planeObject = SceneUtils::addGameObjectComponent(registry, planeEntity, save_planeData);
 
-    // RawMeshData* planeMesh = MeshGen::createPlane(2,2,200,200);
-    // if (planeMesh != nullptr) {
-    //     Material* planeMaterial = new Material(basicShader);
-    //     planeMaterial->albedoColor = glm::vec4(1.0f);
-    //     planeMaterial->albedoMap = new Texture(TEXTURE_DIR + "tiles/tiles.tga");
-    //     planeMaterial->normalMap = new Texture(TEXTURE_DIR + "tiles/tiles-n.tga");
-    //     planeMaterial->heightMap = new Texture(TEXTURE_DIR + "tiles/tiles-h.tga");
-    //     planeMaterial->heightScale = 0.05f;
-    //     planeMaterial->isDeferred = true;
-    //     planeMaterial->uvScale = glm::vec2(4.0f);
-    //     planeMesh->material = planeMaterial;
-    //     meshEntityPairs.emplace_back(std::move(planeMesh), planeObject->getEntity());
-    // }
+    RawMeshData* planeMesh = MeshGen::createPlane(2,2,200,200);
+    if (planeMesh != nullptr) {
+        Material* planeMaterial = new Material(basicShader);
+        planeMaterial->albedoColor = glm::vec4(1.0f);
+        planeMaterial->albedoMap = new Texture(TEXTURE_DIR + "tiles/tiles.tga");
+        planeMaterial->normalMap = new Texture(TEXTURE_DIR + "tiles/tiles-n.tga");
+        planeMaterial->heightMap = new Texture(TEXTURE_DIR + "tiles/tiles-h.tga");
+        planeMaterial->heightScale = 0.05f;
+        planeMaterial->isDeferred = true;
+        planeMaterial->uvScale = glm::vec2(4.0f);
+        planeMesh->material = planeMaterial;
+        meshEntityPairs.emplace_back(std::move(planeMesh), planeObject->getEntity());
+    }
 
     // --------------------- Diablo Model ---------------------
-    // entt::entity diabloEntity = registry.create();
-    // SceneData save_diabloData;
-    // save_diabloData.name = "Diablo";
-    // save_diabloData.position = glm::vec3(0.0f, 3.0f, 0.0f);
-    // save_diabloData.scale = glm::vec3(3.0f);
-    // GameObject* diabloObject = SceneUtils::addGameObjectComponent(registry, diabloEntity, save_diabloData);
-    // diabloObject->addScript<MoveScript>();
+    entt::entity diabloEntity = registry.create();
+    SceneData save_diabloData;
+    save_diabloData.name = "Diablo";
+    save_diabloData.position = glm::vec3(0.0f, 3.0f, 0.0f);
+    save_diabloData.scale = glm::vec3(3.0f);
+    GameObject* diabloObject = SceneUtils::addGameObjectComponent(registry, diabloEntity, save_diabloData);
+    diabloObject->addScript<MoveScript>();
 
-    // Mesh* diabloMesh = ResourceLoader::loadMesh(MODEL_DIR + "/diablo3_pose.obj");
-    // if (diabloMesh != nullptr) {
-    //     Material* diabloMaterial = new Material(basicShader);
-    //     diabloMaterial->albedoColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-    //     diabloMaterial->isDeferred = true;
+    RawMeshData* diabloMesh = ResourceLoader::loadMesh(MODEL_DIR + "/diablo3_pose.obj");
+    if (diabloMesh != nullptr) {
+        Material* diabloMaterial = new Material(basicShader);
+        diabloMaterial->albedoColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        diabloMaterial->isDeferred = true;
 
-    //     Texture* diabloAlbedoMap = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_diffuse.tga");
-    //     diabloMaterial->albedoMap = diabloAlbedoMap;
+        Texture* diabloAlbedoMap = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_diffuse.tga");
+        diabloMaterial->albedoMap = diabloAlbedoMap;
 
-    //     Texture* diabloNormalMap = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_nm_tangent.tga");
-    //     diabloMaterial->normalMap = diabloNormalMap;
+        Texture* diabloNormalMap = new Texture(TEXTURE_DIR + "diablo/diablo3_pose_nm_tangent.tga");
+        diabloMaterial->normalMap = diabloNormalMap;
 
-    //     diabloMesh->material = diabloMaterial;
-    //     registry.emplace<Mesh*>(diabloEntity, diabloMesh);
-    // }
+        diabloMesh->material = diabloMaterial;
+        meshEntityPairs.emplace_back(std::move(diabloMesh), diabloObject->getEntity());
+    }
 
     /*
     * glTF Game Objects
@@ -200,36 +200,36 @@ void Scene::loadScene() {
     auto gltfLoadEnd = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> gltfLoadElasped;
 
-    // gltfLoadStart = std::chrono::high_resolution_clock::now();
-    // GameObject* helmetObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf", meshEntityPairs);
-    // if (helmetObj) {
-    //     helmetObj->setScale(glm::vec3(1.0f));
-    //     helmetObj->setPosition(glm::vec3(0.0f, 5.0f, -5.0f));
-    //     helmetObj->setEuler(glm::vec3(90,0,0));
-    //     // helmetObj->addScript<MoveScript>();
-    // }
-    // gltfLoadEnd = std::chrono::high_resolution_clock::now();
-    // gltfLoadElasped = gltfLoadEnd - gltfLoadStart;
-    // std::cout << "createMeshGameObject(Helmet) took " << gltfLoadElasped.count() << " seconds.\n";
+    gltfLoadStart = std::chrono::high_resolution_clock::now();
+    GameObject* helmetObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf", meshEntityPairs);
+    if (helmetObj) {
+        helmetObj->setScale(glm::vec3(1.0f));
+        helmetObj->setPosition(glm::vec3(0.0f, 5.0f, -5.0f));
+        helmetObj->setEuler(glm::vec3(90,0,0));
+        // helmetObj->addScript<MoveScript>();
+    }
+    gltfLoadEnd = std::chrono::high_resolution_clock::now();
+    gltfLoadElasped = gltfLoadEnd - gltfLoadStart;
+    std::cout << "createMeshGameObject(Helmet) took " << gltfLoadElasped.count() << " seconds.\n";
 
-    // GameObject* dragonObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "dragon/dragon.gltf", meshEntityPairs);
-    // if (dragonObj) {
-    //     dragonObj->setScale(glm::vec3(0.5f));
-    //     dragonObj->setPosition(glm::vec3(10.0f, -0.5f, 2.5f));
-    // }
+    GameObject* dragonObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "dragon/dragon.gltf", meshEntityPairs);
+    if (dragonObj) {
+        dragonObj->setScale(glm::vec3(0.5f));
+        dragonObj->setPosition(glm::vec3(10.0f, -0.5f, 2.5f));
+    }
 
-    // GameObject* laternObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf");
-    // if (laternObj) {
-    //     laternObj->setScale(glm::vec3(0.5f));
-    //     laternObj->setPosition(glm::vec3(10.0f, -0.25f, -2.5f));
-    //     laternObj->addScript<MoveScript>();
-    // }
+    GameObject* laternObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Lantern/glTF/Lantern.gltf", meshEntityPairs);
+    if (laternObj) {
+        laternObj->setScale(glm::vec3(0.5f));
+        laternObj->setPosition(glm::vec3(10.0f, -0.25f, -2.5f));
+        laternObj->addScript<MoveScript>();
+    }
 
-    // GameObject* boomBox = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/BoomBox/glTF/BoomBox.gltf");
-    // if (boomBox) {
-    //     boomBox->setScale(glm::vec3(100.0f));
-    //     boomBox->setPosition(glm::vec3(0.0f, 15.0f, -5.0f));
-    // }
+    GameObject* boomBox = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/BoomBox/glTF/BoomBox.gltf", meshEntityPairs);
+    if (boomBox) {
+        boomBox->setScale(glm::vec3(100.0f));
+        boomBox->setPosition(glm::vec3(0.0f, 15.0f, -5.0f));
+    }
 
     gltfLoadStart = std::chrono::high_resolution_clock::now();
     GameObject* romanObj = SceneUtils::createMeshGameObject(registry, basicShader, ASSET_DIR "gltf-assets/Models/Sponza/glTF/Sponza.gltf", meshEntityPairs);
@@ -254,13 +254,13 @@ void Scene::loadScene() {
     float yPosition = 10.0f;
     createSuns(1, 50.0f, 50.0f, basicShader);
 
-    // createSpotLights(2, circleRadius, yPosition, basicShader);
+    createSpotLights(2, circleRadius, yPosition, basicShader);
 
     // // Light balls
     // createSpheres(n, circleRadius * 10.0f, 0, 1.0f, basicShader, true);
 
     // // Normal balls
-    // createSpheres(4, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
+    createSpheres(10000, circleRadius * 10.0f, 0, 1.0f, basicShader, false);
 
     // // Gizmo Cube
     // // Box dimensions
@@ -279,9 +279,6 @@ void Scene::loadScene() {
     //         }
     //     }
     // }
-
-    // // Finally, update the mesh instance map if any for later use
-    // updateInstanceMap();
 }
 
 void Scene::createSuns(int n, float circleRadius, float yPosition, Shader* basicShader) {
@@ -411,82 +408,93 @@ void Scene::createSpotLights(int n, float circleRadius, float yPosition, Shader*
         SceneUtils::addLightComponents(registry, lightEntity, lightData);
 
         // Cube mesh
-        // Mesh* lightCube = ResourceLoader::loadMesh(MODEL_DIR + "/spotlight.obj");
-        // if (lightCube != nullptr) {
-        //     Material* cubeMaterial = new Material(basicShader);
-        //     cubeMaterial->albedoColor = glm::vec4(1.0f);
-        //     cubeMaterial->albedoMap = new Texture(TEXTURE_DIR + "gold/gold.png");
-        //     cubeMaterial->normalMap = nullptr;
-        //     cubeMaterial->isDeferred = true;
-        //     lightCube->material = cubeMaterial;
-        //     registry.emplace<Mesh*>(lightEntity, lightCube);
-        // }
+        RawMeshData* spotlightMesh = ResourceLoader::loadMesh(MODEL_DIR + "/spotlight.obj");
+        if (spotlightMesh != nullptr) {
+            Material* cubeMaterial = new Material(basicShader);
+            cubeMaterial->albedoColor = glm::vec4(1.0f);
+            cubeMaterial->albedoMap = new Texture(TEXTURE_DIR + "gold/gold.png");
+            cubeMaterial->normalMap = nullptr;
+            cubeMaterial->isDeferred = true;
+            spotlightMesh->material = cubeMaterial;
+            meshEntityPairs.emplace_back(std::move(spotlightMesh), lightObject->getEntity());
+        }
     }
 }
 
 void Scene::createSpheres(int n, float fieldSize, float minHeight, float maxHeight, Shader* basicShader, bool litSpheres) {
-    // Mesh* asteroidMesh = MeshGen::createSphere(25, 25);
-    // if (!asteroidMesh) {
-    //     return;
-    // }
+    // Create the mesh data once
+    std::unique_ptr<RawMeshData> asteroidMesh(MeshGen::createSphere(25, 25));
+    if (!asteroidMesh) {
+        return;
+    }
 
-    // Material* asteroidMaterial = new Material(basicShader);
-    // asteroidMaterial->albedoColor = glm::vec4(1.0f);
-    // asteroidMaterial->albedoMap = new Texture(TEXTURE_DIR + "gold/gold.png");
-    // asteroidMaterial->normalMap = new Texture(TEXTURE_DIR + "gold/gold-n.png");
-    // asteroidMesh->material = asteroidMaterial;
-    // asteroidMaterial->isDeferred = true;
-    // MeshInstance meshInstance = addMeshInstance(asteroidMesh);
+    // Set up material
+    Material* asteroidMaterial = new Material(basicShader);
+    asteroidMaterial->albedoColor = glm::vec4(1.0f);
+    asteroidMaterial->albedoMap = new Texture(TEXTURE_DIR + "gold/gold.png");
+    asteroidMaterial->normalMap = new Texture(TEXTURE_DIR + "gold/gold-n.png");
+    asteroidMaterial->isDeferred = true;
+    asteroidMesh->material = asteroidMaterial;
 
-    // // Randomization setup
-    // std::random_device rd;
-    // std::mt19937 gen(rd());
-    // std::uniform_real_distribution<float> posDist(-fieldSize, fieldSize);
-    // std::uniform_real_distribution<float> heightDist(minHeight, maxHeight);
-    // std::uniform_real_distribution<float> scaleDist(0.25f, 0.25f);
-    // std::uniform_real_distribution<float> angleDist(0.0f, 360.0f);
-    // std::uniform_real_distribution<float> colorDist(0.0f, 1.0f);  // For color
-    // std::uniform_real_distribution<float> intensityDist(1.0f, 4.0f);  // For intensity
-    // std::uniform_real_distribution<float> radiusDist(3.0f, 3.0f);  // For radius
+    // Get the group ID for this instanced mesh
+    size_t groupId = instancedMeshGroups.size();
 
-    // for (int i = 0; i < n; ++i) {
-    //     // Random position
-    //     float x = posDist(gen);
-    //     float y = heightDist(gen) + 1.0f;
-    //     float z = posDist(gen);
+    // Create instance group
+    InstancedMeshGroup instanceGroup;
+    instanceGroup.meshData = std::move(asteroidMesh);
+    instanceGroup.entities.reserve(n);
 
-    //     // Random rotation
-    //     glm::vec3 randomRotation(angleDist(gen), angleDist(gen), angleDist(gen));
+    // Randomization setup
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> posDist(-fieldSize, fieldSize);
+    std::uniform_real_distribution<float> heightDist(minHeight, maxHeight);
+    std::uniform_real_distribution<float> scaleDist(0.25f, 0.25f);
+    std::uniform_real_distribution<float> angleDist(0.0f, 360.0f);
+    std::uniform_real_distribution<float> colorDist(0.0f, 1.0f);
 
-    //     // Random scale
-    //     float randomScale = scaleDist(gen);
+    for (int i = 0; i < n; ++i) {
+        // Generate random transform data
+        float x = posDist(gen);
+        float y = heightDist(gen) + 1.0f;
+        float z = posDist(gen);
+        glm::vec3 randomRotation(angleDist(gen), angleDist(gen), angleDist(gen));
+        float randomScale = scaleDist(gen);
 
-    //     entt::entity asteroidEntity = registry.create();
+        entt::entity asteroidEntity = registry.create();
 
-    //     // Meta data
-    //     SceneData save_asteroid;
-    //     save_asteroid.name = "Asteroid(" + std::to_string(i) + ")";
-    //     save_asteroid.scale = glm::vec3(randomScale);
-    //     save_asteroid.position = glm::vec3(x, y, z);
-    //     save_asteroid.eulerAngles = randomRotation;
+        // SceneData for the entity
+        SceneData save_asteroid;
+        save_asteroid.name = "Asteroid(" + std::to_string(i) + ")";
+        save_asteroid.scale = glm::vec3(randomScale);
+        save_asteroid.position = glm::vec3(x, y, z);
+        save_asteroid.eulerAngles = randomRotation;
 
-    //     // Add a point light to each asteroid
-    //     if (litSpheres) {
-    //         Light asteroidLight;
-    //         asteroidLight.color = glm::vec3(colorDist(gen), colorDist(gen), colorDist(gen));
-    //         asteroidLight.intensity = 5.0f;
-    //         asteroidLight.point.radius = 10.0f;
-    //         asteroidLight.type = LightType::Point;
-    //         asteroidLight.castShadow = false;
-    //         asteroidLight.isActive = true;
-    //         SceneUtils::addLightComponents(registry, asteroidEntity, asteroidLight);
-    //     }
+        // Add GameObject component (handles all transform components)
+        GameObject* asteroidObject = SceneUtils::addGameObjectComponent(registry, asteroidEntity, save_asteroid);
+        asteroidObject->addScript<BouncingMotion>();
 
-    //     // Game object
-    //     GameObject* asteroidObject = SceneUtils::addGameObjectComponent(registry, asteroidEntity, save_asteroid);
-    //     asteroidObject->addScript<BouncingMotion>();
-    //     registry.emplace<MeshInstance>(asteroidEntity, meshInstance);
-    // }
+        // Add InstancedMeshComponent
+        registry.emplace<MeshInstance>(asteroidEntity, MeshInstance{groupId, (size_t)i});
+
+        // Add lighting if needed
+        if (litSpheres) {
+            Light asteroidLight;
+            asteroidLight.color = glm::vec3(colorDist(gen), colorDist(gen), colorDist(gen));
+            asteroidLight.intensity = 5.0f;
+            asteroidLight.point.radius = 10.0f;
+            asteroidLight.type = LightType::Point;
+            asteroidLight.castShadow = false;
+            asteroidLight.isActive = true;
+            SceneUtils::addLightComponents(registry, asteroidEntity, asteroidLight);
+        }
+
+        // Store entity in the group
+        instanceGroup.entities.push_back(asteroidEntity);
+    }
+
+    // Store the instance group
+    instancedMeshGroups.push_back(std::move(instanceGroup));
 }
 
 Camera& Scene::getPrimaryCamera() {
@@ -506,55 +514,4 @@ void Scene::loadSkyBox(const std::vector<std::string>& skyboxFilePaths) {
 
     // Load the cubemap textures from the provided file paths
     m_skyboxHandle = CubeMap::createFromImages(skyboxFilePaths);
-}
-
-// Scene instancing
-MeshInstance Scene::addMeshInstance(Mesh* mesh) {
-    uint8_t meshIndex = (uint8_t)m_meshInstances.size();
-    m_meshInstances.push_back(mesh);
-
-    MeshInstance newInstance;
-    newInstance.id = meshIndex;
-    return newInstance;
-}
-
-void Scene::updateInstanceMap() {
-    // Handle instance count updates (less frequent)
-    if (m_instanceCountsDirty) {
-        // Clear and count in one pass
-        for (auto& [id, count] : m_instanceCounts) {
-            count = 0;
-        }
-
-        registry.view<MeshInstance>().each([&](const MeshInstance& instance) {
-            m_instanceCounts[instance.id]++;
-        });
-
-        // Resize vectors based on new counts
-        for (auto& [id, count] : m_instanceCounts) {
-            auto& instanceVector = m_instanceMap[id];
-            instanceVector.resize(count);
-            // Initialize current index for this ID while we're here
-            m_currentIndices[id] = 0;
-        }
-
-        m_instanceCountsDirty = false;
-    } else {
-        // Only reset indices if we didn't do it in the count update
-        for (auto& [id, index] : m_currentIndices) {
-            index = 0;
-        }
-    }
-
-    auto view = registry.view<MeshInstance, ModelMatrix>();
-    view.each([&](const auto& instance, const auto& modelMatrix) {
-        const size_t id = instance.id;
-        auto& instanceVector = m_instanceMap[id];
-        size_t& idx = m_currentIndices[id];
-
-        // Safety check in case something got out of sync
-        if (idx < instanceVector.size()) {
-            instanceVector[idx++] = modelMatrix.matrix;
-        }
-    });
 }

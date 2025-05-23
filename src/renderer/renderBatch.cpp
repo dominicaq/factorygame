@@ -1,6 +1,7 @@
 #include "renderBatch.h"
-#include "renderer.h"  // Now we can include the full renderer header
+#include "renderer.h"
 #include <iostream>
+#include <map>
 
 RenderBatch::RenderBatch(size_t initialCapacity) {
     m_instances.reserve(initialCapacity);
@@ -21,16 +22,37 @@ void RenderBatch::prepare(Renderer& renderer) {
     m_drawCommands.clear();
     m_objectData.clear();
 
-    for (const auto& instance : m_instances) {
-        buildDrawCommand(instance.mesh, renderer); // Pass renderer
+    if (m_instances.empty()) return;
 
-        // Create GPU-side instance data (matches shader struct)
-        DrawInstance gpuInstance;
-        gpuInstance.modelMatrix = instance.modelMatrix;
-        gpuInstance.uvScale = instance.uvScale;
-        gpuInstance.padding = glm::vec2(0.0f); // Zero padding for alignment
+    // Group instances by mesh ID for batching
+    std::map<GLuint, std::vector<size_t>> meshGroups;
+    for (size_t i = 0; i < m_instances.size(); ++i) {
+        GLuint meshId = static_cast<GLuint>(m_instances[i].mesh.id);
+        meshGroups[meshId].push_back(i);
+    }
 
-        m_objectData.push_back(gpuInstance);
+    // Build draw commands and object data for each mesh group
+    GLuint currentBaseInstance = 0;
+    for (const auto& [meshId, instanceIndices] : meshGroups) {
+        const Mesh& mesh = m_instances[instanceIndices[0]].mesh; // Use first instance's mesh
+        GLuint instanceCount = static_cast<GLuint>(instanceIndices.size());
+
+        // Build draw command with proper instance count
+        buildDrawCommand(mesh, renderer, currentBaseInstance, instanceCount);
+
+        // Add all instances for this mesh to object data
+        for (size_t instanceIdx : instanceIndices) {
+            const auto& instance = m_instances[instanceIdx];
+
+            DrawInstance gpuInstance;
+            gpuInstance.modelMatrix = instance.modelMatrix;
+            gpuInstance.uvScale = instance.uvScale;
+            gpuInstance.padding = glm::vec2(0.0f);
+
+            m_objectData.push_back(gpuInstance);
+        }
+
+        currentBaseInstance += instanceCount;
     }
 
     updateBuffers();
@@ -40,7 +62,14 @@ void RenderBatch::render(Renderer& renderer) {
     if (m_drawCommands.empty()) {
         return;
     }
+
+    // FIXED: Ensure the SSBO is bound before rendering
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_drawInstanceSSBO);
+
     renderer.executeIndirectDraw(m_drawCommands, m_indirectBuffer);
+
+    // Unbind SSBO after rendering
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
 }
 
 void RenderBatch::clear() {
@@ -48,10 +77,13 @@ void RenderBatch::clear() {
 }
 
 void RenderBatch::initBuffers(size_t capacity) {
+    // FIXED: Ensure proper buffer sizing for mixed command types
     glGenBuffers(1, &m_indirectBuffer);
     glBindBuffer(GL_DRAW_INDIRECT_BUFFER, m_indirectBuffer);
+    // Size for the larger of the two command types to handle both
+    size_t commandSize = std::max(sizeof(DrawElementsIndirectCommand), sizeof(DrawArraysIndirectCommand));
     glBufferData(GL_DRAW_INDIRECT_BUFFER,
-                 capacity * sizeof(IndirectDrawCommand),
+                 capacity * commandSize,
                  nullptr, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
     m_indirectBufferCapacity = capacity;
@@ -67,13 +99,16 @@ void RenderBatch::initBuffers(size_t capacity) {
 }
 
 void RenderBatch::updateBuffers() {
+    // FIXED: Handle buffer resizing for mixed command types
     if (m_drawCommands.size() > m_indirectBufferCapacity) {
         size_t newCapacity = m_drawCommands.size() * 3 / 2;
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, m_indirectBuffer);
+        size_t commandSize = std::max(sizeof(DrawElementsIndirectCommand), sizeof(DrawArraysIndirectCommand));
         glBufferData(GL_DRAW_INDIRECT_BUFFER,
-                     newCapacity * sizeof(IndirectDrawCommand),
+                     newCapacity * commandSize,
                      nullptr, GL_DYNAMIC_DRAW);
         m_indirectBufferCapacity = newCapacity;
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
     }
 
     if (m_objectData.size() > m_drawInstanceSSBOCapacity) {
@@ -84,16 +119,13 @@ void RenderBatch::updateBuffers() {
                      nullptr, GL_DYNAMIC_DRAW);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_drawInstanceSSBO);
         m_drawInstanceSSBOCapacity = newCapacity;
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
 
-    if (!m_drawCommands.empty()) {
-        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, m_indirectBuffer);
-        glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0,
-                        static_cast<GLsizeiptr>(m_drawCommands.size() * sizeof(IndirectDrawCommand)),
-                        m_drawCommands.data());
-        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
-    }
+    // FIXED: Don't upload IndirectDrawCommand directly - let executeIndirectDraw handle it
+    // The IndirectDrawCommand contains both types, but OpenGL expects specific command types
 
+    // Upload instance data
     if (!m_objectData.empty()) {
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_drawInstanceSSBO);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0,
@@ -103,7 +135,7 @@ void RenderBatch::updateBuffers() {
     }
 }
 
-void RenderBatch::buildDrawCommand(const Mesh& mesh, Renderer& renderer) {
+void RenderBatch::buildDrawCommand(const Mesh& mesh, Renderer& renderer, GLuint baseInstance, GLuint instanceCount) {
     IndirectDrawCommand cmd;
     cmd.meshId = static_cast<GLuint>(mesh.id);
     cmd.useIndices = renderer.hasMeshIndices(mesh.id);
@@ -116,12 +148,10 @@ void RenderBatch::buildDrawCommand(const Mesh& mesh, Renderer& renderer) {
         }
 
         cmd.elements.count = (mesh.count > 0) ? mesh.count : actualIndexCount;
-        cmd.elements.instanceCount = 1;
+        cmd.elements.instanceCount = instanceCount; // Set to actual instance count
         cmd.elements.firstIndex = mesh.firstIndex;
         cmd.elements.baseVertex = mesh.baseVertex;
-
-        // FIXED: baseInstance should match the instance data index
-        cmd.elements.baseInstance = static_cast<GLuint>(m_objectData.size()); // Use objectData size, not drawCommands
+        cmd.elements.baseInstance = baseInstance; // Starting instance index
     } else {
         GLsizei actualVertexCount = renderer.getMeshVertexCount(mesh.id);
         if (actualVertexCount == 0) {
@@ -130,11 +160,9 @@ void RenderBatch::buildDrawCommand(const Mesh& mesh, Renderer& renderer) {
         }
 
         cmd.arrays.count = (mesh.count > 0) ? mesh.count : actualVertexCount;
-        cmd.arrays.instanceCount = 1;
+        cmd.arrays.instanceCount = instanceCount; // Set to actual instance count
         cmd.arrays.first = mesh.firstIndex;
-
-        // FIXED: baseInstance should match the instance data index
-        cmd.arrays.baseInstance = static_cast<GLuint>(m_objectData.size()); // Use objectData size, not drawCommands
+        cmd.arrays.baseInstance = baseInstance; // Starting instance index
     }
 
     m_drawCommands.push_back(cmd);

@@ -24,6 +24,7 @@ class Scene {
 public:
     entt::registry registry;
     std::vector<MeshEntityPair> meshEntityPairs;
+    std::vector<InstancedMeshGroup> instancedMeshGroups;
 
     // =========================================================================
     // Scene Management
@@ -71,12 +72,6 @@ public:
     * Tell the scene to recount the number of active instances to keep instance map up to date
     */
     void flagDirtyInstanceCount() { m_instanceCountsDirty = true; };
-
-    /*
-    * Resets the instance map with the latest mesh transformations and instance counts.
-    * Collects transformation matrices `ModelMatrix` of the mesh instances and stores them in the appropriate vector for each mesh ID.
-    */
-    void updateInstanceMap();
 
     /*
      * Adds a mesh to be instanced and returns the associated MeshInstance component.

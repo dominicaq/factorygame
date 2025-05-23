@@ -52,7 +52,7 @@ void ResourceLoader::freeImage(unsigned char* data) {
 /*
 * Mesh
 */
-std::unique_ptr<RawMeshData> ResourceLoader::loadMesh(const std::string& filepath) {
+RawMeshData* ResourceLoader::loadMesh(const std::string& filepath) {
     std::string fileContent = readFile(filepath);
     if (fileContent.empty()) {
         std::cerr << "[Error] ResourceLoader::loadMesh: File contents empty: " << filepath << "\n";
@@ -74,8 +74,7 @@ std::unique_ptr<RawMeshData> ResourceLoader::loadMesh(const std::string& filepat
 
     // Determine the appropriate function based on the extension
     if (extension == "obj") {
-        return nullptr;
-        // return ObjLoader::loadOBJ(fileContent);
+        return ObjLoader::loadOBJ(fileContent);
     } else if (extension == "gltf") {
         std::cerr << "[Error] ResourceLoader::loadMesh: for glTF files use ResourceLoader::loadMeshVector() for file: " << filepath << "\n";
         return nullptr;

@@ -16,7 +16,7 @@ namespace ResourceLoader {
     /*
     * Mesh functions
     */
-    std::unique_ptr<RawMeshData> loadMesh(const std::string& filepath);
+    RawMeshData* loadMesh(const std::string& filepath);
 
     void loadMeshVector(
         const std::string& filepath,

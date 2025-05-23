@@ -148,19 +148,19 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 }
 
 void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) {
-    // Create batch for shadow rendering
-    RenderBatch shadowBatch;
+    renderer.clearDrawCommands();
+    m_shadowBatch.clear();
 
-    // Add all non-wireframe meshes to the shadow batch
+    // Batch draw
     registry.view<Mesh, ModelMatrix>().each([&](const Mesh& mesh, const ModelMatrix& modelMatrix) {
-        // For shadow rendering, UV scale doesn't matter much, use default
-        glm::vec2 defaultUVScale(1.0f, 1.0f);
-        shadowBatch.addInstance(mesh, modelMatrix.matrix, defaultUVScale);
+        if (mesh.material->isDeferred) {
+            m_shadowBatch.addInstance(mesh, modelMatrix.matrix, mesh.material->uvScale);
+        }
     });
 
-    // Render all shadows in one batch
-    shadowBatch.prepare(renderer);
-    shadowBatch.render(renderer);
+    // Draw scene
+    m_shadowBatch.prepare(renderer);
+    m_shadowBatch.render(renderer);
 }
 
 void ShadowPass::cleanupLightResources(entt::entity lightEntity) {

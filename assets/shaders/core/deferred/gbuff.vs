@@ -48,7 +48,8 @@ vec3 unpackTangent(vec4 q) {
 
 void main() {
     // Get instance data directly from SSBO
-    InstanceData instance = instances[gl_InstanceID];
+    uint instanceId = gl_BaseInstance + gl_InstanceID;
+    InstanceData instance = instances[instanceId];
     mat4 modelMatrix = instance.modelMatrix;
     vec2 currentUVScale = instance.uvScale;
 

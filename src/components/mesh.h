@@ -49,9 +49,12 @@ struct Mesh {
 };
 
 struct MeshInstance {
-    uint32_t materialIndex = 0xFFFFFFFF;
-    uint8_t id;
+    size_t meshGroupId;  // Index into instancedMeshGroups
+    size_t instanceId;   // Index within the group
+};
 
-    // Raw mesh data (TO BE REMOVED)
-    Material* material;
+struct InstancedMeshGroup {
+    std::unique_ptr<RawMeshData> meshData;
+    std::vector<entt::entity> entities;
+    Mesh* initializedMesh = nullptr;
 };

@@ -34,18 +34,18 @@ public:
 
         // Clear and build draw commands for indirect rendering
         renderer.clearDrawCommands();
+        m_geometryBatch.clear();
 
         // Batch draw
-        RenderBatch batch;
         registry.view<Mesh, ModelMatrix>().each([&](const Mesh& mesh, const ModelMatrix& modelMatrix) {
             if (mesh.material->isDeferred) {
-                batch.addInstance(mesh, modelMatrix.matrix, mesh.material->uvScale);
+                m_geometryBatch.addInstance(mesh, modelMatrix.matrix, mesh.material->uvScale);
             }
         });
 
         // Draw scene
-        batch.prepare(renderer);
-        batch.render(renderer);
+        m_geometryBatch.prepare(renderer);
+        m_geometryBatch.render(renderer);
 
         std::pair<int, int> dimensions = renderer.getScreenDimensions();
         int width = dimensions.first;
@@ -62,6 +62,7 @@ public:
 
 private:
     Shader m_gBufferShader;
+    RenderBatch m_geometryBatch;
 };
 
 #endif // GEOMETRYPASS_H

@@ -35,7 +35,6 @@ public:
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        m_activeScene.updateInstanceMap();
         for (auto& pass : m_renderPasses) {
             pass->execute(renderer, registry);
         }

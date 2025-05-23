@@ -74,6 +74,6 @@ private:
 
     void initBuffers(size_t capacity);
     void updateBuffers();
-    void buildDrawCommand(const Mesh& mesh, Renderer& renderer);
+    void buildDrawCommand(const Mesh& mesh, Renderer& renderer, GLuint instanceIndex, GLuint instanceCount);
     void cleanup();
 };

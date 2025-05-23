@@ -18,6 +18,7 @@ public:
 
 private:
     Shader m_shadowShader;
+    RenderBatch m_shadowBatch;
     Framebuffer* m_shadowFrameBuffer;
 
     // Caches for storing shadow textures per light entity

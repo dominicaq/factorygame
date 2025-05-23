@@ -75,17 +75,19 @@ int main() {
         scene.registry.emplace<Mesh>(entity, mesh);
     }
 
-    // Init mesh buffers for each vector of model matrices
-    // auto& meshInstances = scene.getMeshInstances();
-    // for (const auto& pair : scene.getInstanceMap()) {
-    //     size_t instanceID = pair.first;
-    //     const std::vector<glm::mat4>& matrices = pair.second;
+    for (auto& instanceGroup : scene.instancedMeshGroups) {
+        // Initialize the mesh buffers once for the entire group
+        Mesh& instancedMesh = renderer.initMeshBuffers(instanceGroup.meshData);
+        instancedMesh.material = instanceGroup.meshData->material;
 
-    //     // Initialize mesh buffers with the instanceID
-    //     renderer.initMeshBuffers(meshInstances[instanceID], false, instanceID);
-    //     // Set up instance attributes with the vector of matrices
-    //     renderer.setupInstanceAttributes(instanceID, matrices);
-    // }
+        // Store reference to initialized mesh in the group
+        instanceGroup.initializedMesh = &instancedMesh;
+
+        // Add the same Mesh component to all entities in the group
+        for (entt::entity entity : instanceGroup.entities) {
+            scene.registry.emplace<Mesh>(entity, instancedMesh);
+        }
+    }
 
     // -------------------- Start Game -------------------
     frameGraph.setupPasses();
