@@ -71,12 +71,6 @@ public:
     GLsizei getMeshIndexCount(size_t meshId) const;
     GLsizei getMeshVertexCount(size_t meshId) const;
 
-    /*
-     * Command buffer management for indirect drawing
-     */
-    void clearDrawCommands();
-    void addDrawCommand(const Mesh& mesh);
-
 private:
     /*
      * Core Renderer State
@@ -102,14 +96,6 @@ private:
     std::vector<MeshData> m_meshData;
 
     /*
-     * Indirect draw buffers
-     */
-    GLuint m_indirectBuffer = 0;
-    GLuint m_indirectCount = 0;
-    GLuint m_drawCountBuffer = 0;
-    std::vector<IndirectDrawCommand> m_commandBuffer;
-
-    /*
     * Material storage
     */
 
@@ -118,6 +104,5 @@ private:
      */
     void initOpenGLState();
     void initScreenQuad();
-    void initIndirectDrawBuffer(size_t maxDrawCommands);
     void cleanup();
 };

@@ -33,14 +33,13 @@ public:
         m_gBufferShader.setMat4("u_Projection", camera->getProjectionMatrix());
 
         // Clear and build draw commands for indirect rendering
-        renderer.clearDrawCommands();
         m_geometryBatch.clear();
 
         // Batch draw
         registry.view<Mesh, ModelMatrix>().each([&](const Mesh& mesh, const ModelMatrix& modelMatrix) {
             m_geometryBatch.addInstance(RenderInstance(mesh, modelMatrix.matrix));
         });
-        MaterialManager::getInstance().bindMaterialBuffer(0);
+        MaterialManager::getInstance().bindMaterialBuffer(1);
 
         // Draw scene
         m_geometryBatch.prepare(renderer);

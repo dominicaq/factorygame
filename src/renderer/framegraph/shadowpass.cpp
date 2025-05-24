@@ -148,7 +148,6 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 }
 
 void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) {
-    renderer.clearDrawCommands();
     m_shadowBatch.clear();
 
     // Batch draw

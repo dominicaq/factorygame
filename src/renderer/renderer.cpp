@@ -3,7 +3,6 @@
 
 #define VERTEX_SIZE 8
 #define NUM_GATTACHMENTS 5
-#define MAX_DRAW_COMMANDS 1024
 
 Renderer::Renderer(config::GraphicsSettings settings, Camera* camera)
     : config(settings), m_camera(camera) {
@@ -16,73 +15,10 @@ Renderer::Renderer(config::GraphicsSettings settings, Camera* camera)
 
     // Initialize G-Buffer
     m_gBuffer = std::make_unique<Framebuffer>(m_width, m_height, NUM_GATTACHMENTS, true);
-
-    initIndirectDrawBuffer(MAX_DRAW_COMMANDS);
 }
 
 Renderer::~Renderer() {
     cleanup();
-}
-
-// ============================================================================
-// COMMAND BUFFER MANAGEMENT (from your original code, cleaned up)
-// ============================================================================
-
-void Renderer::clearDrawCommands() {
-    m_commandBuffer.clear();
-    m_indirectCount = 0;
-}
-
-void Renderer::addDrawCommand(const Mesh& mesh) {
-    // Enhanced validation
-    if (mesh.id >= m_meshData.size() || m_meshData[mesh.id].VAO == 0) {
-        std::cerr << "[Error] Invalid mesh ID: " << mesh.id << "\n";
-        return;
-    }
-
-    const MeshData& meshData = m_meshData[mesh.id];
-
-    // Create unified command
-    IndirectDrawCommand cmd;
-    cmd.meshId = mesh.id;
-    cmd.useIndices = (meshData.EBO != 0);
-
-    if (cmd.useIndices) {
-        uint32_t requestedCount = mesh.count > 0 ? mesh.count : meshData.indexCount;
-        uint32_t requestedFirst = mesh.firstIndex;
-
-        if (requestedFirst >= meshData.indexCount) {
-            return;
-        }
-
-        if (requestedFirst + requestedCount > meshData.indexCount) {
-            requestedCount = meshData.indexCount - requestedFirst;
-        }
-
-        cmd.elements.count = requestedCount;
-        cmd.elements.instanceCount = mesh.instanceCount > 0 ? mesh.instanceCount : 1;
-        cmd.elements.firstIndex = requestedFirst;
-        cmd.elements.baseVertex = mesh.baseVertex;
-        cmd.elements.baseInstance = mesh.baseInstance;
-    } else {
-        uint32_t requestedCount = mesh.count > 0 ? mesh.count : meshData.vertexCount;
-        uint32_t requestedFirst = mesh.firstIndex;
-
-        if (requestedFirst >= meshData.vertexCount) {
-            return;
-        }
-
-        if (requestedFirst + requestedCount > meshData.vertexCount) {
-            requestedCount = meshData.vertexCount - requestedFirst;
-        }
-
-        cmd.arrays.count = requestedCount;
-        cmd.arrays.instanceCount = mesh.instanceCount > 0 ? mesh.instanceCount : 1;
-        cmd.arrays.first = requestedFirst;
-        cmd.arrays.baseInstance = mesh.baseInstance;
-    }
-
-    m_commandBuffer.push_back(cmd);
 }
 
 
@@ -266,33 +202,6 @@ void Renderer::drawScreenQuad() {
     glBindVertexArray(0);
 }
 
-void Renderer::initIndirectDrawBuffer(size_t maxDrawCommands) {
-    // Clean up existing buffers
-    if (m_indirectBuffer != 0) {
-        glDeleteBuffers(1, &m_indirectBuffer);
-    }
-    if (m_drawCountBuffer != 0) {
-        glDeleteBuffers(1, &m_drawCountBuffer);
-    }
-
-    // Create indirect command buffer (for both elements and arrays)
-    glGenBuffers(1, &m_indirectBuffer);
-    glBindBuffer(GL_DRAW_INDIRECT_BUFFER, m_indirectBuffer);
-    glBufferData(GL_DRAW_INDIRECT_BUFFER,
-                 maxDrawCommands * sizeof(DrawElementsIndirectCommand),
-                 nullptr, GL_DYNAMIC_DRAW);
-
-    // Create buffer for draw count (bind as regular buffer for now)
-    glGenBuffers(1, &m_drawCountBuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, m_drawCountBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLuint), nullptr, GL_DYNAMIC_DRAW);
-
-    glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    m_commandBuffer.reserve(maxDrawCommands);
-}
-
 void Renderer::cleanup() {
     // Clean up mesh buffers
     for (auto& data : m_meshData) {
@@ -305,17 +214,6 @@ void Renderer::cleanup() {
         if (data.EBO) {
             glDeleteBuffers(1, &data.EBO);
         }
-    }
-
-    // Clean up indirect draw resources
-    if (m_indirectBuffer != 0) {
-        glDeleteBuffers(1, &m_indirectBuffer);
-        m_indirectBuffer = 0;
-    }
-
-    if (m_drawCountBuffer != 0) {
-        glDeleteBuffers(1, &m_drawCountBuffer);
-        m_drawCountBuffer = 0;
     }
 
     // Clean up screen quad

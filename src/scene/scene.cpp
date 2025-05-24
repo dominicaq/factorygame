@@ -16,11 +16,6 @@
 
 // TODO: In the future, this will be user generated through UI, not code.
 void Scene::loadScene() {
-    // ------------------------ Wireframe Setup ------------------------
-    // Shader* wireframeShader = new Shader(SHADER_DIR + "debug/wireframe.vs", SHADER_DIR + "debug/wireframe.fs");
-    // m_wireframeMaterial = new Material(wireframeShader);
-    // m_wireframeMaterial->albedoColor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
-
     // ------------------------ Skybox Setup ------------------------
     std::vector<std::string> skyboxPaths = {
         ASSET_DIR "textures/skyboxes/bspace/1.png",
@@ -44,14 +39,14 @@ void Scene::loadScene() {
     // Toggle the flash light with F key
     Light flashLight;
     flashLight.color = glm::vec3(1.0f);
-    flashLight.intensity = 5.0f;
+    flashLight.intensity = 30.0f;
     flashLight.castShadow = true;
     flashLight.isActive = false;
 
     flashLight.type = LightType::Spot;
-    flashLight.spot.innerCutoff = cos(glm::radians(3.0f));
-    flashLight.spot.outerCutoff = cos(glm::radians(30.0f));
-    flashLight.spot.range = 25.0f;
+    flashLight.spot.innerCutoff = cos(glm::radians(4.0f));
+    flashLight.spot.outerCutoff = cos(glm::radians(40.0f));
+    flashLight.spot.range = 50.0f;
     SceneUtils::addLightComponents(registry, cameraEntity, flashLight);
 
     Camera cameraComponent(cameraEntity, registry);
@@ -63,29 +58,26 @@ void Scene::loadScene() {
     std::string defaultFragPath = SHADER_DIR + "default.fs";
 
     // --------------------- Beetle Car ---------------------
-    const int numRows = 5;  // Adjust for more rows
-    const float spacing = 10.0f;  // Distance between rows
-    const float startZ = -((numRows - 1) * spacing) / 2.0f;  // Center the rows
+    for (int i = 0; i < 2; ++i) {
+        entt::entity bunnyEntity = registry.create();
+        SceneData save_bunnyData;
+        save_bunnyData.name = "Bunny " + std::to_string(i);
+        save_bunnyData.position = glm::vec3(i * 10.0f - 5.0f, 5.0f, 0); // Space them apart
+        save_bunnyData.scale = glm::vec3(1.0f);
+        GameObject* bunnyObject = SceneUtils::addGameObjectComponent(registry, bunnyEntity, save_bunnyData);
+        bunnyObject->setScale(glm::vec3(20.0f));
 
-    // Create Bunny
-    entt::entity bunnyEntity = registry.create();
-    SceneData save_bunnyData;
-    save_bunnyData.name = "Bunny";
-    save_bunnyData.position = glm::vec3(6.0f, -0.5f, startZ); // Set to first buggy position
-    save_bunnyData.scale = glm::vec3(5.0f);
-    GameObject* bunnyObject = SceneUtils::addGameObjectComponent(registry, bunnyEntity, save_bunnyData);
-
-    // Mesh* bunnyMesh = ResourceLoader::loadMesh(MODEL_DIR + "stanfordBunny.obj");
-    // if (bunnyMesh != nullptr) {
-    //     Material* bunnyMaterial = new Material(basicShader);
-    //     bunnyMaterial->albedoColor = glm::vec4(1.0f, 0.5f, 0.31f, 1.0f);
-    //     bunnyMaterial->isDeferred = true;
-
-    //     bunnyMaterial->albedoMap = new Texture(TEXTURE_DIR + "uv_map.jpg");
-
-    //     bunnyMesh->material = bunnyMaterial;
-    //     // registry.emplace<Mesh*>(bunnyEntity, bunnyMesh);
-    // }
+        std::unique_ptr<RawMeshData> bunnyMesh(ResourceLoader::loadMesh(MODEL_DIR + "bunny.obj"));
+        if (bunnyMesh != nullptr) {
+            EntityMeshDefinition bunnyMeshDef{bunnyObject->getEntity()};
+            bunnyMeshDef.materialDef->vertexShaderPath = defaultVertexPath;
+            bunnyMeshDef.materialDef->fragmentShaderPath = defaultFragPath;
+            bunnyMeshDef.materialDef->albedoColor = glm::vec4(1.0f, 0.5f, 0.31f, 1.0f);
+            bunnyMeshDef.materialDef->isDeferred = true;
+            bunnyMeshDef.rawMeshData = std::move(bunnyMesh);
+            meshEntityPairs.emplace_back(std::move(bunnyMeshDef));
+        }
+    }
 
     // for (int row = 0; row < numRows; ++row) {
     //     entt::entity carEntity = registry.create();
@@ -111,39 +103,6 @@ void Scene::loadScene() {
     //     }
     // }
 
-    // --------------------- Gold Wall ---------------------
-    // int numBalls = 0;
-    // float ballSpace = 6.0f;
-    // for (int i = 0; i < numBalls; ++i) {
-    //     entt::entity ballEntity = registry.create();
-
-    //     // Set up the game object data
-    //     SceneData save_goldWall;
-    //     save_goldWall.name = "Gold Ball";
-    //     save_goldWall.position = glm::vec3(-10.0f + i * ballSpace, 1.0f, -10.0f);
-    //     save_goldWall.eulerAngles = glm::vec3(90, 0, 0);
-    //     save_goldWall.scale = glm::vec3(2.0f);
-    //     GameObject* goldWallObject = SceneUtils::addGameObjectComponent(registry, ballEntity, save_goldWall);
-
-    //     // Generate the sphere mesh
-    //     Mesh* wallMesh = MeshGen::createSphere(50, 50);
-    //     if (wallMesh != nullptr) {
-    //         // Create and configure the material
-    //         Material* ballMat = new Material(basicShader);
-    //         ballMat->albedoColor = glm::vec4(1.0f);
-    //         ballMat->albedoMap = new Texture(TEXTURE_DIR + "gold/gold.png");
-    //         ballMat->normalMap = new Texture(TEXTURE_DIR + "gold/gold-n.png");
-    //         ballMat->heightMap = new Texture(TEXTURE_DIR + "gold/gold-h.ong");
-    //         ballMat->heightScale = 0.01f;
-    //         ballMat->isDeferred = true;
-    //         ballMat->uvScale = glm::vec2(1.0f);
-    //         wallMesh->material = ballMat;
-
-    //         // Attach the mesh to the entity
-    //         registry.emplace<Mesh*>(ballEntity, wallMesh);
-    //     }
-    // }
-
     // --------------------- Ground Plane ---------------------
     entt::entity planeEntity = registry.create();
     SceneData save_planeData;
@@ -152,7 +111,7 @@ void Scene::loadScene() {
     save_planeData.eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
     save_planeData.scale = glm::vec3(1.0f, 1.0f, 1.0f);
     GameObject* planeObject = SceneUtils::addGameObjectComponent(registry, planeEntity, save_planeData);
-    RawMeshData* planeMesh = MeshGen::createPlane(2,2,200,200);
+    std::unique_ptr<RawMeshData> planeMesh(MeshGen::createPlane(2, 2, 200, 200));
     if (planeMesh != nullptr) {
         EntityMeshDefinition planeMeshDef{planeObject->getEntity()};
         planeMeshDef.materialDef->vertexShaderPath = defaultVertexPath;
@@ -164,6 +123,7 @@ void Scene::loadScene() {
         planeMeshDef.materialDef->heightMapPath = TEXTURE_DIR + "tiles/tiles-h.tga";
         planeMeshDef.materialDef->heightScale = 0.05f;
         planeMeshDef.materialDef->uvScale= glm::vec2(4.0f);
+        planeMeshDef.rawMeshData = std::move(planeMesh);
         meshEntityPairs.emplace_back(std::move(planeMeshDef));
     }
 
@@ -176,7 +136,7 @@ void Scene::loadScene() {
     GameObject* diabloObject = SceneUtils::addGameObjectComponent(registry, diabloEntity, save_diabloData);
     diabloObject->addScript<MoveScript>();
 
-    RawMeshData* diabloMesh = ResourceLoader::loadMesh(MODEL_DIR + "/diablo3_pose.obj");
+    std::unique_ptr<RawMeshData> diabloMesh(ResourceLoader::loadMesh(MODEL_DIR + "/diablo3_pose.obj"));
     if (diabloMesh != nullptr) {
         EntityMeshDefinition diabloMeshDef{diabloObject->getEntity()};
         diabloMeshDef.materialDef->vertexShaderPath = defaultVertexPath;
@@ -185,17 +145,13 @@ void Scene::loadScene() {
         diabloMeshDef.materialDef->isDeferred = true;
         diabloMeshDef.materialDef->albedoMapPath = TEXTURE_DIR + "diablo/diablo3_pose_diffuse.tga";
         diabloMeshDef.materialDef->normalMapPath = TEXTURE_DIR + "diablo/diablo3_pose_nm_tangent.tga";
+        diabloMeshDef.rawMeshData = std::move(diabloMesh);
         meshEntityPairs.emplace_back(std::move(diabloMeshDef));
     }
 
     /*
     * glTF Game Objects
     */
-    auto gltfLoadStart = std::chrono::high_resolution_clock::now();
-    auto gltfLoadEnd = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> gltfLoadElasped;
-
-    gltfLoadStart = std::chrono::high_resolution_clock::now();
     GameObject* helmetObj = SceneUtils::createMeshGameObject(registry, meshEntityPairs, ASSET_DIR "gltf-assets/Models/DamagedHelmet/glTF/DamagedHelmet.gltf", defaultVertexPath, defaultFragPath);
     if (helmetObj) {
         helmetObj->setScale(glm::vec3(1.0f));
@@ -203,9 +159,6 @@ void Scene::loadScene() {
         helmetObj->setEuler(glm::vec3(90,0,0));
         // helmetObj->addScript<MoveScript>();
     }
-    gltfLoadEnd = std::chrono::high_resolution_clock::now();
-    gltfLoadElasped = gltfLoadEnd - gltfLoadStart;
-    std::cout << "createMeshGameObject(Helmet) took " << gltfLoadElasped.count() << " seconds.\n";
 
     GameObject* dragonObj = SceneUtils::createMeshGameObject(registry, meshEntityPairs, ASSET_DIR "dragon/dragon.gltf", defaultVertexPath, defaultFragPath);
     if (dragonObj) {
@@ -226,15 +179,11 @@ void Scene::loadScene() {
         boomBox->setPosition(glm::vec3(0.0f, 15.0f, -5.0f));
     }
 
-    gltfLoadStart = std::chrono::high_resolution_clock::now();
     GameObject* romanObj = SceneUtils::createMeshGameObject(registry, meshEntityPairs, ASSET_DIR "gltf-assets/Models/Sponza/glTF/Sponza.gltf", defaultVertexPath, defaultFragPath);
     if (romanObj) {
         romanObj->setScale(glm::vec3(0.0003f));
         romanObj->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
     }
-    gltfLoadEnd = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = gltfLoadEnd - gltfLoadStart;
-    std::cout << "createMeshGameObject(Sponza) took " << elapsed.count() << " seconds.\n";
 
     // --------------------- Dummy Entity (global scripts) ------------------
     entt::entity dummyEntity = registry.create();
@@ -252,7 +201,7 @@ void Scene::loadScene() {
     createSpotLights(2, circleRadius, yPosition, defaultVertexPath, defaultFragPath);
 
     // // Light balls
-    // createSpheres(n, circleRadius * 10.0f, 0, 1.0f, defaultVertexPath, defaultFragPath, true);
+    createSpheres(n, circleRadius * 10.0f, 0, 1.0f, defaultVertexPath, defaultFragPath, true);
 
     // // Normal balls
     createSpheres(10000, circleRadius * 10.0f, 0, 1.0f, defaultVertexPath, defaultFragPath, false);
@@ -320,7 +269,7 @@ void Scene::createSuns(int n, float circleRadius, float yPosition, std::string v
         }
 
         lightData.color = color;
-        lightData.intensity = 15.0f;
+        lightData.intensity = 30.0f;
         lightData.castShadow = true;
         lightData.isActive = true;
 
@@ -403,7 +352,7 @@ void Scene::createSpotLights(int n, float circleRadius, float yPosition, std::st
         SceneUtils::addLightComponents(registry, lightEntity, lightData);
 
         // Cube mesh
-        RawMeshData* spotlightMesh = ResourceLoader::loadMesh(MODEL_DIR + "/spotlight.obj");
+        std::unique_ptr<RawMeshData> spotlightMesh(ResourceLoader::loadMesh(MODEL_DIR + "/spotlight.obj"));
         if (spotlightMesh != nullptr) {
             EntityMeshDefinition cubeMeshDef{lightObject->getEntity()};
             cubeMeshDef.materialDef->vertexShaderPath = vertexPath;
@@ -411,6 +360,7 @@ void Scene::createSpotLights(int n, float circleRadius, float yPosition, std::st
             cubeMeshDef.materialDef->albedoColor = glm::vec4(1.0f);
             cubeMeshDef.materialDef->albedoMapPath = TEXTURE_DIR + "gold/gold.png";
             cubeMeshDef.materialDef->isDeferred = true;
+            cubeMeshDef.rawMeshData = std::move(spotlightMesh);
             meshEntityPairs.emplace_back(std::move(cubeMeshDef));
         }
     }
@@ -474,7 +424,7 @@ void Scene::createSpheres(int n, float fieldSize, float minHeight, float maxHeig
         if (litSpheres) {
             Light asteroidLight;
             asteroidLight.color = glm::vec3(colorDist(gen), colorDist(gen), colorDist(gen));
-            asteroidLight.intensity = 5.0f;
+            asteroidLight.intensity = 10.0f;
             asteroidLight.point.radius = 10.0f;
             asteroidLight.type = LightType::Point;
             asteroidLight.castShadow = false;
