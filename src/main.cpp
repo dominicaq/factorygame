@@ -31,7 +31,6 @@ int main() {
         return -1;
     }
     inputManager.init(window.getGLFWwindow());
-
     // Init editor specific UI
     Profiler profiler;
     // Editor editor(settings.display.width, settings.display.height);
@@ -60,37 +59,42 @@ int main() {
 
     // frameGraph.addRenderPass(std::make_unique<ForwardPass>());
 
-    // auto lightPass = std::make_unique<LightPass>();
-    // lightPass->setSkyBox(scene.getSkyBox());
-    // frameGraph.addRenderPass(std::move(lightPass));
+    auto lightPass = std::make_unique<LightPass>();
+    lightPass->setSkyBox(scene.getSkyBox());
+    frameGraph.addRenderPass(std::move(lightPass));
 
     // Post processing passes. Debug pass is like a post process.
     frameGraph.addRenderPass(std::make_unique<DebugPass>(&camera));
 
     // ----------------------- Renderer Setup -----------------------
+    MaterialManager& matManager = MaterialManager::getInstance();
+    matManager.initialize(500);
+
     // Init all meshes
     for (auto& meshDef : scene.meshEntityPairs) {
-        // Debug: Print albedo file path
-        // std::cout << "[Debug] Mesh Entity: " << static_cast<uint32_t>(meshDef.entity)
-        //         << " - Albedo Path: '" << meshDef.materialDef->albedoMapPath << "'" << "\n";
+        uint32_t materialIndex = matManager.getMaterialIndex(*meshDef.materialDef);
 
         Mesh& mesh = renderer.initMeshBuffers(meshDef.rawMeshData);
+        mesh.materialIndex = materialIndex;
         scene.registry.emplace<Mesh>(meshDef.entity, mesh);
     }
 
     // Instanced mesh groups
     for (auto& instanceGroup : scene.instancedMeshGroups) {
-        // Initialize the mesh buffers once for the entire group
+        // Get or create material data for instance group
+        uint32_t materialIndex = matManager.getMaterialIndex(*instanceGroup.materialDef);
         Mesh& instancedMesh = renderer.initMeshBuffers(instanceGroup.meshData);
 
-        // Store reference to initialized mesh in the group
+        instancedMesh.materialIndex = materialIndex;
         instanceGroup.initializedMesh = &instancedMesh;
 
-        // Add the same Mesh component to all entities in the group
+        // Add the same Mesh component (with material index) to all entities in the group
         for (entt::entity entity : instanceGroup.entities) {
             scene.registry.emplace<Mesh>(entity, instancedMesh);
         }
     }
+
+    // matManager.printStats();
 
     // -------------------- Start Game -------------------
     frameGraph.setupPasses();

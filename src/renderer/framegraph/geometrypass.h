@@ -38,10 +38,9 @@ public:
 
         // Batch draw
         registry.view<Mesh, ModelMatrix>().each([&](const Mesh& mesh, const ModelMatrix& modelMatrix) {
-            // if (mesh.material->isDeferred) {
-            //     m_geometryBatch.addInstance(mesh, modelMatrix.matrix, mesh.material->uvScale);
-            // }
+            m_geometryBatch.addInstance(RenderInstance(mesh, modelMatrix.matrix));
         });
+        MaterialManager::getInstance().bindMaterialBuffer(0);
 
         // Draw scene
         m_geometryBatch.prepare(renderer);

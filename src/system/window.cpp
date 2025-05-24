@@ -102,7 +102,7 @@ bool Window::init() {
 
     // Initialize ImGui for GLFW and OpenGL3
     ImGui_ImplGlfw_InitForOpenGL(m_window, true);
-    ImGui_ImplOpenGL3_Init("#version 430");
+    ImGui_ImplOpenGL3_Init("#version 460");
 
     int major, minor;
     glGetIntegerv(GL_MAJOR_VERSION, &major);

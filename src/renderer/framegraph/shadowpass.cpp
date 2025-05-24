@@ -153,9 +153,7 @@ void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) 
 
     // Batch draw
     registry.view<Mesh, ModelMatrix>().each([&](const Mesh& mesh, const ModelMatrix& modelMatrix) {
-        // if (mesh.material->isDeferred) {
-        //     m_shadowBatch.addInstance(mesh, modelMatrix.matrix, mesh.material->uvScale);
-        // }
+        m_shadowBatch.addInstance(RenderInstance(mesh, modelMatrix.matrix));
     });
 
     // Draw scene

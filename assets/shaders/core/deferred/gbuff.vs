@@ -8,7 +8,8 @@ layout(location = 1) in vec4 aPackedTNB; // Packed tangent space quaternion
 struct InstanceData {
     mat4 modelMatrix;
     vec2 uvScale;
-    vec2 padding; // Align to 16-byte boundary
+    uint materialId;
+    uint padding;
 };
 
 // Instance buffer with interleaved data
@@ -24,6 +25,7 @@ out vec3 Tangent;
 out vec3 Bitangent;
 out vec3 TangentFragPos;
 out vec3 TangentViewPos;
+flat out uint MaterialID;  // Make sure this is on its own line
 
 // View uniforms (these stay as uniforms since they're global)
 uniform vec3 u_ViewPos;
@@ -51,6 +53,7 @@ void main() {
     InstanceData instance = instances[gl_BaseInstance + gl_InstanceID];
     mat4 modelMatrix = instance.modelMatrix;
     vec2 currentUVScale = instance.uvScale;
+    MaterialID = instance.materialId;
 
     // Extract vertex position
     vec3 position = aPosition.xyz;
@@ -65,7 +68,7 @@ void main() {
     // Transform position to world space
     FragPos = vec3(modelMatrix * vec4(position, 1.0));
 
-    // Apply UV scaling
+    // Apply UV scaling from instance data
     TexCoords = uv * currentUVScale;
 
     // Normalize the packed quaternion for tangent space

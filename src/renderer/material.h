@@ -39,12 +39,12 @@ struct MaterialDefinition {
 
 // GPU material data with texture handles
 struct MaterialData {
-    // Texture handles (64-bit)
-    GLuint64 albedoMapHandle = 0;
-    GLuint64 normalMapHandle = 0;
-    GLuint64 metallicRoughnessMapHandle = 0;
-    GLuint64 emissiveMapHandle = 0;
-    GLuint64 heightMapHandle = 0;
+    // Texture handles as uvec2 (low, high 32-bit parts)
+    glm::uvec2 albedoMapHandle = glm::uvec2(0, 0);
+    glm::uvec2 normalMapHandle = glm::uvec2(0, 0);
+    glm::uvec2 metallicRoughnessMapHandle = glm::uvec2(0, 0);
+    glm::uvec2 emissiveMapHandle = glm::uvec2(0, 0);
+    glm::uvec2 heightMapHandle = glm::uvec2(0, 0);
 
     // Material properties
     glm::vec4 albedoColor = glm::vec4(1.0f);
@@ -64,4 +64,12 @@ struct MaterialData {
     void setTextureFlag(uint32_t flag) { textureFlags |= flag; }
     void clearTextureFlag(uint32_t flag) { textureFlags &= ~flag; }
     bool hasTextureFlag(uint32_t flag) const { return (textureFlags & flag) != 0; }
+
+    // Helper to split 64-bit handle into uvec2
+    static glm::uvec2 splitHandle(GLuint64 handle) {
+        return glm::uvec2(
+            static_cast<uint32_t>(handle & 0xFFFFFFFF),
+            static_cast<uint32_t>(handle >> 32)
+        );
+    }
 };

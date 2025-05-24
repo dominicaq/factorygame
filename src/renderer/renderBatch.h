@@ -38,32 +38,47 @@ struct IndirectDrawCommand {
     }
 };
 
+// GPU-side instance data
+struct DrawInstance {
+    glm::mat4 modelMatrix;
+    glm::vec2 uvScale;
+    uint32_t materialId;
+    uint32_t padding;
+};
+
+// CPU-side instance data with conversion capability
+struct RenderInstance {
+    Mesh mesh;
+    glm::mat4 modelMatrix;
+    glm::vec2 uvScale;
+
+    // Constructor for easy creation
+    RenderInstance(const Mesh& m, const glm::mat4& matrix, const glm::vec2& uv = glm::vec2(1.0f))
+        : mesh(m), modelMatrix(matrix), uvScale(uv) {}
+
+    // Convert to GPU-ready format
+    DrawInstance toGPUInstance() const {
+        DrawInstance gpu;
+        gpu.modelMatrix = modelMatrix;
+        gpu.uvScale = uvScale;
+        gpu.materialId = mesh.materialIndex;
+        gpu.padding = 0;
+        return gpu;
+    }
+};
+
 class RenderBatch {
 public:
-    struct DrawInstance {
-        glm::mat4 modelMatrix;
-        glm::vec2 uvScale;
-        uint32_t materialId;
-        uint32_t padding;
-    };
-
-    // Internal storage for CPU-side data
-    struct InstanceInfo {
-        Mesh mesh;
-        glm::mat4 modelMatrix;
-        glm::vec2 uvScale;
-    };
-
     RenderBatch(size_t initialCapacity = 1024);
     ~RenderBatch();
 
-    void addInstance(const Mesh& mesh, const glm::mat4& modelMatrix, const glm::vec2& uvScale);
+    void addInstance(const RenderInstance& instance);
     void prepare(Renderer& renderer);
     void render(Renderer& renderer);
     void clear();
 
 private:
-    std::vector<InstanceInfo> m_instances;      // CPU-side data with Mesh info
+    std::vector<RenderInstance> m_instances;    // CPU-side data
     std::vector<DrawInstance> m_objectData;     // GPU-side data for SSBO
 
     // Separate command vectors for different draw types

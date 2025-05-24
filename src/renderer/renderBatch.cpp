@@ -15,8 +15,8 @@ RenderBatch::~RenderBatch() {
     cleanup();
 }
 
-void RenderBatch::addInstance(const Mesh& mesh, const glm::mat4& modelMatrix, const glm::vec2& uvScale) {
-    m_instances.push_back({mesh, modelMatrix, uvScale});
+void RenderBatch::addInstance(const RenderInstance& instance) {
+    m_instances.push_back(instance);
 }
 
 void RenderBatch::prepare(Renderer& renderer) {
@@ -37,23 +37,15 @@ void RenderBatch::prepare(Renderer& renderer) {
     // Build draw commands and object data for each mesh group
     GLuint currentBaseInstance = 0;
     for (const auto& [meshId, instanceIndices] : meshGroups) {
-        const Mesh& mesh = m_instances[instanceIndices[0]].mesh; // Use first instance's mesh
+        const Mesh& mesh = m_instances[instanceIndices[0]].mesh;
         GLuint instanceCount = static_cast<GLuint>(instanceIndices.size());
 
         // Build draw command with proper instance count
         buildDrawCommand(mesh, renderer, currentBaseInstance, instanceCount);
 
-        // Add all instances for this mesh to object data
+        // Convert instances to GPU format
         for (size_t instanceIdx : instanceIndices) {
-            const auto& instance = m_instances[instanceIdx];
-
-            DrawInstance gpuInstance;
-            gpuInstance.modelMatrix = instance.modelMatrix;
-            gpuInstance.uvScale = instance.uvScale;
-            gpuInstance.materialId = 1;
-            gpuInstance.padding = 1;
-
-            m_objectData.push_back(gpuInstance);
+            m_objectData.push_back(m_instances[instanceIdx].toGPUInstance());
         }
 
         currentBaseInstance += instanceCount;
@@ -107,7 +99,7 @@ void RenderBatch::initBuffers(size_t capacity) {
     glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
     m_arraysBufferCapacity = capacity;
 
-    // Create instance data SSBO (unchanged)
+    // Create instance data SSBO
     glGenBuffers(1, &m_drawInstanceSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_drawInstanceSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER,
@@ -176,23 +168,23 @@ void RenderBatch::buildDrawCommand(const Mesh& mesh, Renderer& renderer, GLuint 
         }
 
         cmd.elements.count = (mesh.count > 0) ? mesh.count : actualIndexCount;
-        cmd.elements.instanceCount = instanceCount; // Set to actual instance count
+        cmd.elements.instanceCount = instanceCount;
         cmd.elements.firstIndex = mesh.firstIndex;
         cmd.elements.baseVertex = mesh.baseVertex;
-        cmd.elements.baseInstance = baseInstance; // Starting instance index
+        cmd.elements.baseInstance = baseInstance;
 
         m_elementsCommands.push_back(cmd);
     } else {
         GLsizei actualVertexCount = renderer.getMeshVertexCount(mesh.id);
         if (actualVertexCount == 0) {
-            std::cerr << "[Error] Mesh " << mesh.id << " has no vertices\n";
+            // std::cerr << "[Error] Mesh " << mesh.id << " has no vertices\n";
             return;
         }
 
         cmd.arrays.count = (mesh.count > 0) ? mesh.count : actualVertexCount;
-        cmd.arrays.instanceCount = instanceCount; // Set to actual instance count
+        cmd.arrays.instanceCount = instanceCount;
         cmd.arrays.first = mesh.firstIndex;
-        cmd.arrays.baseInstance = baseInstance; // Starting instance index
+        cmd.arrays.baseInstance = baseInstance;
 
         m_arraysCommands.push_back(cmd);
     }

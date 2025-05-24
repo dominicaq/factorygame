@@ -1,9 +1,22 @@
 #include "texture.h"
 #include "../resources/resourceLoader.h"
-
 #include <iostream>
 
-Texture::Texture(const std::string& filePath) : m_textureID(0) {
+Texture::Texture(const std::string& filePath)
+    : m_textureID(0), m_handle(0), m_isResident(false), m_filePath(filePath) {
+    createTexture(filePath);
+}
+
+Texture::~Texture() {
+    if (m_isResident && m_handle != 0) {
+        glMakeTextureHandleNonResidentARB(m_handle);
+    }
+    if (m_textureID != 0) {
+        glDeleteTextures(1, &m_textureID);
+    }
+}
+
+void Texture::createTexture(const std::string& filePath) {
     int width = 0, height = 0, nrChannels = 0;
     // Use ResourceLoader to load image data
     unsigned char* data = ResourceLoader::loadImage(filePath, &width, &height, &nrChannels);
@@ -25,7 +38,7 @@ Texture::Texture(const std::string& filePath) : m_textureID(0) {
             format = GL_RGBA;
             internalFormat = GL_RGBA8;
         } else {
-            std::cerr << "[Error] Texture::Texture: Unsupported number of channels: " << nrChannels << "\n";
+            std::cerr << "[Error] Texture::createTexture: Unsupported number of channels: " << nrChannels << "\n";
             format = GL_RGB;
             internalFormat = GL_RGB8;
         }
@@ -54,31 +67,67 @@ Texture::Texture(const std::string& filePath) : m_textureID(0) {
         // Generate mipmaps for the texture
         glGenerateMipmap(GL_TEXTURE_2D);
 
-        // Apply anisotropic filtering
-        GLfloat maxAniso = 0.0f;
-        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &maxAniso);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, maxAniso);
+        // Apply anisotropic filtering if available
+        if (glTexParameterf) { // Check if function is loaded
+            GLfloat maxAniso = 0.0f;
+            glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &maxAniso);
+            if (maxAniso > 0.0f) {
+                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, maxAniso);
+            }
+        }
 
         // Unbind the texture
         glBindTexture(GL_TEXTURE_2D, 0);
 
+        // Create bindless handle
+        if (glGetTextureHandleARB) { // Check if bindless texture functions are loaded
+            m_handle = glGetTextureHandleARB(m_textureID);
+            if (m_handle == 0) {
+                std::cerr << "[Error] Texture::createTexture: Failed to create bindless handle for: " << filePath << "\n";
+            }
+        } else {
+            std::cerr << "[Warning] Texture::createTexture: Bindless textures not supported\n";
+        }
+
         // Error checking
         GLenum error = glGetError();
         if (error != GL_NO_ERROR) {
-            std::cerr << "[Error] Texture::Texture: OpenGL error during texture creation: " << error << "\n";
+            std::cerr << "[Error] Texture::createTexture: OpenGL error during texture creation: " << error << "\n";
         }
     } else {
-        std::cerr << "[Error] Texture::Texture: Failed to load texture: " << filePath << "\n";
+        std::cerr << "[Error] Texture::createTexture: Failed to load texture: " << filePath << "\n";
     }
 
     // Free image data after uploading to the GPU
     ResourceLoader::freeImage(data);
 }
 
-Texture::~Texture() {
-    glDeleteTextures(1, &m_textureID);
+void Texture::makeResident() {
+    if (m_handle != 0 && !m_isResident && glMakeTextureHandleResidentARB) {
+        glMakeTextureHandleResidentARB(m_handle);
+        m_isResident = true;
+
+        GLenum error = glGetError();
+        if (error != GL_NO_ERROR) {
+            std::cerr << "[Error] Texture::makeResident: OpenGL error: " << error << "\n";
+            m_isResident = false;
+        }
+    }
 }
 
+void Texture::makeNonResident() {
+    if (m_handle != 0 && m_isResident && glMakeTextureHandleNonResidentARB) {
+        glMakeTextureHandleNonResidentARB(m_handle);
+        m_isResident = false;
+
+        GLenum error = glGetError();
+        if (error != GL_NO_ERROR) {
+            std::cerr << "[Error] Texture::makeNonResident: OpenGL error: " << error << "\n";
+        }
+    }
+}
+
+// Binding textures (old way)
 void Texture::bind(unsigned int slot) const {
     // Ensure the texture slot is within the allowed range
     int maxTextureUnits;
