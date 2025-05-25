@@ -2,14 +2,14 @@
 
 layout (location = 0) in vec3 aPos;
 
-// Instance data structure (matching your gbuffer shader)
 struct InstanceData {
     mat4 modelMatrix;
     vec2 uvScale;
-    vec2 padding; // Align to 16-byte boundary
+    uint materialId;
+    uint padding;
 };
 
-// Instance buffer with interleaved data (matching your gbuffer shader)
+// Instance buffer with interleaved data
 layout (std430, binding = 0) buffer InstanceBuffer {
     InstanceData instances[];
 };
@@ -17,7 +17,7 @@ layout (std430, binding = 0) buffer InstanceBuffer {
 uniform mat4 u_LightSpaceMatrix;
 
 void main() {
-    // Get instance data directly from SSBO (matching gbuffer approach)
+    // Get instance data directly from SSBO
     uint instanceId = gl_BaseInstance + gl_InstanceID;
     InstanceData instance = instances[instanceId];
     mat4 modelMatrix = instance.modelMatrix;

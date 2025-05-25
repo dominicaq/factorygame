@@ -56,7 +56,8 @@ GLuint64 MaterialManager::getTextureHandle(const std::string& filePath) {
     auto it = m_textureCache.find(filePath);
     if (it != m_textureCache.end()) {
         // Texture already loaded, return existing handle
-        return it->second->getHandle();
+        GLuint64 handle = it->second->getHandle();
+        return handle;
     }
 
     // Load new texture
@@ -64,7 +65,6 @@ GLuint64 MaterialManager::getTextureHandle(const std::string& filePath) {
     if (texture->isValid()) {
         texture->makeResident();
         m_textureCache[filePath] = texture;
-        // std::cout << "[Info] MaterialManager: Loaded texture: " << filePath << "\n";
         return texture->getHandle();
     } else {
         std::cerr << "[Error] MaterialManager: Failed to load texture: " << filePath << "\n";
@@ -77,7 +77,7 @@ MaterialData MaterialManager::createMaterialData(const MaterialDefinition& def) 
 
     // Copy material properties
     data.albedoColor = def.albedoColor;
-    data.emissiveColor = def.emissiveColor;
+    data.emissiveColor = glm::vec4(def.emissiveColor, 1.0);
     data.uvScale = def.uvScale;
     data.heightScale = def.heightScale;
     data.occlusionStrength = def.occlusionStrength;
@@ -87,31 +87,31 @@ MaterialData MaterialManager::createMaterialData(const MaterialDefinition& def) 
     // Load textures and set handles + flags
     GLuint64 handle = getTextureHandle(def.albedoMapPath);
     if (handle != 0) {
-        data.albedoMapHandle = MaterialData::splitHandle(handle);
+        data.albedoMapHandle = handle;
         data.setTextureFlag(MATERIAL_HAS_ALBEDO_MAP);
     }
 
     handle = getTextureHandle(def.normalMapPath);
     if (handle != 0) {
-        data.normalMapHandle = MaterialData::splitHandle(handle);
+        data.normalMapHandle = handle;
         data.setTextureFlag(MATERIAL_HAS_NORMAL_MAP);
     }
 
     handle = getTextureHandle(def.metallicRoughnessMapPath);
     if (handle != 0) {
-        data.metallicRoughnessMapHandle = MaterialData::splitHandle(handle);
+        data.metallicRoughnessMapHandle = handle;
         data.setTextureFlag(MATERIAL_HAS_METALLIC_ROUGHNESS_MAP);
     }
 
     handle = getTextureHandle(def.emissiveMapPath);
     if (handle != 0) {
-        data.emissiveMapHandle = MaterialData::splitHandle(handle);
+        data.emissiveMapHandle = handle;
         data.setTextureFlag(MATERIAL_HAS_EMISSIVE_MAP);
     }
 
     handle = getTextureHandle(def.heightMapPath);
     if (handle != 0) {
-        data.heightMapHandle = MaterialData::splitHandle(handle);
+        data.heightMapHandle = handle;
         data.setTextureFlag(MATERIAL_HAS_HEIGHT_MAP);
     }
 

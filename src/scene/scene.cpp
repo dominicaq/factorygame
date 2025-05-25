@@ -39,7 +39,7 @@ void Scene::loadScene() {
     // Toggle the flash light with F key
     Light flashLight;
     flashLight.color = glm::vec3(1.0f);
-    flashLight.intensity = 30.0f;
+    flashLight.intensity = 5.0f;
     flashLight.castShadow = true;
     flashLight.isActive = false;
 
@@ -62,17 +62,16 @@ void Scene::loadScene() {
         entt::entity bunnyEntity = registry.create();
         SceneData save_bunnyData;
         save_bunnyData.name = "Bunny " + std::to_string(i);
-        save_bunnyData.position = glm::vec3(i * 10.0f - 5.0f, 5.0f, 0); // Space them apart
-        save_bunnyData.scale = glm::vec3(1.0f);
+        save_bunnyData.position = glm::vec3(i * 10.0f - 5.0f, 10.0f, 0); // Space them apart
+        save_bunnyData.scale = glm::vec3(20.0f);
         GameObject* bunnyObject = SceneUtils::addGameObjectComponent(registry, bunnyEntity, save_bunnyData);
-        bunnyObject->setScale(glm::vec3(20.0f));
 
         std::unique_ptr<RawMeshData> bunnyMesh(ResourceLoader::loadMesh(MODEL_DIR + "bunny.obj"));
         if (bunnyMesh != nullptr) {
             EntityMeshDefinition bunnyMeshDef{bunnyObject->getEntity()};
             bunnyMeshDef.materialDef->vertexShaderPath = defaultVertexPath;
             bunnyMeshDef.materialDef->fragmentShaderPath = defaultFragPath;
-            bunnyMeshDef.materialDef->albedoColor = glm::vec4(1.0f, 0.5f, 0.31f, 1.0f);
+            bunnyMeshDef.materialDef->albedoColor = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
             bunnyMeshDef.materialDef->isDeferred = true;
             bunnyMeshDef.rawMeshData = std::move(bunnyMesh);
             meshEntityPairs.emplace_back(std::move(bunnyMeshDef));
@@ -107,7 +106,7 @@ void Scene::loadScene() {
     entt::entity planeEntity = registry.create();
     SceneData save_planeData;
     save_planeData.name = "Ground Plane";
-    save_planeData.position = glm::vec3(0.0f, -1.1f, 0.0f);
+    save_planeData.position = glm::vec3(0.0f, 0.0f, 0.0f);
     save_planeData.eulerAngles = glm::vec3(0.0f, 0.0f, 0.0f);
     save_planeData.scale = glm::vec3(1.0f, 1.0f, 1.0f);
     GameObject* planeObject = SceneUtils::addGameObjectComponent(registry, planeEntity, save_planeData);
@@ -122,7 +121,7 @@ void Scene::loadScene() {
         planeMeshDef.materialDef->normalMapPath = TEXTURE_DIR + "tiles/tiles-n.tga";
         planeMeshDef.materialDef->heightMapPath = TEXTURE_DIR + "tiles/tiles-h.tga";
         planeMeshDef.materialDef->heightScale = 0.05f;
-        planeMeshDef.materialDef->uvScale= glm::vec2(4.0f);
+        planeMeshDef.materialDef->uvScale = glm::vec2(20.0f);
         planeMeshDef.rawMeshData = std::move(planeMesh);
         meshEntityPairs.emplace_back(std::move(planeMeshDef));
     }

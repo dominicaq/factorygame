@@ -105,12 +105,13 @@ void Texture::createTexture(const std::string& filePath) {
 void Texture::makeResident() {
     if (m_handle != 0 && !m_isResident && glMakeTextureHandleResidentARB) {
         glMakeTextureHandleResidentARB(m_handle);
-        m_isResident = true;
 
         GLenum error = glGetError();
         if (error != GL_NO_ERROR) {
-            std::cerr << "[Error] Texture::makeResident: OpenGL error: " << error << "\n";
+            std::cerr << "[Error] Texture::makeResident: OpenGL error: " << error << std::endl;
             m_isResident = false;
+        } else {
+            m_isResident = true;
         }
     }
 }
@@ -124,40 +125,5 @@ void Texture::makeNonResident() {
         if (error != GL_NO_ERROR) {
             std::cerr << "[Error] Texture::makeNonResident: OpenGL error: " << error << "\n";
         }
-    }
-}
-
-// Binding textures (old way)
-void Texture::bind(unsigned int slot) const {
-    // Ensure the texture slot is within the allowed range
-    int maxTextureUnits;
-    glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &maxTextureUnits);
-
-    // Ensure the slot is valid and within the maximum allowed texture units
-    if (slot >= static_cast<unsigned int>(maxTextureUnits)) {
-        std::cerr << "[Error] Texture::bind: Texture slot exceeds max allowed texture units: " << slot << "\n";
-        return;
-    }
-
-    // Activate the specified texture slot
-    glActiveTexture(GL_TEXTURE0 + slot);
-
-    // Bind the texture to the specified texture slot
-    glBindTexture(GL_TEXTURE_2D, m_textureID);
-
-    // Error checking: ensure no OpenGL errors occurred during texture binding
-    GLenum error = glGetError();
-    if (error != GL_NO_ERROR) {
-        std::cerr << "[Error] Texture::bind: OpenGL error during texture binding: " << error << "\n";
-    }
-}
-
-void Texture::unbind() const {
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    // Error checking: ensure no OpenGL errors occurred during unbinding
-    GLenum error = glGetError();
-    if (error != GL_NO_ERROR) {
-        std::cerr << "[Error] Texture::unbind: OpenGL error during texture unbinding: " << error << "\n";
     }
 }

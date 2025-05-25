@@ -93,8 +93,7 @@ int main() {
             scene.registry.emplace<Mesh>(entity, instancedMesh);
         }
     }
-
-    // matManager.printStats();
+    matManager.updateMaterialBuffer();
 
     // -------------------- Start Game -------------------
     frameGraph.setupPasses();
@@ -146,7 +145,7 @@ int main() {
         profiler.end("Rendering");
         profiler.end("Frame");
 
-        // ------------------ ImGui Rendering ------------------
+        // // ------------------ ImGui Rendering ------------------
         window.beginImGuiFrame();
         profiler.record(1.0f / deltaTime);
         profiler.display();

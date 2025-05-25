@@ -25,7 +25,7 @@ out vec3 Tangent;
 out vec3 Bitangent;
 out vec3 TangentFragPos;
 out vec3 TangentViewPos;
-flat out uint MaterialID;  // Make sure this is on its own line
+flat out uint MaterialID;
 
 // View uniforms (these stay as uniforms since they're global)
 uniform vec3 u_ViewPos;

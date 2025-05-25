@@ -29,7 +29,10 @@ GameObject* SceneUtils::addGameObjectComponent(entt::registry& registry, entt::e
     registry.emplace<EulerAngles>(entity, data.eulerAngles);
     registry.emplace<Rotation>(entity, glm::quat(glm::radians(data.eulerAngles)));
     registry.emplace<Scale>(entity, data.scale);
+
+    // Mesh data
     registry.emplace<ModelMatrix>(entity);
+    registry.emplace<EntityStatus>(entity).status.set(EntityStatus::DIRTY_MODEL_MATRIX);
 
     return &registry.emplace<GameObject>(entity, entity, registry);
 }

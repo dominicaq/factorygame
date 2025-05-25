@@ -39,37 +39,30 @@ struct MaterialDefinition {
 
 // GPU material data with texture handles
 struct MaterialData {
-    // Texture handles as uvec2 (low, high 32-bit parts)
-    glm::uvec2 albedoMapHandle = glm::uvec2(0, 0);
-    glm::uvec2 normalMapHandle = glm::uvec2(0, 0);
-    glm::uvec2 metallicRoughnessMapHandle = glm::uvec2(0, 0);
-    glm::uvec2 emissiveMapHandle = glm::uvec2(0, 0);
-    glm::uvec2 heightMapHandle = glm::uvec2(0, 0);
+    uint64_t albedoMapHandle = 0;           // 0-7
+    uint64_t normalMapHandle = 0;           // 8-15
+    uint64_t metallicRoughnessMapHandle = 0; // 16-23
+    uint64_t emissiveMapHandle = 0;         // 24-31
+    uint64_t heightMapHandle = 0;           // 32-39
 
-    // Material properties
-    glm::vec4 albedoColor = glm::vec4(1.0f);
-    glm::vec3 emissiveColor = glm::vec3(1.0f);
-    glm::vec2 uvScale = glm::vec2(1.0f);
+    uint64_t _padding0 = 0;                 // 40-47 (NSight shows data starts at 48)
 
-    float heightScale = 1.0f;
-    float occlusionStrength = 1.0f;
-    float shininess = 32.0f;
-    float time = 0.0f;
+    glm::vec4 albedoColor = glm::vec4(1.0f);    // 48-63
+    glm::vec4 emissiveColor = glm::vec4(1.0f);  // 64-79
+    glm::vec2 uvScale = glm::vec2(1.0f);        // 80-87
 
-    // Flags for which textures are present
-    uint32_t textureFlags = 0;
-    uint32_t padding[3]; // Ensure proper alignment
+    uint64_t _padding1 = 0;                 // 88-95 (align floats to 16-byte boundary)
 
-    // Helper functions for bit manipulation
+    float heightScale = 1.0f;               // 96-99
+    float occlusionStrength = 1.0f;         // 100-103
+    float shininess = 32.0f;                // 104-107
+    float time = 0.0f;                      // 108-111
+
+    uint32_t textureFlags = 0;              // 112-115
+    uint32_t _padding2[3] = {0, 0, 0};      // 116-127
+
+    // Helper functions remain the same
     void setTextureFlag(uint32_t flag) { textureFlags |= flag; }
     void clearTextureFlag(uint32_t flag) { textureFlags &= ~flag; }
     bool hasTextureFlag(uint32_t flag) const { return (textureFlags & flag) != 0; }
-
-    // Helper to split 64-bit handle into uvec2
-    static glm::uvec2 splitHandle(GLuint64 handle) {
-        return glm::uvec2(
-            static_cast<uint32_t>(handle & 0xFFFFFFFF),
-            static_cast<uint32_t>(handle >> 32)
-        );
-    }
 };

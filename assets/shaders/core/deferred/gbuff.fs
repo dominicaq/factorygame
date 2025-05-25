@@ -1,5 +1,6 @@
-#version 450 core
+#version 460 core
 #extension GL_ARB_bindless_texture : require
+#extension GL_ARB_gpu_shader_int64 : enable
 
 // G-buffer outputs
 layout (location = 0) out vec3 gPosition;
@@ -8,6 +9,7 @@ layout (location = 2) out vec4 gAlbedo;
 layout (location = 3) out vec4 gPBRParams;
 layout (location = 4) out vec3 gEmissive;
 
+// Input from vertex shader
 in vec3 FragPos;
 in vec2 TexCoords;
 in vec3 Normal;
@@ -17,19 +19,21 @@ in vec3 TangentViewPos;
 in vec3 TangentFragPos;
 flat in uint MaterialID;
 
-// Material data structure - using uvec2 handles
+// Material data structure (same as your C++ struct)
 struct MaterialData {
-    // Texture handles (64-bit split into 2x32-bit)
-    uvec2 albedoMapHandle;
-    uvec2 normalMapHandle;
-    uvec2 metallicRoughnessMapHandle;
-    uvec2 emissiveMapHandle;
-    uvec2 heightMapHandle;
+    sampler2D albedoMapSampler;
+    sampler2D normalMapSampler;
+    sampler2D metallicRoughnessMapSampler;
+    sampler2D emissiveMapSampler;
+    sampler2D heightMapSampler;
 
-    // Material properties
+    uint64_t _padding0;
+
     vec4 albedoColor;
-    vec3 emissiveColor;
+    vec4 emissiveColor;
     vec2 uvScale;
+
+    uint64_t _padding1;
 
     float heightScale;
     float occlusionStrength;
@@ -37,120 +41,110 @@ struct MaterialData {
     float time;
 
     uint textureFlags;
-    uint padding[3];
+    uint _padding2[3];
 };
 
 // Material buffer
-layout(std430, binding = 1) readonly buffer MaterialBuffer {
+layout (std430, binding = 1) buffer MaterialBuffer {
     MaterialData materials[];
 };
 
-// Texture flag constants
-const uint MATERIAL_HAS_ALBEDO_MAP = 1u << 0u;
-const uint MATERIAL_HAS_NORMAL_MAP = 1u << 1u;
-const uint MATERIAL_HAS_METALLIC_ROUGHNESS_MAP = 1u << 2u;
-const uint MATERIAL_HAS_EMISSIVE_MAP = 1u << 3u;
-const uint MATERIAL_HAS_HEIGHT_MAP = 1u << 4u;
+// Material flags
+const uint MATERIAL_HAS_ALBEDO_MAP = 1u;
+const uint MATERIAL_HAS_NORMAL_MAP = 2u;
+const uint MATERIAL_HAS_METALLIC_ROUGHNESS_MAP = 4u;
+const uint MATERIAL_HAS_EMISSIVE_MAP = 8u;
+const uint MATERIAL_HAS_HEIGHT_MAP = 16u;
 
-// Helper function to check if a texture flag is set
-bool hasTexture(uint flags, uint flag) {
+// Helper function to check texture flags
+bool hasTextureFlag(uint flags, uint flag) {
     return (flags & flag) != 0u;
 }
 
-// Helper to check if handle is valid
-bool isValidHandle(uvec2 handle) {
-    return handle.x != 0u || handle.y != 0u;
-}
-
+// Apply tiling using material's uvScale
 vec2 applyTiling(vec2 texCoords, vec2 uvScale) {
     return fract(texCoords * uvScale);
 }
 
-vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir, uvec2 heightHandle, float heightScale) {
-    if (!isValidHandle(heightHandle)) {
-        return texCoords;
-    }
-
+// Parallax mapping function
+vec2 ParallaxMapping(vec2 texCoords, vec3 viewDir, sampler2D heightMap, float heightScale) {
     const float minLayers = 8;
     const float maxLayers = 32;
     float numLayers = mix(maxLayers, minLayers, abs(dot(normalize(vec3(0.0, 0.0, 1.0)), viewDir)));
     float layerDepth = 1.0 / numLayers;
-
     float curvatureFactor = clamp(dot(normalize(Normal), vec3(0.0, 0.0, 1.0)), 0.5, 1.0);
     float adjustedHeightScale = heightScale * curvatureFactor;
-
     float currentLayerDepth = 0.0;
     vec2 P = viewDir.xy / viewDir.z * adjustedHeightScale;
     vec2 deltaTexCoords = P / numLayers;
-
     vec2 currentTexCoords = texCoords;
-    float currentDepthMapValue = texture(sampler2D(heightHandle), currentTexCoords).r;
+    float currentDepthMapValue = texture(heightMap, currentTexCoords).r;
 
     while (currentLayerDepth < currentDepthMapValue) {
         currentTexCoords -= deltaTexCoords;
-        currentDepthMapValue = texture(sampler2D(heightHandle), currentTexCoords).r;
+        currentDepthMapValue = texture(heightMap, currentTexCoords).r;
         currentLayerDepth += layerDepth;
     }
 
     vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
     float afterDepth = currentDepthMapValue - currentLayerDepth;
-    float beforeDepth = texture(sampler2D(heightHandle), prevTexCoords).r - currentLayerDepth + layerDepth;
+    float beforeDepth = texture(heightMap, prevTexCoords).r - currentLayerDepth + layerDepth;
     float weight = afterDepth / (afterDepth - beforeDepth);
     return prevTexCoords * weight + currentTexCoords * (1.0 - weight);
 }
 
 void main() {
-    // Get material data for this fragment
-    MaterialData mat = materials[MaterialID];
+    // Get material data
+    MaterialData material = materials[MaterialID];
 
-    // Apply UV tiling using material's UV scale
-    vec2 texCoords = applyTiling(TexCoords, mat.uvScale);
+    // Apply tiling using material's uvScale
+    vec2 texCoords = applyTiling(TexCoords, material.uvScale);
 
-    // Parallax mapping if height map is present
-    if (hasTexture(mat.textureFlags, MATERIAL_HAS_HEIGHT_MAP)) {
+    // Apply parallax mapping if height map is available
+    if (hasTextureFlag(material.textureFlags, MATERIAL_HAS_HEIGHT_MAP)) {
         vec3 viewDir = normalize(TangentViewPos - TangentFragPos);
-        texCoords = ParallaxMapping(texCoords, viewDir, mat.heightMapHandle, mat.heightScale);
+        texCoords = ParallaxMapping(texCoords, viewDir, material.heightMapSampler, material.heightScale);
         texCoords = fract(texCoords);
     }
 
+    // Write position to G-buffer
     gPosition = FragPos;
 
-    // Normal mapping
+    // Handle normal mapping
     vec3 mappedNormal = normalize(Normal);
-    if (hasTexture(mat.textureFlags, MATERIAL_HAS_NORMAL_MAP) && isValidHandle(mat.normalMapHandle)) {
+    if (hasTextureFlag(material.textureFlags, MATERIAL_HAS_NORMAL_MAP)) {
         mat3 TBN = mat3(normalize(Tangent), normalize(Bitangent), normalize(Normal));
-        vec3 normalSample = texture(sampler2D(mat.normalMapHandle), texCoords).rgb;
+        vec3 normalSample = texture(material.normalMapSampler, texCoords).rgb;
         normalSample = normalSample * 2.0 - 1.0;
         mappedNormal = normalize(TBN * normalSample);
     }
     gNormal = mappedNormal;
 
-    // Albedo
-    vec3 albedo = mat.albedoColor.rgb;
-    if (hasTexture(mat.textureFlags, MATERIAL_HAS_ALBEDO_MAP) && isValidHandle(mat.albedoMapHandle)) {
-        albedo *= texture(sampler2D(mat.albedoMapHandle), texCoords).rgb;
+    // Handle albedo
+    vec3 albedo = material.albedoColor.rgb;
+    if (hasTextureFlag(material.textureFlags, MATERIAL_HAS_ALBEDO_MAP)) {
+        albedo *= texture(material.albedoMapSampler, texCoords).rgb;
     }
     gAlbedo.rgb = albedo;
-    gAlbedo.a = mat.albedoColor.a;
+    gAlbedo.a = material.albedoColor.a;
 
-    // PBR parameters
-    float ao = 1.0;
+    // Handle PBR parameters (metallic, roughness, AO)
+    float ao = material.occlusionStrength;
     float roughness = 1.0;
     float metallic = 0.0;
 
-    if (hasTexture(mat.textureFlags, MATERIAL_HAS_METALLIC_ROUGHNESS_MAP) && isValidHandle(mat.metallicRoughnessMapHandle)) {
-        vec3 mr = texture(sampler2D(mat.metallicRoughnessMapHandle), texCoords).rgb;
-        ao = mr.r;
-        roughness = mr.g;
-        metallic = mr.b;
+    if (hasTextureFlag(material.textureFlags, MATERIAL_HAS_METALLIC_ROUGHNESS_MAP)) {
+        vec3 mr = texture(material.metallicRoughnessMapSampler, texCoords).rgb;
+        ao *= mr.r;        // Occlusion
+        roughness = mr.g;  // Roughness
+        metallic = mr.b;   // Metallic
     }
-
     gPBRParams = vec4(metallic, roughness, ao, 1.0);
 
-    // Emissive
+    // Handle emissive
     vec3 emissive = vec3(0.0);
-    if (hasTexture(mat.textureFlags, MATERIAL_HAS_EMISSIVE_MAP) && isValidHandle(mat.emissiveMapHandle)) {
-        emissive = texture(sampler2D(mat.emissiveMapHandle), texCoords).rgb * mat.emissiveColor;
+    if (hasTextureFlag(material.textureFlags, MATERIAL_HAS_EMISSIVE_MAP)) {
+        emissive = texture(material.emissiveMapSampler, texCoords).rgb * material.emissiveColor.rgb;
     }
     gEmissive = emissive;
 }

@@ -50,8 +50,8 @@ Mesh& Renderer::initMeshBuffers(std::unique_ptr<RawMeshData>& rawData, bool isSt
         bufferData.push_back(rawData->vertices[i].z);
 
         // Packed UVs (1 float)
-        uint16_t u = static_cast<uint16_t>(glm::clamp(rawData->uvs[i].x, 0.0f, 1.0f) * 65535.0f);
-        uint16_t v = static_cast<uint16_t>(glm::clamp(rawData->uvs[i].y, 0.0f, 1.0f) * 65535.0f);
+        uint16_t u = static_cast<uint16_t>(rawData->uvs[i].x * 65535.0f);
+        uint16_t v = static_cast<uint16_t>(rawData->uvs[i].y * 65535.0f);
         uint32_t packedUV = (static_cast<uint32_t>(v) << 16) | u;
         bufferData.push_back(*reinterpret_cast<float*>(&packedUV));
 

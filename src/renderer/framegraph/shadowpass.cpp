@@ -45,10 +45,8 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
     GLint originalViewport[4];
     glGetIntegerv(GL_VIEWPORT, originalViewport);
 
-    // Setup for shadow rendering - minimal state changes
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-
+    // Set up common shadow rendering state
+    glViewport(0, 0, shadowRes, shadowRes);
     m_shadowShader.use();
 
     // Render single shadow maps (spotlights)
@@ -64,13 +62,10 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 
         // Bind framebuffer and attach this light's shadow map
         m_shadowFrameBuffer->bind();
-        m_shadowFrameBuffer->resetDepthAttachment();
         unsigned int depthHandle = m_lightShadowMapMap[entity];
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthHandle, 0);
         glClear(GL_DEPTH_BUFFER_BIT);
 
-        // Set the view/projection matrix and render the scene
-        glViewport(0, 0, shadowRes, shadowRes);
         m_shadowShader.setMat4("u_LightSpaceMatrix", lightSpaceMatrix.matrix);
         renderSceneDepth(renderer, registry);
 
@@ -100,7 +95,6 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 
         // Bind the framebuffer using the custom framebuffer
         m_shadowFrameBuffer->bind();
-        m_shadowFrameBuffer->resetDepthAttachment();
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthAtlas, 0);
         glClear(GL_DEPTH_BUFFER_BIT);
 
@@ -129,11 +123,6 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
         shadowRes = renderer.config.shadows.shadowResolution;
         light.depthHandle = depthAtlas;
     });
-
-    // Reset only what's necessary
-    m_shadowFrameBuffer->bind();
-    m_shadowFrameBuffer->resetDepthAttachment();
-    m_shadowFrameBuffer->unbind();
 
     // Restore original framebuffer and viewport
     glBindFramebuffer(GL_FRAMEBUFFER, originalFramebuffer);

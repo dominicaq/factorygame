@@ -17,10 +17,6 @@ public:
     void makeResident();
     void makeNonResident();
 
-    // Legacy binding methods (for compatibility)
-    void bind(unsigned int slot = 0) const;
-    void unbind() const;
-
 private:
     GLuint m_textureID;
     GLuint64 m_handle;

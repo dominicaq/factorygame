@@ -163,7 +163,6 @@ void RenderBatch::buildDrawCommand(const Mesh& mesh, Renderer& renderer, GLuint 
     if (cmd.useIndices) {
         GLsizei actualIndexCount = renderer.getMeshIndexCount(mesh.id);
         if (actualIndexCount == 0) {
-            std::cerr << "[Error] Mesh " << mesh.id << " has no indices but marked as indexed\n";
             return;
         }
 
@@ -177,7 +176,6 @@ void RenderBatch::buildDrawCommand(const Mesh& mesh, Renderer& renderer, GLuint 
     } else {
         GLsizei actualVertexCount = renderer.getMeshVertexCount(mesh.id);
         if (actualVertexCount == 0) {
-            // std::cerr << "[Error] Mesh " << mesh.id << " has no vertices\n";
             return;
         }
 

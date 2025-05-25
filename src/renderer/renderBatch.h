@@ -6,6 +6,7 @@
 #include <memory>
 #include <vector>
 #include <cstring>
+#include <iostream>
 
 // Forward declaration
 class Renderer;
