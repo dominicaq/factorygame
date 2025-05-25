@@ -31,7 +31,6 @@ int main() {
         return -1;
     }
     inputManager.init(window.getGLFWwindow());
-
     // Init editor specific UI
     Profiler profiler;
     // Editor editor(settings.display.width, settings.display.height);
@@ -58,7 +57,7 @@ int main() {
     skyboxPass->setSkyBox(scene.getSkyBox());
     frameGraph.addRenderPass(std::move(skyboxPass));
 
-    frameGraph.addRenderPass(std::make_unique<ForwardPass>());
+    // frameGraph.addRenderPass(std::make_unique<ForwardPass>());
 
     auto lightPass = std::make_unique<LightPass>();
     lightPass->setSkyBox(scene.getSkyBox());
@@ -68,22 +67,33 @@ int main() {
     frameGraph.addRenderPass(std::make_unique<DebugPass>(&camera));
 
     // ----------------------- Renderer Setup -----------------------
-    // Init all meshses
-    scene.registry.view<Mesh*, ModelMatrix>().each([&](entt::entity entity, Mesh* mesh, const ModelMatrix& modelMatrix) {
-        renderer.initMeshBuffers(mesh);
-    });
+    MaterialManager& matManager = MaterialManager::getInstance();
+    matManager.initialize(500);
 
-    // Init mesh buffers for each vector of model matrices
-    auto& meshInstances = scene.getMeshInstances();
-    for (const auto& pair : scene.getInstanceMap()) {
-        size_t instanceID = pair.first;
-        const std::vector<glm::mat4>& matrices = pair.second;
+    // Init all meshes
+    for (auto& meshDef : scene.meshEntityPairs) {
+        uint32_t materialIndex = matManager.getMaterialIndex(*meshDef.materialDef);
 
-        // Initialize mesh buffers with the instanceID
-        renderer.initMeshBuffers(meshInstances[instanceID], false, instanceID);
-        // Set up instance attributes with the vector of matrices
-        renderer.setupInstanceAttributes(instanceID, matrices);
+        Mesh& mesh = renderer.initMeshBuffers(meshDef.rawMeshData);
+        mesh.materialIndex = materialIndex;
+        scene.registry.emplace<Mesh>(meshDef.entity, mesh);
     }
+
+    // Instanced mesh groups
+    for (auto& instanceGroup : scene.instancedMeshGroups) {
+        // Get or create material data for instance group
+        uint32_t materialIndex = matManager.getMaterialIndex(*instanceGroup.materialDef);
+        Mesh& instancedMesh = renderer.initMeshBuffers(instanceGroup.meshData);
+
+        instancedMesh.materialIndex = materialIndex;
+        instanceGroup.initializedMesh = &instancedMesh;
+
+        // Add the same Mesh component (with material index) to all entities in the group
+        for (entt::entity entity : instanceGroup.entities) {
+            scene.registry.emplace<Mesh>(entity, instancedMesh);
+        }
+    }
+    matManager.updateMaterialBuffer();
 
     // -------------------- Start Game -------------------
     frameGraph.setupPasses();
@@ -135,10 +145,10 @@ int main() {
         profiler.end("Rendering");
         profiler.end("Frame");
 
-        // ------------------ ImGui Rendering ------------------
+        // // ------------------ ImGui Rendering ------------------
         window.beginImGuiFrame();
         profiler.record(1.0f / deltaTime);
-        // profiler.display();
+        profiler.display();
         // editor.drawEditorLayout(scene, renderer);
         window.endImGuiFrame();
 

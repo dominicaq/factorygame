@@ -1,20 +1,27 @@
-#ifndef TEXTURE_H
-#define TEXTURE_H
+#pragma once
 
-#include <string>
 #include <glad/glad.h>
+#include <string>
 
 class Texture {
 public:
     Texture(const std::string& filePath);
     ~Texture();
 
-    // Texture usage
-    void bind(unsigned int slot = 0) const;
-    void unbind() const;
+    // Bindless texture methods
+    GLuint64 getHandle() const { return m_handle; }
+    GLuint getTextureID() const { return m_textureID; }
+    bool isValid() const { return m_handle != 0; }
+    const std::string& getFilePath() const { return m_filePath; }
+
+    void makeResident();
+    void makeNonResident();
 
 private:
-    unsigned int m_textureID;
-};
+    GLuint m_textureID;
+    GLuint64 m_handle;
+    bool m_isResident;
+    std::string m_filePath;
 
-#endif
+    void createTexture(const std::string& filePath);
+};

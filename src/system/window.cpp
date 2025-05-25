@@ -43,7 +43,7 @@ bool Window::init() {
     std::cerr << "[Warning] Defaulting to OpenGL 4.1. Some OpenGL features may cause errors or not function properly.\n";
 #else
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 #endif
 
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -102,7 +102,7 @@ bool Window::init() {
 
     // Initialize ImGui for GLFW and OpenGL3
     ImGui_ImplGlfw_InitForOpenGL(m_window, true);
-    ImGui_ImplOpenGL3_Init("#version 430");
+    ImGui_ImplOpenGL3_Init("#version 460");
 
     int major, minor;
     glGetIntegerv(GL_MAJOR_VERSION, &major);

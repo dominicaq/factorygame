@@ -27,9 +27,9 @@ void GameObjectSystem::updateAll(const float& currentTime, const float& deltaTim
 
         if (Mesh** meshPtr = m_registry.try_get<Mesh*>(entity)) {
             Mesh* mesh = *meshPtr;
-            if (mesh && mesh->material) {
-                mesh->material->time = currentTime;
-            }
+            // if (mesh && mesh->material) {
+            //     mesh->material->time = currentTime;
+            // }
         }
         gameObject.updateScripts(deltaTime);
 

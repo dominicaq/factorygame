@@ -72,9 +72,6 @@ public:
 
         // Draw the screen-aligned quad to visualize the debug information
         renderer.drawScreenQuad();
-
-        // Unbind the framebuffer
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     };
 
 private:

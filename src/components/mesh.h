@@ -6,179 +6,84 @@
 
 #include "../renderer/material.h"
 
-#define MAX_BONE_INFLUENCE 4
-
-/*
-* Mesh Instancing
-*/
-struct MeshInstance {
-    Material* material;
-    uint8_t id;
-};
-
-/*
-* Mesh
-*/
-struct Mesh {
-    // Raw mesh data
+struct RawMeshData {
+    std::vector<glm::vec4> packedTNBFrame;
     std::vector<glm::vec3> vertices;
-    std::vector<glm::vec3> normals;
-    std::vector<glm::vec3> tangents;
-    std::vector<glm::vec3> bitangents;
-    std::vector<glm::vec2> uvs;
     std::vector<uint32_t> indices;
-    Material* material = nullptr;
+    std::vector<glm::vec2> uvs;
     int drawMode = GL_TRIANGLES;
 
-    /*
-    * WARNING: DO NOT set the Mesh ID yourself. It will be overwritten anyway.
-    */
-    size_t id = SIZE_MAX;
-    bool wireframe = false;
-
-    // Method to clear CPU-side mesh data
     void clearData() {
         vertices.clear();
         uvs.clear();
-        normals.clear();
-        indices.clear();
+        packedTNBFrame.clear();
 
         // Resize vectors to zero
         vertices.shrink_to_fit();
         uvs.shrink_to_fit();
-        normals.shrink_to_fit();
+        packedTNBFrame.shrink_to_fit();
         indices.shrink_to_fit();
     }
 };
 
-/*
-* Skeletal Mesh
-*/
-struct Bone {
-    glm::mat4 offsetMatrix;
-    std::string name;
+struct Mesh {
+    /*
+    * WARNING: DO NOT set the Mesh ID yourself. It will be overwritten anyway.
+    */
+    size_t id = SIZE_MAX;
+
+    // Optional overrides
+    uint32_t count = 0;
+    uint32_t instanceCount = 1;
+    uint32_t firstIndex = 0;
+    uint32_t baseVertex = 0;
+    uint32_t baseInstance = 0;
+    uint32_t materialIndex = 0xFFFFFFFF;
+    int drawMode = GL_TRIANGLES;
+};
+
+struct EntityMeshDefinition {
+    std::unique_ptr<RawMeshData> rawMeshData;
+    std::unique_ptr<MaterialDefinition> materialDef;
     entt::entity entity;
-    int index;
-};
 
-struct VertexBoneData {
-    int boneIDs[MAX_BONE_INFLUENCE] = {-1, -1, -1, -1};
-    float weights[MAX_BONE_INFLUENCE] = {0.0f, 0.0f, 0.0f, 0.0f};
-
-    // Add bone influence to this vertex
-    void addBoneData(int boneID, float weight) {
-        // Find an empty slot
-        for (int i = 0; i < MAX_BONE_INFLUENCE; i++) {
-            if (boneIDs[i] < 0) {
-                boneIDs[i] = boneID;
-                weights[i] = weight;
-                return;
-            }
-        }
-
-        // If no empty slot, find the smallest weight
-        int minIndex = 0;
-        for (int i = 1; i < MAX_BONE_INFLUENCE; i++) {
-            if (weights[i] < weights[minIndex]) {
-                minIndex = i;
-            }
-        }
-
-        // Replace if new weight is larger
-        if (weight > weights[minIndex]) {
-            boneIDs[minIndex] = boneID;
-            weights[minIndex] = weight;
-        }
+    // Constructor to make creation easier
+    EntityMeshDefinition(entt::entity ent) : entity(ent) {
+        rawMeshData = std::make_unique<RawMeshData>();
+        materialDef = std::make_unique<MaterialDefinition>();
     }
 
-    // Normalize weights to sum to 1.0
-    void normalizeWeights() {
-        float sum = 0.0f;
-        for (int i = 0; i < MAX_BONE_INFLUENCE; i++) {
-            if (boneIDs[i] >= 0) {
-                sum += weights[i];
-            }
-        }
+    // Move semantics
+    EntityMeshDefinition(EntityMeshDefinition&&) = default;
+    EntityMeshDefinition& operator=(EntityMeshDefinition&&) = default;
 
-        if (sum > 0.0f) {
-            for (int i = 0; i < MAX_BONE_INFLUENCE; i++) {
-                if (boneIDs[i] >= 0) {
-                    weights[i] /= sum;
-                }
-            }
-        }
-    }
+    // Delete copy
+    EntityMeshDefinition(const EntityMeshDefinition&) = delete;
+    EntityMeshDefinition& operator=(const EntityMeshDefinition&) = delete;
 };
 
-// Animation keyframe for a single bone
-struct BoneKeyframe {
-    float timeStamp;
-    glm::vec3 position;
-    glm::quat rotation;
-    glm::vec3 scale;
+struct MeshInstance {
+    size_t meshGroupId;  // Index into instancedMeshGroups
+    size_t instanceId;   // Index within the group
 };
 
-// Animation track for a single bone
-struct BoneAnimationTrack {
-    std::string boneName;
-    std::vector<BoneKeyframe> keyframes;
-};
+struct InstancedMeshGroup {
+    std::unique_ptr<RawMeshData> meshData;
+    std::unique_ptr<MaterialDefinition> materialDef;
+    std::vector<entt::entity> entities;
+    Mesh* initializedMesh = nullptr;
 
-// Full animation containing tracks for multiple bones
-struct Animation {
-    std::string name;
-    float duration;
-    std::vector<BoneAnimationTrack> tracks;
-    std::unordered_map<std::string, size_t> trackMap; // Maps bone name to track index
-};
-
-// Component for skeleton animation state
-struct SkeletonAnimator {
-    std::vector<glm::mat4> finalBoneMatrices; // Bone transforms for shader
-    int currentAnimation = -1;
-    float currentTime = 0.0f;
-    float playbackSpeed = 1.0f;
-    bool playing = false;
-    bool loop = true;
-    entt::entity rootBone = entt::null;
-};
-
-struct SkeletalMesh : Mesh {
-    // Bone hierarchy and skinning data
-    std::vector<VertexBoneData> vertexBoneData;           // Per-vertex bone influences
-    std::unordered_map<std::string, int> boneNameToIndex; // Maps bone names to indices
-    std::vector<Animation> animations;                    // Available animations
-    std::vector<glm::mat4> inverseBindPoses;              // Inverse bind matrices for each bone
-
-    // Clear skeletal data
-    void clearSkeletalData() {
-        Mesh::clearData();
-        vertexBoneData.clear();
-        boneNameToIndex.clear();
-        animations.clear();
-        inverseBindPoses.clear();
-
-        vertexBoneData.shrink_to_fit();
-        animations.shrink_to_fit();
-        inverseBindPoses.shrink_to_fit();
+    // Constructor
+    InstancedMeshGroup() {
+        meshData = std::make_unique<RawMeshData>();
+        materialDef = std::make_unique<MaterialDefinition>();
     }
 
-    // Find bone by name
-    int findBoneByName(const std::string& name) const {
-        auto it = boneNameToIndex.find(name);
-        if (it != boneNameToIndex.end()) {
-            return it->second;
-        }
-        return -1;
-    }
+    // Move semantics
+    InstancedMeshGroup(InstancedMeshGroup&&) = default;
+    InstancedMeshGroup& operator=(InstancedMeshGroup&&) = default;
 
-    // Get animation by name
-    int findAnimationByName(const std::string& name) const {
-        for (size_t i = 0; i < animations.size(); i++) {
-            if (animations[i].name == name) {
-                return static_cast<int>(i);
-            }
-        }
-        return -1;
-    }
+    // Delete copy
+    InstancedMeshGroup(const InstancedMeshGroup&) = delete;
+    InstancedMeshGroup& operator=(const InstancedMeshGroup&) = delete;
 };

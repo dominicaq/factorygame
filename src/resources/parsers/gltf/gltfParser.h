@@ -27,7 +27,7 @@ bool parseAccessors(
     const json& gltfDoc,
     std::vector<std::vector<uint8_t>>& buffers,
     std::vector<glTFBufferView>& bufferViews,
-    std::vector<Mesh*>& meshes,
+    std::vector<std::unique_ptr<RawMeshData>>& meshes,
     std::vector<int>& materialIndices);
 bool parseBuffers(const json &gltfDoc, const std::string &fileName, std::vector<std::vector<uint8_t>>& buffers);
 template <typename T>
@@ -37,17 +37,16 @@ void parseAccessorData(
     const glTFBufferView& bufferView,
     std::vector<T>& targetVector);
 bool parseNodes(const json& gltfDoc, std::vector<SceneData>& nodeData);
-void loadMaterials(
+void loadMaterialDefinitions(
     const json& gltfDoc,
-    std::vector<Mesh*>& meshes,
+    std::vector<std::unique_ptr<MaterialDefinition>>& materialDefs,
     const std::vector<int>& materialIndices,
-    Shader* shader,
-    const std::string& filePath);
+    const std::string& fileName);
 
 /*
 * Math
 */
-void calculateTangentSpace(Mesh* mesh);
+void calculateTangentSpace(RawMeshData* mesh, std::vector<glm::vec3>& normals, std::vector<glm::vec4>& tangents);
 
 /*
  * Utility
@@ -93,10 +92,73 @@ size_t getComponentSize(int componentType) {
     }
 }
 
+void packTBNframe(RawMeshData* mesh, const std::vector<glm::vec3>& gltfNormals,
+             const std::vector<glm::vec4>& gltfTangents) {
+    size_t count = std::min(gltfNormals.size(), gltfTangents.size());
+    mesh->packedTNBFrame.reserve(mesh->packedTNBFrame.size() + count);
+
+    constexpr int storageSize = 2; // sizeof(int16_t)
+    constexpr float bias = 1.0f / ((1 << (storageSize * 8 - 1)) - 1);
+
+    for (size_t i = 0; i < count; ++i) {
+        const glm::vec3& n = gltfNormals[i];
+        const glm::vec4& t = gltfTangents[i];
+        glm::vec3 tangent(t.x, t.y, t.z);
+
+        // Compute cross product: c = n × t (CRITICAL: this is the correct order)
+        glm::vec3 c = glm::cross(n, tangent);
+
+        // Construct matrix in COLUMN-MAJOR order: [tangent, c, normal]
+        // This matches the JavaScript toMat3 function exactly
+        glm::mat3 tbn(
+            tangent.x, tangent.y, tangent.z,  // First column: tangent
+            c.x,       c.y,       c.z,        // Second column: cross product
+            n.x,       n.y,       n.z         // Third column: normal
+        );
+
+        // Extract quaternion and normalize
+        glm::quat q = glm::normalize(glm::quat_cast(tbn));
+
+        // Ensure positive quaternion (w >= 0)
+        if (q.w < 0.0f) {
+            q = -q;
+        }
+
+        // Apply bias to prevent w from being zero
+        if (q.w < bias) {
+            q.w = bias;
+            float factor = std::sqrt(1.0f - bias * bias);
+            q.x *= factor;
+            q.y *= factor;
+            q.z *= factor;
+        }
+
+        // Compute bitangent based on handedness for reflection check
+        glm::vec3 b;
+        if (t.w > 0.0f) {
+            b = glm::cross(tangent, n);
+        } else {
+            b = glm::cross(n, tangent);
+        }
+
+        // Reflection check: if (n × t) · b < 0, negate quaternion
+        glm::vec3 cc = glm::cross(tangent, n);
+        if (glm::dot(cc, b) < 0.0f) {
+            q = -q;
+        }
+
+        // Store packed quaternion
+        mesh->packedTNBFrame.push_back(glm::vec4(q.x, q.y, q.z, q.w));
+    }
+}
+
 /*
 * Parsing
 */
-bool loadglTF(std::string fileName, std::vector<Mesh*>& meshes, std::vector<SceneData>& nodeData, Shader* shader) {
+bool loadglTF(const std::string& fileName,
+              std::vector<std::unique_ptr<RawMeshData>>& meshes,
+              std::vector<std::unique_ptr<MaterialDefinition>>& materialDefs,
+              std::vector<SceneData>& nodeData) {
     std::ifstream file(fileName);
     if (!file.is_open()) {
         std::cerr << "Failed to open file: " << fileName << "\n";
@@ -106,8 +168,9 @@ bool loadglTF(std::string fileName, std::vector<Mesh*>& meshes, std::vector<Scen
     std::stringstream buffer;
     buffer << file.rdbuf();
 
-    bool isBinary = (fileName.substr(fileName.size() - 3) == "glb");
+    bool isBinary = (fileName.size() >= 3 && fileName.substr(fileName.size() - 3) == "glb");
     if (isBinary) {
+        // Binary .glb not supported
         return false;
     }
 
@@ -141,7 +204,7 @@ bool loadglTF(std::string fileName, std::vector<Mesh*>& meshes, std::vector<Scen
     for (size_t i = 0; i < bufferViewsJson.size(); ++i) {
         const auto& bufferViewJson = bufferViewsJson[i];
 
-        glTFBufferView bufferView {0};
+        glTFBufferView bufferView{0};
         parseJsonProperty(bufferViewJson, "buffer", bufferView.index);
         parseJsonProperty(bufferViewJson, "byteOffset", bufferView.byteOffset);
         parseJsonProperty(bufferViewJson, "byteLength", bufferView.size);
@@ -152,8 +215,10 @@ bool loadglTF(std::string fileName, std::vector<Mesh*>& meshes, std::vector<Scen
 
     // Accessors (primitive mesh data)
     std::vector<int> materialIndices;
+
+    // Note: You will have to update parseAccessors to fill meshes as vector of unique_ptr
     if (!parseAccessors(gltfDoc, buffers, bufferViews, meshes, materialIndices)) {
-        std::cerr << "Failed to parse glTF acessors\n";
+        std::cerr << "Failed to parse glTF accessors\n";
         return false;
     }
 
@@ -165,7 +230,7 @@ bool loadglTF(std::string fileName, std::vector<Mesh*>& meshes, std::vector<Scen
         return false;
     }
 
-    loadMaterials(gltfDoc, meshes, materialIndices, shader, fileName);
+    loadMaterialDefinitions(gltfDoc, materialDefs, materialIndices, fileName);
     return true;
 }
 
@@ -220,7 +285,7 @@ bool parseAccessors(
     const json& gltfDoc,
     std::vector<std::vector<uint8_t>>& buffers,
     std::vector<glTFBufferView>& bufferViews,
-    std::vector<Mesh*>& meshes,
+    std::vector<std::unique_ptr<RawMeshData>>& meshes,
     std::vector<int>& materialIndices) {
 
     if (!gltfDoc.contains("accessors") || !gltfDoc["accessors"].is_array() || gltfDoc["accessors"].empty()) {
@@ -249,7 +314,7 @@ bool parseAccessors(
 
         const auto& primitivesJson = meshJson["primitives"];
         for (size_t primitiveIdx = 0; primitiveIdx < primitivesJson.size(); ++primitiveIdx) {
-            Mesh* mesh = new Mesh();
+            auto mesh = std::make_unique<RawMeshData>();
             const auto& primitiveJson = primitivesJson[primitiveIdx];
             if (!primitiveJson.contains("attributes")) {
                 continue;
@@ -264,6 +329,8 @@ bool parseAccessors(
             /*
             * Required attributes
             */
+            std::vector<glm::vec3> tempNormals;
+            std::vector<glm::vec4> tempTangents;
 
             // Process POSITION attribute
             if (attributeJson.contains("POSITION")) {
@@ -286,7 +353,7 @@ bool parseAccessors(
                 size_t normalIdx = attributeJson["NORMAL"];
                 const auto& normalAccesor = accessorsJson[normalIdx];
                 size_t normalBufferViewIdx = normalAccesor["bufferView"];
-                parseAccessorData(normalAccesor, buffers, bufferViews[normalBufferViewIdx], mesh->normals);
+                parseAccessorData(normalAccesor, buffers, bufferViews[normalBufferViewIdx], tempNormals);
             }
 
             // Process TEXCOORD_0 attribute
@@ -301,14 +368,14 @@ bool parseAccessors(
                 }
             }
 
-            if (mesh->vertices.empty() || mesh->normals.empty() || mesh->indices.empty() || mesh->uvs.empty()) {
+            if (mesh->vertices.empty() || tempNormals.empty() || mesh->indices.empty() || mesh->uvs.empty()) {
                 std::stringstream warningMsg;
                 warningMsg << "[Warning] failed to load glTF mesh at index [" << primitiveIdx
                         << "]: one or more required attributes are missing.\n"
                         << "Present data: \n"
                         << "    Vertices: " << (mesh->vertices.empty() ? "Missing" : "OK") << "\n"
                         << "    Indices: " << (mesh->indices.empty() ? "Missing" : "OK") << "\n"
-                        << "    Normals: " << (mesh->normals.empty() ? "Missing" : "OK") << "\n"
+                        << "    Normals: " << (tempNormals.empty() ? "Missing" : "OK") << "\n"
                         << "    TexCoords: " << (mesh->uvs.empty() ? "Missing" : "OK") << "\n";
                 std::cerr << warningMsg.str() << "\n";
                 meshes.clear();
@@ -324,32 +391,10 @@ bool parseAccessors(
                 size_t tangentIdx = attributeJson["TANGENT"];
                 const auto& tangentAccessor = accessorsJson[tangentIdx];
                 size_t tangentBufferViewIdx = tangentAccessor["bufferView"];
-
-                // Temporary vector to hold vec4 tangents from the file
-                std::vector<glm::vec4> tempTangents;
                 parseAccessorData(tangentAccessor, buffers, bufferViews[tangentBufferViewIdx], tempTangents);
-
-                // Extract xyz components for your storage and keep w for bitangent calculation
-                mesh->tangents.resize(tempTangents.size());
-                mesh->bitangents.resize(tempTangents.size());
-
-                for (size_t i = 0; i < tempTangents.size(); ++i) {
-                    // Extract tangent XYZ for storage
-                    mesh->tangents[i] = glm::vec3(tempTangents[i].x, tempTangents[i].y, tempTangents[i].z);
-
-                    // Ensure we have normals to calculate bitangent
-                    if (i < mesh->normals.size()) {
-                        const glm::vec3& normal = mesh->normals[i];
-                        const glm::vec3& tangent = mesh->tangents[i];
-                        float handedness = tempTangents[i].w;
-
-                        // Calculate bitangent using cross product and apply handedness
-                        mesh->bitangents[i] = handedness * glm::cross(normal, tangent);
-                    }
-                }
             } else {
-                std::cerr << "[Warning] Tangents and BiTangents not found for mesh, calculating...\n";
-                calculateTangentSpace(mesh);
+                std::cerr << "[Warning] Tangents not found for mesh, calculating...\n";
+                calculateTangentSpace(mesh.get(), tempNormals, tempTangents);
                 std::cout << "[Info] Done.\n";
             }
 
@@ -359,8 +404,12 @@ bool parseAccessors(
                 materialIndex = primitiveJson["material"].get<int>();
             }
 
+            // CRITICAL FIX: Call packTBNframe BEFORE moving the unique_ptr
             // Store the mesh and its corresponding material index
-            meshes.push_back(mesh);
+            packTBNframe(mesh.get(), tempNormals, tempTangents);
+
+            // Now it's safe to move the mesh to the container
+            meshes.push_back(std::move(mesh));
             materialIndices.push_back(materialIndex);
         }
     }
@@ -368,64 +417,67 @@ bool parseAccessors(
     return !meshes.empty();
 }
 
-
-void calculateTangentSpace(Mesh* mesh) {
-    // Initialize tangents and bitangents
+void calculateTangentSpace(RawMeshData* mesh, std::vector<glm::vec3>& normals, std::vector<glm::vec4>& tangents) {
     size_t vertexCount = mesh->vertices.size();
-    mesh->tangents.resize(vertexCount, glm::vec3(0.0f));
-    mesh->bitangents.resize(vertexCount, glm::vec3(0.0f));
+    tangents.resize(vertexCount, glm::vec4(0.0f));
 
-    // Process triangles
+    std::vector<glm::vec3> accumulatedTangents(vertexCount, glm::vec3(0.0f));
+    std::vector<glm::vec3> accumulatedBitangents(vertexCount, glm::vec3(0.0f));
+
     for (size_t i = 0; i < mesh->indices.size(); i += 3) {
-        // Get vertex indices for this triangle
         uint32_t i0 = mesh->indices[i];
         uint32_t i1 = mesh->indices[i + 1];
         uint32_t i2 = mesh->indices[i + 2];
 
-        // Skip invalid indices
-        if (i0 >= vertexCount || i1 >= vertexCount || i2 >= vertexCount) {
+        if (i0 >= vertexCount || i1 >= vertexCount || i2 >= vertexCount)
             continue;
-        }
 
-        // Get positions and UVs
-        glm::vec3 edge1 = mesh->vertices[i1] - mesh->vertices[i0];
-        glm::vec3 edge2 = mesh->vertices[i2] - mesh->vertices[i0];
-        glm::vec2 deltaUV1 = mesh->uvs[i1] - mesh->uvs[i0];
-        glm::vec2 deltaUV2 = mesh->uvs[i2] - mesh->uvs[i0];
+        glm::vec3 pos0 = mesh->vertices[i0];
+        glm::vec3 pos1 = mesh->vertices[i1];
+        glm::vec3 pos2 = mesh->vertices[i2];
 
-        // Calculate determinant
+        glm::vec2 uv0 = mesh->uvs[i0];
+        glm::vec2 uv1 = mesh->uvs[i1];
+        glm::vec2 uv2 = mesh->uvs[i2];
+
+        glm::vec3 edge1 = pos1 - pos0;
+        glm::vec3 edge2 = pos2 - pos0;
+        glm::vec2 deltaUV1 = uv1 - uv0;
+        glm::vec2 deltaUV2 = uv2 - uv0;
+
         float det = deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x;
-        if (std::abs(det) < 1e-6f) continue; // Skip degenerate triangles
+        if (std::abs(det) < 1e-6f)
+            continue;
 
         float invDet = 1.0f / det;
 
-        // Calculate and accumulate tangent/bitangent
         glm::vec3 tangent = (edge1 * deltaUV2.y - edge2 * deltaUV1.y) * invDet;
         glm::vec3 bitangent = (edge2 * deltaUV1.x - edge1 * deltaUV2.x) * invDet;
 
-        // Add to all three vertices of this triangle
-        for (uint32_t idx : {i0, i1, i2}) {
-            mesh->tangents[idx] += tangent;
-            mesh->bitangents[idx] += bitangent;
-        }
+        accumulatedTangents[i0] += tangent;
+        accumulatedTangents[i1] += tangent;
+        accumulatedTangents[i2] += tangent;
+
+        accumulatedBitangents[i0] += bitangent;
+        accumulatedBitangents[i1] += bitangent;
+        accumulatedBitangents[i2] += bitangent;
     }
 
-    // Orthogonalize and normalize
     for (size_t i = 0; i < vertexCount; ++i) {
-        const glm::vec3& n = mesh->normals[i];
+        glm::vec3 n = glm::normalize(normals[i]);  // normalize normal here
+        glm::vec3 t = accumulatedTangents[i];
+        glm::vec3 b = accumulatedBitangents[i];
 
-        // Gram-Schmidt orthogonalization
-        glm::vec3& t = mesh->tangents[i];
+        // Orthonormalize the tangent vector using Gram-Schmidt
         t = glm::normalize(t - n * glm::dot(n, t));
 
-        // Handle degenerate tangents
-        if (glm::length(t) < 1e-6f) {
-            // Find a vector perpendicular to the normal
-            t = glm::abs(n.x) > 0.9f ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
-            t = glm::normalize(t - n * glm::dot(n, t));
-        }
+        // Recalculate bitangent from orthonormal basis
+        glm::vec3 computedB = glm::cross(n, t);
 
-        mesh->bitangents[i] = glm::cross(n, t);
+        // Compute handedness: compare computed bitangent with accumulated one
+        float w = (glm::dot(computedB, glm::normalize(b)) < 0.0f) ? -1.0f : 1.0f;
+
+        tangents[i] = glm::vec4(t, w);
     }
 }
 
@@ -512,25 +564,39 @@ bool parseNodes(const json& gltfDoc, std::vector<SceneData>& nodeData) {
     return true;
 }
 
-void loadMaterials(const json& gltfDoc, std::vector<Mesh*>& meshes, const std::vector<int>& materialIndices, Shader* shader, const std::string& fileName) {
+void loadMaterialDefinitions(
+    const json& gltfDoc,
+    std::vector<std::unique_ptr<MaterialDefinition>>& materialDefs,
+    const std::vector<int>& materialIndices,
+    const std::string& fileName) {
+
+    // Resize to match the number of meshes
+    materialDefs.clear();
+    materialDefs.resize(materialIndices.size());
+
+    // Create default material definitions for all meshes
+    for (size_t i = 0; i < materialIndices.size(); ++i) {
+        materialDefs[i] = std::make_unique<MaterialDefinition>();
+        materialDefs[i]->vertexShaderPath = "";
+        materialDefs[i]->fragmentShaderPath = "";
+        materialDefs[i]->albedoColor = glm::vec4(1.0f);
+        materialDefs[i]->isDeferred = true;
+    }
+
     if (!gltfDoc.contains("materials") || !gltfDoc["materials"].is_array()) {
-        // No materials defined in the glTF file
-        for (auto& mesh : meshes) {
-            Material* newMaterial = new Material(shader);
-            mesh->material = newMaterial;
-        }
+        // No materials defined in the glTF file, use defaults
         return;
     }
 
     const auto& materialsJson = gltfDoc["materials"];
 
-    // Create vector of textures to store loaded textures
-    std::vector<Texture*> textures;
+    // Collect texture file paths
+    std::vector<std::string> texturePaths;
     if (gltfDoc.contains("textures") && gltfDoc["textures"].is_array()) {
         const auto& texturesJson = gltfDoc["textures"];
         const auto& imagesJson = gltfDoc.contains("images") ? gltfDoc["images"] : json();
 
-        textures.resize(texturesJson.size(), nullptr);
+        texturePaths.resize(texturesJson.size());
 
         for (size_t i = 0; i < texturesJson.size(); ++i) {
             const auto& textureJson = texturesJson[i];
@@ -540,18 +606,18 @@ void loadMaterials(const json& gltfDoc, std::vector<Mesh*>& meshes, const std::v
 
                 if (imageIndex < imagesJson.size() && imagesJson[imageIndex].contains("uri")) {
                     std::string imageUri = imagesJson[imageIndex]["uri"].get<std::string>();
-                    std::string imgPath = fileName.substr(0, fileName.find_last_of("/\\") + 1) + imageUri;
-                    textures[i] = new Texture(imgPath);
+                    texturePaths[i] = fileName.substr(0, fileName.find_last_of("/\\") + 1) + imageUri;
                 }
             }
         }
     }
 
-    // Now process materials and assign them to meshes
-    for (size_t meshIdx = 0; meshIdx < meshes.size(); ++meshIdx) {
-        Mesh* mesh = meshes[meshIdx];
-        Material* newMaterial = new Material(shader);
-        mesh->material = newMaterial;
+    // Process materials and assign them to material definitions
+    for (size_t meshIdx = 0; meshIdx < materialDefs.size(); ++meshIdx) {
+        if (meshIdx >= materialIndices.size()) {
+            continue;
+        }
+
         int materialIdx = materialIndices[meshIdx];
 
         if (materialIdx < 0 || materialIdx >= static_cast<int>(materialsJson.size())) {
@@ -559,19 +625,19 @@ void loadMaterials(const json& gltfDoc, std::vector<Mesh*>& meshes, const std::v
         }
 
         const auto& materialJson = materialsJson[materialIdx];
+        auto& matDef = materialDefs[meshIdx];
 
-        // Default albedo color (if no base color texture is specified)
-        newMaterial->albedoColor = glm::vec4(1.0f);
+        // Set default albedo color
+        matDef->albedoColor = glm::vec4(1.0f);
 
-        // Process PBR material properties
         if (materialJson.contains("pbrMetallicRoughness")) {
             const auto& pbrJson = materialJson["pbrMetallicRoughness"];
 
-            // Base color factor (RGBA)
+            // Parse base color factor
             if (pbrJson.contains("baseColorFactor") && pbrJson["baseColorFactor"].is_array() &&
                 pbrJson["baseColorFactor"].size() == 4) {
                 const auto& colorArray = pbrJson["baseColorFactor"];
-                newMaterial->albedoColor = glm::vec4(
+                matDef->albedoColor = glm::vec4(
                     colorArray[0].get<float>(),
                     colorArray[1].get<float>(),
                     colorArray[2].get<float>(),
@@ -579,107 +645,82 @@ void loadMaterials(const json& gltfDoc, std::vector<Mesh*>& meshes, const std::v
                 );
             }
 
-            // Base color texture
+            // Parse base color texture (albedo map)
             if (pbrJson.contains("baseColorTexture") && pbrJson["baseColorTexture"].contains("index")) {
                 size_t textureIdx = pbrJson["baseColorTexture"]["index"].get<size_t>();
-                if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
-                    newMaterial->albedoMap = textures[textureIdx];
+                if (textureIdx < texturePaths.size() && !texturePaths[textureIdx].empty()) {
+                    matDef->albedoMapPath = texturePaths[textureIdx];
                 }
             }
 
-            // Metallic-roughness texture
+            // Parse metallic-roughness texture
             if (pbrJson.contains("metallicRoughnessTexture") &&
                 pbrJson["metallicRoughnessTexture"].contains("index")) {
                 size_t textureIdx = pbrJson["metallicRoughnessTexture"]["index"].get<size_t>();
-                if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
-                    newMaterial->metallicRoughnessMap = textures[textureIdx];
-                    // In glTF, metallic and roughness are packed into a single texture
-                    // G channel = roughness, B channel = metallic
-                    // newMaterial->roughnessMap = textures[textureIdx];
+                if (textureIdx < texturePaths.size() && !texturePaths[textureIdx].empty()) {
+                    matDef->metallicRoughnessMapPath = texturePaths[textureIdx];
                 }
             }
         }
 
-        // Normal map
+        // Parse normal texture
         if (materialJson.contains("normalTexture") && materialJson["normalTexture"].contains("index")) {
             size_t textureIdx = materialJson["normalTexture"]["index"].get<size_t>();
-            if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
-                newMaterial->normalMap = textures[textureIdx];
+            if (textureIdx < texturePaths.size() && !texturePaths[textureIdx].empty()) {
+                matDef->normalMapPath = texturePaths[textureIdx];
             }
-
-            // Normal scale factor
-            // if (materialJson["normalTexture"].contains("scale")) {
-            //     newMaterial->normalScale = materialJson["normalTexture"]["scale"].get<float>();
-            // }
         }
 
-        // Occlusion map
+        // Parse occlusion texture and strength
         if (materialJson.contains("occlusionTexture") && materialJson["occlusionTexture"].contains("index")) {
-            // size_t textureIdx = materialJson["occlusionTexture"]["index"].get<size_t>();
-            // if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
-            //     newMaterial->aoMap = textures[textureIdx];
-            // }
-
-            // Occlusion strength
             if (materialJson["occlusionTexture"].contains("strength")) {
-                newMaterial->occlusionStrength = materialJson["occlusionTexture"]["strength"].get<float>();
+                matDef->occlusionStrength = materialJson["occlusionTexture"]["strength"].get<float>();
             }
         }
 
-        // Emissive map
+        // Parse emissive texture
         if (materialJson.contains("emissiveTexture") && materialJson["emissiveTexture"].contains("index")) {
             size_t textureIdx = materialJson["emissiveTexture"]["index"].get<size_t>();
-            if (textureIdx < textures.size() && textures[textureIdx] != nullptr) {
-                newMaterial->emissiveMap = textures[textureIdx];
+            if (textureIdx < texturePaths.size() && !texturePaths[textureIdx].empty()) {
+                matDef->emissiveMapPath = texturePaths[textureIdx];
             }
         }
 
-        // Emissive factor
+        // Parse emissive factor
         if (materialJson.contains("emissiveFactor") && materialJson["emissiveFactor"].is_array() &&
             materialJson["emissiveFactor"].size() == 3) {
             const auto& emissiveArray = materialJson["emissiveFactor"];
-            newMaterial->emissiveColor = glm::vec3(
+            matDef->emissiveColor = glm::vec3(
                 emissiveArray[0].get<float>(),
                 emissiveArray[1].get<float>(),
                 emissiveArray[2].get<float>()
             );
         }
-
-        // Alpha mode and cutoff
-        // if (materialJson.contains("alphaMode")) {
-        //     std::string alphaMode = materialJson["alphaMode"].get<std::string>();
-        //     if (alphaMode == "MASK") {
-        //         material->alphaMode = Material::AlphaMode::MASK;
-        //         if (materialJson.contains("alphaCutoff")) {
-        //             material->alphaCutoff = materialJson["alphaCutoff"].get<float>();
-        //         }
-        //     } else if (alphaMode == "BLEND") {
-        //         material->alphaMode = Material::AlphaMode::BLEND;
-        //     }
-        //     // Default is OPAQUE
-        // }
-
-        // // Double-sided rendering
-        // if (materialJson.contains("doubleSided")) {
-        //     material->doubleSided = materialJson["doubleSided"].get<bool>();
-        // }
     }
 }
 
 template <typename T>
 void unpackData(const uint8_t* dataPtr, int componentType, int vecSize, T& target) {
-    // Handle scalar values (for indices)
     if constexpr (std::is_same_v<T, uint32_t>) {
         switch (componentType) {
-            case 5121: // UNSIGNED_BYTE
-                target = static_cast<uint32_t>(*dataPtr);
+            case 5121: { // UNSIGNED_BYTE
+                uint8_t value;
+                std::memcpy(&value, dataPtr, sizeof(uint8_t));
+                target = static_cast<uint32_t>(value);
                 break;
-            case 5123: // UNSIGNED_SHORT
-                target = static_cast<uint32_t>(*reinterpret_cast<const uint16_t*>(dataPtr));
+            }
+            case 5123: { // UNSIGNED_SHORT
+                uint16_t value;
+                std::memcpy(&value, dataPtr, sizeof(uint16_t));
+                target = static_cast<uint32_t>(value);
                 break;
-            case 5125: // UNSIGNED_INT
-                target = *reinterpret_cast<const uint32_t*>(dataPtr);
+            }
+            case 5125: { // UNSIGNED_INT
+                uint32_t value;
+                std::memcpy(&value, dataPtr, sizeof(uint32_t));
+                target = value;
                 break;
+            }
             default:
                 std::cerr << "Unsupported component type for indices: " << componentType << "\n";
                 break;
@@ -687,61 +728,55 @@ void unpackData(const uint8_t* dataPtr, int componentType, int vecSize, T& targe
         return;
     }
 
-    // Vector types (vec2, vec3, vec4)
     if constexpr (std::is_same_v<T, glm::vec2> || std::is_same_v<T, glm::vec3> || std::is_same_v<T, glm::vec4>) {
-        float values[4] = {0.0f, 0.0f, 0.0f, 1.0f}; // Default w=1.0 for vec4
-        float normFactor = 1.0f;
-        bool shouldNormalize = false;
+        float values[4] = {0.0f, 0.0f, 0.0f, 1.0f}; // default w = 1.0f
 
-        // Extract raw values first
         switch (componentType) {
             case 5120: { // BYTE
-                const int8_t* typedPtr = reinterpret_cast<const int8_t*>(dataPtr);
-                for (int i = 0; i < vecSize; i++) {
-                    values[i] = static_cast<float>(typedPtr[i]);
+                for (int i = 0; i < vecSize; ++i) {
+                    int8_t temp;
+                    std::memcpy(&temp, dataPtr + i * sizeof(int8_t), sizeof(int8_t));
+                    values[i] = static_cast<float>(temp);
                 }
-                normFactor = 127.0f;
-                shouldNormalize = true;
                 break;
             }
             case 5121: { // UNSIGNED_BYTE
-                const uint8_t* typedPtr = dataPtr;
-                for (int i = 0; i < vecSize; i++) {
-                    values[i] = static_cast<float>(typedPtr[i]);
+                for (int i = 0; i < vecSize; ++i) {
+                    uint8_t temp;
+                    std::memcpy(&temp, dataPtr + i * sizeof(uint8_t), sizeof(uint8_t));
+                    values[i] = static_cast<float>(temp);
                 }
-                normFactor = 255.0f;
-                shouldNormalize = true;
                 break;
             }
             case 5122: { // SHORT
-                const int16_t* typedPtr = reinterpret_cast<const int16_t*>(dataPtr);
-                for (int i = 0; i < vecSize; i++) {
-                    values[i] = static_cast<float>(typedPtr[i]);
+                for (int i = 0; i < vecSize; ++i) {
+                    int16_t temp;
+                    std::memcpy(&temp, dataPtr + i * sizeof(int16_t), sizeof(int16_t));
+                    values[i] = static_cast<float>(temp);
                 }
-                normFactor = 32767.0f;
-                shouldNormalize = true;
                 break;
             }
             case 5123: { // UNSIGNED_SHORT
-                const uint16_t* typedPtr = reinterpret_cast<const uint16_t*>(dataPtr);
-                for (int i = 0; i < vecSize; i++) {
-                    values[i] = static_cast<float>(typedPtr[i]);
-                }
-                normFactor = 65535.0f;
-                shouldNormalize = true;
-                break;
-            }
-            case 5125: { // UNSIGNED_INT - no normalization for vertex data
-                const uint32_t* typedPtr = reinterpret_cast<const uint32_t*>(dataPtr);
-                for (int i = 0; i < vecSize; i++) {
-                    values[i] = static_cast<float>(typedPtr[i]);
+                for (int i = 0; i < vecSize; ++i) {
+                    uint16_t temp;
+                    std::memcpy(&temp, dataPtr + i * sizeof(uint16_t), sizeof(uint16_t));
+                    values[i] = static_cast<float>(temp);
                 }
                 break;
             }
-            case 5126: { // FLOAT - direct copy
-                const float* typedPtr = reinterpret_cast<const float*>(dataPtr);
-                for (int i = 0; i < vecSize; i++) {
-                    values[i] = typedPtr[i];
+            case 5125: { // UNSIGNED_INT
+                for (int i = 0; i < vecSize; ++i) {
+                    uint32_t temp;
+                    std::memcpy(&temp, dataPtr + i * sizeof(uint32_t), sizeof(uint32_t));
+                    values[i] = static_cast<float>(temp);
+                }
+                break;
+            }
+            case 5126: { // FLOAT
+                for (int i = 0; i < vecSize; ++i) {
+                    float temp;
+                    std::memcpy(&temp, dataPtr + i * sizeof(float), sizeof(float));
+                    values[i] = temp;
                 }
                 break;
             }
@@ -750,21 +785,6 @@ void unpackData(const uint8_t* dataPtr, int componentType, int vecSize, T& targe
                 break;
         }
 
-        // Apply normalization after extraction (if needed)
-        if (shouldNormalize) {
-            for (int i = 0; i < vecSize; i++) {
-                // Handle signed vs unsigned normalization
-                if (componentType == 5120 || componentType == 5122) {
-                    // Signed types normalize to [-1, 1]
-                    values[i] = std::max(values[i] / normFactor, -1.0f);
-                } else {
-                    // Unsigned types normalize to [0, 1]
-                    values[i] = values[i] / normFactor;
-                }
-            }
-        }
-
-        // Assign the values to the appropriate vector type
         if constexpr (std::is_same_v<T, glm::vec2>) {
             target = glm::vec2(values[0], values[1]);
         } else if constexpr (std::is_same_v<T, glm::vec3>) {

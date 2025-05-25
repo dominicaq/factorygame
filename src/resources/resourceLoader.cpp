@@ -20,7 +20,7 @@ std::string ResourceLoader::readFile(const std::string& filePath) {
     if (!file.is_open()) {
         std::filesystem::path absolutePath = std::filesystem::absolute(filePath);
         std::cerr << "[Error] ResourceLoader::readFile: Failed to open file: "
-                 << filePath << "\n";
+                  << filePath << "\n";
         std::cerr << "[Error] Absolute path was: " << absolutePath.string() << "\n";
         return "";
     }
@@ -52,7 +52,7 @@ void ResourceLoader::freeImage(unsigned char* data) {
 /*
 * Mesh
 */
-Mesh* ResourceLoader::loadMesh(const std::string& filepath) {
+RawMeshData* ResourceLoader::loadMesh(const std::string& filepath) {
     std::string fileContent = readFile(filepath);
     if (fileContent.empty()) {
         std::cerr << "[Error] ResourceLoader::loadMesh: File contents empty: " << filepath << "\n";
@@ -76,7 +76,7 @@ Mesh* ResourceLoader::loadMesh(const std::string& filepath) {
     if (extension == "obj") {
         return ObjLoader::loadOBJ(fileContent);
     } else if (extension == "gltf") {
-        std::cerr << "[Error] ResourceLoader::loadMesh: for glTF files use ResoucreLoader::loadMeshVector() for file: " << filepath << "\n";
+        std::cerr << "[Error] ResourceLoader::loadMesh: for glTF files use ResourceLoader::loadMeshVector() for file: " << filepath << "\n";
         return nullptr;
     } else {
         std::cerr << "[Error] ResourceLoader::loadMesh: Unknown file extension: " << extension << " for file: " << filepath << "\n";
@@ -84,17 +84,21 @@ Mesh* ResourceLoader::loadMesh(const std::string& filepath) {
     }
 }
 
-void ResourceLoader::loadMeshVector(const std::string& filepath, std::vector<Mesh*>& meshes, std::vector<SceneData>& nodeData, Shader* shader) {
+void ResourceLoader::loadMeshVector(
+    const std::string& filepath,
+    std::vector<std::unique_ptr<RawMeshData>>& meshes,
+    std::vector<std::unique_ptr<MaterialDefinition>>& materialDefs,
+    std::vector<SceneData>& nodeData) {
     std::string fileContent = readFile(filepath);
     if (fileContent.empty()) {
-        std::cerr << "[Error] ResourceLoader::loadMesh: File contents empty: " << filepath << "\n";
+        std::cerr << "[Error] ResourceLoader::loadMeshVector: File contents empty: " << filepath << "\n";
         return;
     }
 
     // Extract the file extension
     size_t dotPos = filepath.find_last_of(".");
     if (dotPos == std::string::npos) {
-        std::cerr << "[Error] ResourceLoader::loadMesh: Failed to determine file type for: " << filepath << "\n";
+        std::cerr << "[Error] ResourceLoader::loadMeshVector: Failed to determine file type for: " << filepath << "\n";
         return;
     }
 
@@ -108,9 +112,10 @@ void ResourceLoader::loadMeshVector(const std::string& filepath, std::vector<Mes
         return;
     }
 
-    if (!loadglTF(filepath, meshes, nodeData, shader)) {
-        std::cerr << "[Error] ResourceLoader::loadMeshVector: Failed to load glTF mesh: \n" << filepath << "\n";
+    if (!loadglTF(filepath, meshes, materialDefs, nodeData)) {
+        std::cerr << "[Error] ResourceLoader::loadMeshVector: Failed to load glTF mesh: " << filepath << "\n";
         meshes.clear();
+        materialDefs.clear();
         nodeData.clear();
         return;
     }

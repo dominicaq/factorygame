@@ -2,88 +2,67 @@
 
 #include "shader.h"
 #include "texture.h"
-
 #include <glm/glm.hpp>
 
-struct Material {
-    Shader* shader = nullptr;
+// Texture presence bit flags - shared between C++ and shaders
+#define MATERIAL_HAS_ALBEDO_MAP             (1u << 0)  // 0x01
+#define MATERIAL_HAS_NORMAL_MAP             (1u << 1)  // 0x02
+#define MATERIAL_HAS_METALLIC_ROUGHNESS_MAP (1u << 2)  // 0x04
+#define MATERIAL_HAS_EMISSIVE_MAP           (1u << 3)  // 0x08
+#define MATERIAL_HAS_HEIGHT_MAP             (1u << 4)  // 0x10
 
-    Texture* albedoMap = nullptr;
-    Texture* normalMap = nullptr;
+// Table to fill out in material init
+struct MaterialDefinition {
+    // Shader Paths
+    std::string vertexShaderPath;
+    std::string fragmentShaderPath;
 
-    // Combined metallic-roughness map (e.g. RGB channels: R=AO, G=Roughness, B=Metallic)
-    Texture* metallicRoughnessMap = nullptr;
-    float occlusionStrength = 1.0f;
+    // Texture file paths
+    std::string albedoMapPath;
+    std::string normalMapPath;
+    std::string metallicRoughnessMapPath;
+    std::string emissiveMapPath;
+    std::string heightMapPath;
 
-    Texture* emissiveMap = nullptr;
-    glm::vec3 emissiveColor = glm::vec3(1.0f);
-
-    Texture* heightMap = nullptr;
-    float heightScale = 1.0f;
-
+    // Material properties
     glm::vec4 albedoColor = glm::vec4(1.0f);
+    glm::vec3 emissiveColor = glm::vec3(1.0f);
+    glm::vec2 uvScale = glm::vec2(1.0f);
 
-    glm::vec2 uvScale = glm::vec2(1.0f, 1.0f);
-
+    float heightScale = 1.0f;
+    float occlusionStrength = 1.0f;
     float shininess = 32.0f;
-    float time;
+    float time = 0.0f;
 
     bool isDeferred = true;
+};
 
-    Material(Shader* shader)
-        : shader(shader),
-          albedoColor(glm::vec4(1.0f)),
-          shininess(32.0f),
-          isDeferred(true) {}
+// GPU material data with texture handles
+struct MaterialData {
+    uint64_t albedoMapHandle = 0;           // 0-7
+    uint64_t normalMapHandle = 0;           // 8-15
+    uint64_t metallicRoughnessMapHandle = 0; // 16-23
+    uint64_t emissiveMapHandle = 0;         // 24-31
+    uint64_t heightMapHandle = 0;           // 32-39
 
-    void bind(Shader* shaderOverride = nullptr) const {
-        Shader* shaderToUse = shaderOverride ? shaderOverride : shader;
+    uint64_t _padding0 = 0;                 // 40-47 (NSight shows data starts at 48)
 
-        struct TextureBinding {
-            const char* uniformName;
-            const char* hasUniformName;
-            Texture* texture;
-            int textureUnit;
-            float* strength;
-        };
+    glm::vec4 albedoColor = glm::vec4(1.0f);    // 48-63
+    glm::vec4 emissiveColor = glm::vec4(1.0f);  // 64-79
+    glm::vec2 uvScale = glm::vec2(1.0f);        // 80-87
 
-        TextureBinding bindings[] = {
-            {"u_AlbedoMap", nullptr, albedoMap, 0, nullptr},
-            {"u_NormalMap", "u_HasNormalMap", normalMap, 1, nullptr},
-            {"u_MetallicRoughnessMap", "u_HasMetallicRoughnessMap", metallicRoughnessMap, 2, nullptr},
-            {"u_HeightMap", "u_HasHeightMap", heightMap, 3, nullptr},
-            {"u_EmissiveMap", "u_HasEmissiveMap", emissiveMap, 4, nullptr}
-        };
+    uint64_t _padding1 = 0;                 // 88-95 (align floats to 16-byte boundary)
 
-        for (const auto& binding : bindings) {
-            if (binding.texture) {
-                if (shaderToUse->hasUniform(binding.uniformName)) {
-                    shaderToUse->setInt(binding.uniformName, binding.textureUnit);
-                    binding.texture->bind(binding.textureUnit);
-                }
-                if (binding.hasUniformName && shaderToUse->hasUniform(binding.hasUniformName)) {
-                    shaderToUse->setBool(binding.hasUniformName, true);
-                }
-            } else {
-                if (binding.hasUniformName && shaderToUse->hasUniform(binding.hasUniformName)) {
-                    shaderToUse->setBool(binding.hasUniformName, false);
-                }
-            }
-        }
+    float heightScale = 1.0f;               // 96-99
+    float occlusionStrength = 1.0f;         // 100-103
+    float shininess = 32.0f;                // 104-107
+    float time = 0.0f;                      // 108-111
 
-        shaderToUse->setVec4("u_AlbedoColor", albedoColor);
+    uint32_t textureFlags = 0;              // 112-115
+    uint32_t _padding2[3] = {0, 0, 0};      // 116-127
 
-        if (shaderToUse->hasUniform("u_Time")) {
-            shaderToUse->setFloat("u_Time", time);
-        }
-        if (shaderToUse->hasUniform("u_HeightScale")) {
-            shaderToUse->setFloat("u_HeightScale", heightScale);
-        }
-        if (shaderToUse->hasUniform("u_uvScale")) {
-            shaderToUse->setVec2("u_uvScale", uvScale);
-        }
-        if (shaderToUse->hasUniform("u_EmissiveColor")) {
-            shaderToUse->setVec3("u_EmissiveColor", emissiveColor);
-        }
-    }
+    // Helper functions remain the same
+    void setTextureFlag(uint32_t flag) { textureFlags |= flag; }
+    void clearTextureFlag(uint32_t flag) { textureFlags &= ~flag; }
+    bool hasTextureFlag(uint32_t flag) const { return (textureFlags & flag) != 0; }
 };

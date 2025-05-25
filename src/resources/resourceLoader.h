@@ -1,10 +1,11 @@
-#ifndef RESOURCE_LOADER_H
-#define RESOURCE_LOADER_H
+#pragma once
 
 #include "../components/mesh.h"
 #include "scene/sceneData.h"
 
 #include <string>
+#include <memory>
+#include <vector>
 
 namespace ResourceLoader {
     /*
@@ -15,8 +16,12 @@ namespace ResourceLoader {
     /*
     * Mesh functions
     */
-    Mesh* loadMesh(const std::string& filepath);
-    void loadMeshVector(const std::string& filepath, std::vector<Mesh*>& meshes, std::vector<SceneData>& nodeData, Shader* shader);
+    RawMeshData* loadMesh(const std::string& filepath);
+
+    void loadMeshVector(const std::string& filepath,
+                        std::vector<std::unique_ptr<RawMeshData>>& meshes,
+                        std::vector<std::unique_ptr<MaterialDefinition>>& materialDefs,
+                        std::vector<SceneData>& nodeData);
 
     /*
     * Image functions
@@ -28,7 +33,5 @@ namespace ResourceLoader {
     * Cubemap loaders
     */
     std::vector<unsigned char*> loadCubemapImages(const std::vector<std::string>& faces, int* width, int* height, int* nrChannels);
-    void freeCubemapImages(std::vector<unsigned char*>& data);;
+    void freeCubemapImages(std::vector<unsigned char*>& data);
 }
-
-#endif // RESOURCE_LOADER_H

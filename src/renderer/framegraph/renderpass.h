@@ -5,6 +5,7 @@
 #include <vector>
 #include <glm/glm.hpp>
 #include "entt/entt.hpp"
+#include "../renderBatch.h"
 #include "../renderer.h"
 
 class Renderer;

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../engine.h"
-
+#include "renderBatch.h"
 #include "framebuffer.h"
 #include "cubeMap.h"
 #include "config/settings.h"
@@ -9,6 +9,12 @@
 #include <glad/glad.h>
 #include <memory>
 #include <vector>
+#include <map>
+
+// Forward declarations
+struct IndirectDrawCommand;
+struct DrawElementsIndirectCommand;
+struct DrawArraysIndirectCommand;
 
 /*
  * The Renderer class is responsible for handling OpenGL rendering,
@@ -23,85 +29,80 @@ public:
     bool applySettings(const config::GraphicsSettings& settings);
 
     /*
-    * Getters
-    */
+     * Getters
+     */
     std::pair<int, int> getScreenDimensions() const {
         return {m_width, m_height};
     }
     Framebuffer* getFramebuffer() const { return m_gBuffer.get(); }
     Camera* getCamera() const { return m_camera; }
+    int getNumAttachments();
 
     /*
-    * Instancing
-    */
-    void drawInstanced(size_t instanceID, bool wireframe = false);
-    void updateInstanceBuffer(size_t instanceID, const std::vector<glm::mat4>& modelMatrices);
-    void setupInstanceAttributes(size_t instanceID, const std::vector<glm::mat4>& modelMatrices);
-    void deleteInstanceBuffer(size_t instanceID);
-
-    /*
-     * Initialize and manage mesh buffers
+     * Core Rendering Interface - What the renderer should focus on
      */
-    void draw(const Mesh* mesh);
-    void initMeshBuffers(Mesh* mesh, bool isStatic = true, size_t instanceID = SIZE_MAX);
-    void deleteMeshBuffer(const Mesh* mesh);
+    void executeIndirectDraw(const std::vector<IndirectDrawCommand>& commands, GLuint indirectBuffer);
 
     /*
-     * Quad rendering (used for post-processing, G-buffer display, etc.)
+     * Direct mesh drawing (for your current render loop)
      */
     void drawScreenQuad();
 
     /*
-     * Recreate G-buffer with new dimensions
+     * Viewport and framebuffer management
      */
     void resize(int width, int height);
 
-    int getNumAttachments();
+    // ============================================================================
+    // MESH MANAGEMENT SECTION - Keep this minimal for now
+    // ============================================================================
+
+    /*
+     * Mesh buffer management - moved from your original code
+     */
+    Mesh& initMeshBuffers(std::unique_ptr<RawMeshData>& mesh, bool isStatic = true);
+    void deleteMeshBuffer(const Mesh& mesh);
+
+    /*
+     * Query functions for indirect rendering
+     */
+    GLuint getMeshVAO(size_t meshId) const;
+    bool hasMeshIndices(size_t meshId) const;
+    GLsizei getMeshIndexCount(size_t meshId) const;
+    GLsizei getMeshVertexCount(size_t meshId) const;
 
 private:
     /*
-    * Viewport
-    */
+     * Core Renderer State
+     */
     int m_width;
     int m_height;
-    unsigned int m_quadVAO;
     Camera* m_camera;
-
-    /*
-     * Initialize OpenGL state (depth testing, face culling, etc.)
-     */
-    void initOpenGLState();
-
-    /*
-    * Init mesh buffer for screen quad
-    */
-    void initScreenQuad();
-
-    // List of framebuffers (in the future)
     std::unique_ptr<Framebuffer> m_gBuffer;
-    std::unique_ptr<Framebuffer> m_shadowAtlas;
+
+    // Screen quad for deferred rendering
+    GLuint m_quadVAO = 0;
 
     /*
-    * Mesh preprocessing
-    */
-    ComputeShader m_heightCompute;
-    // ComputeShader m_meshCompute;
-    void applyHeightMapCompute(Mesh* mesh);
-
-    /*
-     * Mesh buffer storage
+     * Mesh data storage
      */
     struct MeshData {
-        unsigned int VAO, VBO, EBO;
-        GLsizei indexCount;
-        GLsizei vertexCount;
-
-        GLuint instanceSSBO = 0;
-        GLuint instanceBufferSize = 0;
-        GLsizei instanceCount = 0;
+        GLuint VAO = 0;
+        GLuint VBO = 0;
+        GLuint EBO = 0;
+        uint32_t indexCount = 0;
+        uint32_t vertexCount = 0;
     };
-
     std::vector<MeshData> m_meshData;
-    std::vector<MeshData> m_instanceMeshData;
-};
 
+    /*
+    * Material storage
+    */
+
+    /*
+     * Initialization
+     */
+    void initOpenGLState();
+    void initScreenQuad();
+    void cleanup();
+};

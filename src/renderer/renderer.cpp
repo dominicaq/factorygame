@@ -1,16 +1,12 @@
 #include "renderer.h"
-#include "framebuffer.h"
 #include <iostream>
-#include <memory>
 
-// Define the number of G-buffer attachments
+#define VERTEX_SIZE 8
 #define NUM_GATTACHMENTS 5
 
-Renderer::Renderer(config::GraphicsSettings settings, Camera* camera) {
-    config = settings;
+Renderer::Renderer(config::GraphicsSettings settings, Camera* camera)
+    : config(settings), m_camera(camera) {
 
-    // Viewport
-    m_camera = camera;
     m_width = config.display.width;
     m_height = config.display.height;
 
@@ -19,15 +15,194 @@ Renderer::Renderer(config::GraphicsSettings settings, Camera* camera) {
 
     // Initialize G-Buffer
     m_gBuffer = std::make_unique<Framebuffer>(m_width, m_height, NUM_GATTACHMENTS, true);
-
-    // Init the mesh compute shader
-    m_heightCompute.load(ASSET_DIR "shaders/core/heightmap.comp");
-
-    // Make the first mesh instance blank
-    m_instanceMeshData.push_back(MeshData{0});
 }
 
 Renderer::~Renderer() {
+    cleanup();
+}
+
+
+// ============================================================================
+// MESH MANAGEMENT (from your original code)
+// ============================================================================
+
+Mesh& Renderer::initMeshBuffers(std::unique_ptr<RawMeshData>& rawData, bool isStatic) {
+    static Mesh invalidMesh; // Return this for errors
+
+    if (rawData->uvs.empty() || rawData->packedTNBFrame.empty()) {
+        std::cerr << "[Error] Renderer::initMeshBuffers: UVs and tangent space must be provided.\n";
+        return invalidMesh;
+    }
+
+    MeshData data = {};
+    glGenVertexArrays(1, &data.VAO);
+    glBindVertexArray(data.VAO);
+
+    // Build mesh buffer data (VERTEX_SIZE = 8 floats per vertex)
+    std::vector<float> bufferData;
+    size_t numVertices = rawData->vertices.size();
+    bufferData.reserve(numVertices * VERTEX_SIZE);
+
+    for (size_t i = 0; i < numVertices; ++i) {
+        // Positions (3 floats)
+        bufferData.push_back(rawData->vertices[i].x);
+        bufferData.push_back(rawData->vertices[i].y);
+        bufferData.push_back(rawData->vertices[i].z);
+
+        // Packed UVs (1 float)
+        uint16_t u = static_cast<uint16_t>(rawData->uvs[i].x * 65535.0f);
+        uint16_t v = static_cast<uint16_t>(rawData->uvs[i].y * 65535.0f);
+        uint32_t packedUV = (static_cast<uint32_t>(v) << 16) | u;
+        bufferData.push_back(*reinterpret_cast<float*>(&packedUV));
+
+        // Packed Normal & Tangent frame (4 floats)
+        bufferData.push_back(rawData->packedTNBFrame[i].x);
+        bufferData.push_back(rawData->packedTNBFrame[i].y);
+        bufferData.push_back(rawData->packedTNBFrame[i].z);
+        bufferData.push_back(rawData->packedTNBFrame[i].w);
+    }
+
+    static Mesh newMesh;
+
+    // Create and upload VBO
+    glGenBuffers(1, &data.VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, data.VBO);
+    glBufferData(GL_ARRAY_BUFFER, bufferData.size() * sizeof(float),
+                 bufferData.data(), isStatic ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW);
+
+    // Handle indices
+    if (!rawData->indices.empty()) {
+        glGenBuffers(1, &data.EBO);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, data.EBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, rawData->indices.size() * sizeof(unsigned int),
+                     rawData->indices.data(), GL_STATIC_DRAW);
+        data.indexCount = static_cast<GLsizei>(rawData->indices.size());
+        data.vertexCount = 0;
+        newMesh.count = static_cast<uint32_t>(data.indexCount);
+    } else {
+        data.EBO = 0;
+        data.indexCount = 0;
+        data.vertexCount = static_cast<GLsizei>(rawData->vertices.size());
+        newMesh.count = static_cast<uint32_t>(data.vertexCount);
+    }
+
+    // Attribute 0: Position (xyz) + Packed UVs (w) = 4 floats
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, VERTEX_SIZE * sizeof(float), (void*)0);
+
+    // Attribute 1: Packed Normal & Tangent frame = 4 floats
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, VERTEX_SIZE * sizeof(float), (void*)(4 * sizeof(float)));
+
+    glBindVertexArray(0);
+
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) {
+        std::cerr << "[Error] OpenGL error during mesh buffer creation: " << error << "\n";
+        glDeleteVertexArrays(1, &data.VAO);
+        if (data.VBO) glDeleteBuffers(1, &data.VBO);
+        if (data.EBO) glDeleteBuffers(1, &data.EBO);
+        return invalidMesh;
+    }
+
+    // Find available slot or add new one
+    size_t assignedId = SIZE_MAX;
+    for (size_t i = 0; i < m_meshData.size(); ++i) {
+        if (m_meshData[i].VAO == 0) {
+            m_meshData[i] = data;
+            assignedId = i;
+            break;
+        }
+    }
+
+    if (assignedId == SIZE_MAX) {
+        m_meshData.push_back(data);
+        assignedId = m_meshData.size() - 1;
+    }
+
+    newMesh.id = assignedId;
+
+    // Clear CPU data if static
+    if (isStatic) {
+        rawData->clearData();
+    }
+    return newMesh;
+}
+
+GLuint Renderer::getMeshVAO(size_t meshId) const {
+    if (meshId >= m_meshData.size()) return 0;
+    return m_meshData[meshId].VAO;
+}
+
+bool Renderer::hasMeshIndices(size_t meshId) const {
+    if (meshId >= m_meshData.size()) return false;
+    return m_meshData[meshId].EBO != 0;
+}
+
+GLsizei Renderer::getMeshIndexCount(size_t meshId) const {
+    if (meshId >= m_meshData.size()) return 0;
+    return m_meshData[meshId].indexCount;
+}
+
+GLsizei Renderer::getMeshVertexCount(size_t meshId) const {
+    if (meshId >= m_meshData.size()) return 0;
+    return m_meshData[meshId].vertexCount;
+}
+
+// ============================================================================
+// UTILITY IMPLEMENTATIONS
+// ============================================================================
+
+void Renderer::initOpenGLState() {
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_CLAMP);
+    glDepthFunc(GL_LESS);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
+    glDisable(GL_BLEND);
+}
+
+void Renderer::initScreenQuad() {
+    float quadVertices[] = {
+        -1.0f,  1.0f, 0.0f,  0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f,  0.0f, 0.0f,
+         1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
+         1.0f,  1.0f, 0.0f,  1.0f, 1.0f
+    };
+
+    unsigned int quadIndices[] = { 0, 1, 2, 2, 3, 0 };
+
+    glGenVertexArrays(1, &m_quadVAO);
+    glBindVertexArray(m_quadVAO);
+
+    unsigned int VBO, EBO;
+    glGenBuffers(1, &VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+
+    glGenBuffers(1, &EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quadIndices), &quadIndices, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+
+    glBindVertexArray(0);
+}
+
+void Renderer::drawScreenQuad() {
+    glBindVertexArray(m_quadVAO);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+}
+
+void Renderer::cleanup() {
     // Clean up mesh buffers
     for (auto& data : m_meshData) {
         if (data.VAO) {
@@ -41,521 +216,116 @@ Renderer::~Renderer() {
         }
     }
 
-    // Clean up instance mesh buffers
-    for (auto& data : m_instanceMeshData) {
-        if (data.VAO) {
-            glDeleteVertexArrays(1, &data.VAO);
-        }
-        if (data.VBO) {
-            glDeleteBuffers(1, &data.VBO);
-        }
-        if (data.EBO) {
-            glDeleteBuffers(1, &data.EBO);
-        }
-    }
-
-    // Clean up quad
+    // Clean up screen quad
     if (m_quadVAO) {
         glDeleteVertexArrays(1, &m_quadVAO);
+        m_quadVAO = 0;
     }
-}
-
-/*
- * OpenGL State Initialization
- */
-void Renderer::initOpenGLState() {
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_DEPTH_CLAMP);
-    glDepthFunc(GL_LESS);
-
-    // Face Culling
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    glFrontFace(GL_CCW);
-
-    // Disable Blending by default
-    glDisable(GL_BLEND);
-}
-
-/*
- * Mesh management
- */
-void Renderer::draw(const Mesh* mesh) {
-    size_t index = mesh->id;
-    if (index >= m_meshData.size() || m_meshData[index].VAO == 0) {
-        // TODO: TEMP
-        // std::cerr << "[Error] Remderer::draw: Mesh buffer id not found!\n";
-        return;
-    }
-
-    const MeshData& data = m_meshData[index];
-
-    if (mesh->wireframe) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    }
-
-    // Bind VAO
-    glBindVertexArray(data.VAO);
-
-    // Draw the mesh
-    GLenum drawMode = mesh->wireframe ? GL_LINES : mesh->drawMode;
-    if (data.EBO != 0) {
-        glDrawElements(drawMode, data.indexCount, GL_UNSIGNED_INT, 0);
-    } else {
-        glDrawArrays(drawMode, 0, data.vertexCount);
-    }
-
-    // Unbind VAO
-    glBindVertexArray(0);
-
-    if (mesh->wireframe) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    }
-}
-
-void Renderer::drawInstanced(size_t instanceID, bool wireframe) {
-    if (instanceID >= m_instanceMeshData.size() || m_instanceMeshData[instanceID].VAO == 0) {
-        std::cerr << "[Error] Renderer::drawInstanced: Mesh buffer id not found!\n";
-        return;
-    }
-
-    const MeshData& data = m_instanceMeshData[instanceID];
-    const GLsizei count = data.instanceCount;
-    if (count <= 0) {
-        std::cerr << "[Warning] Renderer::drawInstanced: Instance count is zero or negative!\n";
-        return;
-    }
-
-    // Ensure SSBO is bound to the shader
-    if (data.instanceSSBO != 0) {
-        // Bind the SSBO to the appropriate binding point
-        GLuint bindingPoint = 0; // Using instanceID as binding point
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingPoint, data.instanceSSBO);
-
-    } else {
-        std::cerr << "[Warning] Renderer::drawInstanced: SSBO not initialized for this instance!\n";
-    }
-
-    // Add wireframe support
-    if (wireframe) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    }
-
-    // Bind VAO
-    glBindVertexArray(data.VAO);
-
-    // Draw the instanced mesh
-    if (data.EBO != 0) {
-        glDrawElementsInstanced(GL_TRIANGLES, data.indexCount, GL_UNSIGNED_INT, 0, count);
-    } else {
-        glDrawArraysInstanced(GL_TRIANGLES, 0, data.vertexCount, count);
-    }
-
-    // Unbind VAO
-    glBindVertexArray(0);
-
-    // Unbind SSBO after use (optional, but good practice)
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, (GLuint)instanceID, 0);
-
-    // Reset polygon mode if wireframe was enabled
-    if (wireframe) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    }
-}
-
-void Renderer::initMeshBuffers(Mesh* mesh, bool isStatic, size_t instanceID) {
-    if (!mesh) {
-        std::cerr << "[Error] Renderer::initMeshBuffers: Mesh pointer is null.\n";
-        return;
-    }
-
-    if (mesh->uvs.empty() ||
-        mesh->normals.empty() ||
-        mesh->tangents.empty() ||
-        mesh->bitangents.empty()) {
-        std::cerr << "[Error] Renderer::initMeshBuffers: UVs, normals, and tangent space must be provided.\n";
-        return;
-    }
-
-    bool isInstance = (instanceID != SIZE_MAX);
-
-    // Check if the instance already exists in m_instanceMeshData
-    if (isInstance && instanceID < m_instanceMeshData.size() && m_instanceMeshData[instanceID].VAO != 0) {
-        return;
-    }
-
-    // Assign an ID if not already assigned
-    if (mesh->id == SIZE_MAX) {
-        mesh->id = isInstance ? instanceID : m_meshData.size();
-    }
-
-    // // Modify the mesh by applying its height map
-    // if (mesh->material) {
-    //     applyHeightMapCompute(mesh);
-    // }
-
-    MeshData data = {};
-    glGenVertexArrays(1, &data.VAO);
-    glBindVertexArray(data.VAO);
-
-    // Build mesh buffer data (14 floats per vertex)
-    std::vector<float> bufferData;
-    size_t numVertices = mesh->vertices.size();
-    bufferData.reserve(numVertices * 14);
-
-    for (size_t i = 0; i < numVertices; ++i) {
-        // Positions
-        bufferData.push_back(mesh->vertices[i].x);
-        bufferData.push_back(mesh->vertices[i].y);
-        bufferData.push_back(mesh->vertices[i].z);
-        // UVs
-        bufferData.push_back(mesh->uvs[i].x);
-        bufferData.push_back(mesh->uvs[i].y);
-        // Normals
-        bufferData.push_back(mesh->normals[i].x);
-        bufferData.push_back(mesh->normals[i].y);
-        bufferData.push_back(mesh->normals[i].z);
-        // Tangents
-        bufferData.push_back(mesh->tangents[i].x);
-        bufferData.push_back(mesh->tangents[i].y);
-        bufferData.push_back(mesh->tangents[i].z);
-        // Bitangents
-        bufferData.push_back(mesh->bitangents[i].x);
-        bufferData.push_back(mesh->bitangents[i].y);
-        bufferData.push_back(mesh->bitangents[i].z);
-    }
-
-    glGenBuffers(1, &data.VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, data.VBO);
-    glBufferData(GL_ARRAY_BUFFER, bufferData.size() * sizeof(float), bufferData.data(), GL_STATIC_DRAW);
-
-    if (!mesh->indices.empty()) {
-        glGenBuffers(1, &data.EBO);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, data.EBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->indices.size() * sizeof(unsigned int), mesh->indices.data(), GL_STATIC_DRAW);
-        data.indexCount = static_cast<GLsizei>(mesh->indices.size());
-        data.vertexCount = 0;
-    } else {
-        // No indices
-        data.EBO = 0;
-        data.indexCount = 0;
-        data.vertexCount = static_cast<GLsizei>(mesh->vertices.size());
-    }
-
-    // Vertex attribute pointers
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)0);
-
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(5 * sizeof(float)));
-
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(3 * sizeof(float)));
-
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
-
-    glEnableVertexAttribArray(4);
-    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
-
-    glBindVertexArray(0); // Unbind VAO
-
-    // Store mesh data in the appropriate vector
-    if (isInstance) {
-        // Ensure m_instanceMeshData is large enough
-        if (instanceID >= m_instanceMeshData.size()) {
-            m_instanceMeshData.resize(instanceID + 1);
-        }
-        m_instanceMeshData[instanceID] = data;
-
-    } else {
-        // Find the first available slot in m_meshData
-        bool inserted = false;
-        for (size_t i = 0; i < m_meshData.size(); ++i) {
-            if (m_meshData[i].VAO == 0) {
-                m_meshData[i] = data;
-                mesh->id = i;
-                inserted = true;
-                break;
-            }
-        }
-        if (!inserted) {
-            m_meshData.push_back(data);
-            mesh->id = m_meshData.size() - 1;
-        }
-    }
-
-    // Clear CPU-side mesh data if possible
-    if (isStatic) {
-        mesh->clearData();
-    }
-}
-
-void Renderer::deleteMeshBuffer(const Mesh* mesh) {
-    size_t index = mesh->id;
-    if (index >= m_meshData.size() || m_meshData[index].VAO == 0) {
-        std::cerr << "[Error] Renderer::deleteMeshBuffer: Mesh buffer id not found!\n";
-        return;
-    }
-
-    MeshData& data = m_meshData[index];
-
-    // Delete mesh resources
-    if (data.VAO) {
-        glDeleteVertexArrays(1, &data.VAO);
-        data.VAO = 0;
-    }
-    if (data.VBO) {
-        glDeleteBuffers(1, &data.VBO);
-        data.VBO = 0;
-    }
-    if (data.EBO) {
-        glDeleteBuffers(1, &data.EBO);
-        data.EBO = 0;
-    }
-
-    // Reset mesh at index
-    m_meshData[index] = MeshData{};
-}
-
-/*
- * Screen Quad Initialization and Drawing
- */
-void Renderer::initScreenQuad() {
-    // Vertices for a screen-aligned quad (NDC space)
-    float quadVertices[] = {
-        // positions        // uvs
-        -1.0f,  1.0f, 0.0f,  0.0f, 1.0f,
-        -1.0f, -1.0f, 0.0f,  0.0f, 0.0f,
-         1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
-         1.0f,  1.0f, 0.0f,  1.0f, 1.0f
-    };
-
-    unsigned int quadIndices[] = {
-        0, 1, 2,
-        2, 3, 0
-    };
-
-    // Generate and bind VAO
-    glGenVertexArrays(1, &m_quadVAO);
-    glBindVertexArray(m_quadVAO);
-
-    // Generate and bind VBO
-    unsigned int VBO, EBO;
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-
-    // Generate and bind EBO
-    glGenBuffers(1, &EBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quadIndices), &quadIndices, GL_STATIC_DRAW);
-
-    // Position attribute (location = 0)
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-
-    // UV attribute (location = 1)
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-
-    // Unbind VAO
-    glBindVertexArray(0);
-}
-
-void Renderer::updateInstanceBuffer(size_t instanceID, const std::vector<glm::mat4>& modelMatrices) {
-    if (instanceID >= m_instanceMeshData.size() || m_instanceMeshData[instanceID].VAO == 0) {
-        std::cerr << "[Error] Renderer::updateInstanceBuffer: Instance mesh not found!\n";
-        return;
-    }
-
-    MeshData& data = m_instanceMeshData[instanceID];
-
-    if (data.instanceSSBO == 0) {
-        std::cerr << "[Error] Renderer::updateInstanceBuffer: Instance SSBO doesn't exist! Call setupInstanceAttributes first.\n";
-        return;
-    }
-
-    GLuint newSize = (GLuint)(modelMatrices.size() * sizeof(glm::mat4));
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, data.instanceSSBO);
-
-    // Allocate or reallocate if necessary
-    if (newSize > data.instanceBufferSize) {
-        glBufferData(GL_SHADER_STORAGE_BUFFER, newSize, nullptr, GL_DYNAMIC_DRAW);
-        data.instanceBufferSize = newSize;
-    }
-
-    // Update the data using glBufferSubData instead of mapping
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, newSize, modelMatrices.data());
-
-    // For very large data sets, consider double-buffering or persistent mapping
-    // which would be another optimization beyond this initial SSBO implementation
-
-    data.instanceCount = static_cast<GLsizei>(modelMatrices.size());
-
-    // Update the binding point if needed
-    GLuint bindingPoint = 0;
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingPoint, data.instanceSSBO);
-
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-}
-
-void Renderer::setupInstanceAttributes(size_t instanceID, const std::vector<glm::mat4>& modelMatrices) {
-    if (instanceID >= m_instanceMeshData.size() || m_instanceMeshData[instanceID].VAO == 0) {
-        std::cerr << "[Error] Renderer::setupInstanceAttributes: Instance mesh not found!\n";
-        return;
-    }
-
-    MeshData& data = m_instanceMeshData[instanceID];
-
-    // Create SSBO
-    glGenBuffers(1, &data.instanceSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, data.instanceSSBO);
-
-    // Allocate and initialize
-    GLuint dataSize = (GLuint)(modelMatrices.size() * sizeof(glm::mat4));
-    glBufferData(GL_SHADER_STORAGE_BUFFER, dataSize, modelMatrices.data(), GL_DYNAMIC_DRAW);
-    data.instanceBufferSize = dataSize;
-    data.instanceCount = static_cast<GLsizei>(modelMatrices.size());
-
-    // Bind to shader binding point (you'll need to match this in your shader)
-    GLuint bindingPoint = 0; // Use instanceID as the binding point, or your own system
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingPoint, data.instanceSSBO);
-
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-}
-
-void Renderer::deleteInstanceBuffer(size_t instanceID) {
-    if (instanceID >= m_instanceMeshData.size() || m_instanceMeshData[instanceID].VAO == 0) {
-        std::cerr << "[Error] Renderer::deleteInstanceBuffer: Instance buffer id not found!\n";
-        return;
-    }
-
-    MeshData& data = m_instanceMeshData[instanceID];
-
-    // Delete mesh resources
-    if (data.VAO) {
-        glDeleteVertexArrays(1, &data.VAO);
-        data.VAO = 0;
-    }
-    if (data.VBO) {
-        glDeleteBuffers(1, &data.VBO);
-        data.VBO = 0;
-    }
-    if (data.EBO) {
-        glDeleteBuffers(1, &data.EBO);
-        data.EBO = 0;
-    }
-
-    // Reset mesh at index
-    m_instanceMeshData[instanceID] = MeshData{};
-}
-
-void Renderer::drawScreenQuad() {
-    glBindVertexArray(m_quadVAO);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);
 }
 
 void Renderer::resize(int width, int height) {
     m_width = width;
     m_height = height;
 
-    // Resize the G-buffer (and in the future, all framebuffers)
-    m_gBuffer->resize(width, height);
+    if (m_gBuffer) {
+        m_gBuffer->resize(width, height);
+    }
+
     if (m_camera) {
         m_camera->setAspectRatio(static_cast<float>(width), static_cast<float>(height));
     }
 }
 
-/*
-* Misc
-*/
-int Renderer::getNumAttachments()  { return NUM_GATTACHMENTS; }
+int Renderer::getNumAttachments() {
+    return NUM_GATTACHMENTS;
+}
 
 bool Renderer::applySettings(const config::GraphicsSettings& settings) {
     bool requiresRestart = false;
-
     config = settings;
-
     return requiresRestart;
 }
 
-/*
-* Mesh Pre Processing
-*/
-void Renderer::applyHeightMapCompute(Mesh* mesh) {
-    if (!mesh->material || !mesh->material->heightMap) {
-        return; // No mesh or height map, nothing to do
-    }
-
-    // Make sure we have normals
-    if (mesh->normals.size() != mesh->vertices.size()) {
-        std::cerr << "[Error] Cannot apply height map: mesh is missing normals\n";
+void Renderer::executeIndirectDraw(const std::vector<IndirectDrawCommand>& commands, GLuint indirectBuffer) {
+    if (commands.empty() || indirectBuffer == 0) {
         return;
     }
 
-    // Define sensible defaults if not set
-    if (mesh->material->heightScale <= 0.0f) {
-        mesh->material->heightScale = 1.0f; // Default to 1.0 if not set or negative
+    glBindBuffer(GL_DRAW_INDIRECT_BUFFER, indirectBuffer);
+
+    // Since we now have separate buffers, all commands are the same type
+    bool isIndexed = commands[0].useIndices;
+
+    if (isIndexed) {
+        // Upload elements commands
+        std::vector<DrawElementsIndirectCommand> elementCommands;
+        elementCommands.reserve(commands.size());
+        for (const auto& cmd : commands) {
+            elementCommands.push_back(cmd.elements);
+        }
+
+        glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0,
+                       elementCommands.size() * sizeof(DrawElementsIndirectCommand),
+                       elementCommands.data());
+
+        // Draw in batches by VAO
+        GLuint currentVAO = 0;
+        size_t batchStart = 0;
+
+        for (size_t i = 0; i <= commands.size(); ++i) {
+            GLuint nextVAO = (i < commands.size()) ? getMeshVAO(commands[i].meshId) : 0;
+
+            // Draw current batch if VAO changes or we're at the end
+            if ((nextVAO != currentVAO || i == commands.size()) && currentVAO != 0) {
+                glBindVertexArray(currentVAO);
+
+                size_t batchSize = i - batchStart;
+                size_t offsetBytes = batchStart * sizeof(DrawElementsIndirectCommand);
+
+                glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT,
+                                          reinterpret_cast<const void*>(offsetBytes),
+                                          static_cast<GLsizei>(batchSize),
+                                          sizeof(DrawElementsIndirectCommand));
+                batchStart = i;
+            }
+            currentVAO = nextVAO;
+        }
+    } else {
+        // Upload arrays commands
+        std::vector<DrawArraysIndirectCommand> arrayCommands;
+        arrayCommands.reserve(commands.size());
+        for (const auto& cmd : commands) {
+            arrayCommands.push_back(cmd.arrays);
+        }
+
+        glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0,
+                       arrayCommands.size() * sizeof(DrawArraysIndirectCommand),
+                       arrayCommands.data());
+
+        // Draw in batches by VAO
+        GLuint currentVAO = 0;
+        size_t batchStart = 0;
+
+        for (size_t i = 0; i <= commands.size(); ++i) {
+            GLuint nextVAO = (i < commands.size()) ? getMeshVAO(commands[i].meshId) : 0;
+
+            // Draw current batch if VAO changes or we're at the end
+            if ((nextVAO != currentVAO || i == commands.size()) && currentVAO != 0) {
+                glBindVertexArray(currentVAO);
+
+                size_t batchSize = i - batchStart;
+                size_t offsetBytes = batchStart * sizeof(DrawArraysIndirectCommand);
+
+                glMultiDrawArraysIndirect(GL_TRIANGLES,
+                                        reinterpret_cast<const void*>(offsetBytes),
+                                        static_cast<GLsizei>(batchSize),
+                                        sizeof(DrawArraysIndirectCommand));
+                batchStart = i;
+            }
+            currentVAO = nextVAO;
+        }
     }
 
-    if (mesh->material->uvScale.x <= 0.0f || mesh->material->uvScale.y <= 0.0f) {
-        mesh->material->uvScale = glm::vec2(1.0f, 1.0f); // Default to (1,1) if not set properly
-    }
-
-    // Activate compute shader
-    m_heightCompute.use();
-
-    // Create SSBOs
-    GLuint ssboVertexData, ssboUVData;
-    glGenBuffers(1, &ssboVertexData);
-    glGenBuffers(1, &ssboUVData);
-
-    // Set up vertex data SSBO
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssboVertexData);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, mesh->vertices.size() * sizeof(glm::vec3), mesh->vertices.data(), GL_DYNAMIC_COPY);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssboVertexData);
-
-    // Set up UV data SSBO
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssboUVData);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, mesh->uvs.size() * sizeof(glm::vec2), mesh->uvs.data(), GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssboUVData);
-
-    // Unbind the current SSBO to avoid confusion
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
-    // Bind height map texture
-    mesh->material->heightMap->bind(0);
-    m_heightCompute.setInt("heightMap", 0);
-    mesh->material->normalMap->bind(1);
-    m_heightCompute.setInt("normalMap", 1);
-
-    // Send uniforms to shader
-    m_heightCompute.setFloat("heightScale", mesh->material->heightScale);
-    m_heightCompute.setVec2("uvScale", mesh->material->uvScale);
-
-    // Dispatch compute shader
-    int workGroupSize = 32;
-    GLuint numVertices = static_cast<GLuint>(mesh->vertices.size());
-    GLuint numWorkGroups = (numVertices + workGroupSize - 1) / workGroupSize;
-    glDispatchCompute(numWorkGroups, 1, 1);
-
-    // Ensure execution is complete before reading back data
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-
-    // Explicitly rebind the vertex buffer before reading from it
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssboVertexData);
-
-    // Now read back the data
-    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, mesh->vertices.size() * sizeof(glm::vec3), mesh->vertices.data());
-
-    // Clean up
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    glDeleteBuffers(1, &ssboVertexData);
-    glDeleteBuffers(1, &ssboUVData);
-    glUseProgram(0);
-
-    // If you want to recalculate normals after displacement
-    // recalculateNormals(mesh);
+    glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+    glBindVertexArray(0);
 }

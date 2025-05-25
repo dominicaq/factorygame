@@ -45,10 +45,8 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
     GLint originalViewport[4];
     glGetIntegerv(GL_VIEWPORT, originalViewport);
 
-    // Setup for shadow rendering - minimal state changes
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-
+    // Set up common shadow rendering state
+    glViewport(0, 0, shadowRes, shadowRes);
     m_shadowShader.use();
 
     // Render single shadow maps (spotlights)
@@ -64,13 +62,10 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 
         // Bind framebuffer and attach this light's shadow map
         m_shadowFrameBuffer->bind();
-        m_shadowFrameBuffer->resetDepthAttachment();
         unsigned int depthHandle = m_lightShadowMapMap[entity];
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthHandle, 0);
         glClear(GL_DEPTH_BUFFER_BIT);
 
-        // Set the view/projection matrix and render the scene
-        glViewport(0, 0, shadowRes, shadowRes);
         m_shadowShader.setMat4("u_LightSpaceMatrix", lightSpaceMatrix.matrix);
         renderSceneDepth(renderer, registry);
 
@@ -100,7 +95,6 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 
         // Bind the framebuffer using the custom framebuffer
         m_shadowFrameBuffer->bind();
-        m_shadowFrameBuffer->resetDepthAttachment();
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthAtlas, 0);
         glClear(GL_DEPTH_BUFFER_BIT);
 
@@ -130,11 +124,6 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
         light.depthHandle = depthAtlas;
     });
 
-    // Reset only what's necessary
-    m_shadowFrameBuffer->bind();
-    m_shadowFrameBuffer->resetDepthAttachment();
-    m_shadowFrameBuffer->unbind();
-
     // Restore original framebuffer and viewport
     glBindFramebuffer(GL_FRAMEBUFFER, originalFramebuffer);
     glViewport(originalViewport[0], originalViewport[1], originalViewport[2], originalViewport[3]);
@@ -148,29 +137,16 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 }
 
 void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) {
-    // Normal rendering of non-instanced meshes
-    registry.view<Mesh*, ModelMatrix>().each([&](Mesh* mesh, const ModelMatrix& modelMatrix) {
-        if (mesh->wireframe) {
-            return;
-        }
-        m_shadowShader.setMat4("u_Model", modelMatrix.matrix);
-        renderer.draw(mesh);
+    m_shadowBatch.clear();
+
+    // Batch draw
+    registry.view<Mesh, ModelMatrix>().each([&](const Mesh& mesh, const ModelMatrix& modelMatrix) {
+        m_shadowBatch.addInstance(RenderInstance(mesh, modelMatrix.matrix));
     });
 
-    // Get scene data for instanced rendering
-    const auto& instanceMap = m_scene->getInstanceMap();
-    const auto& meshInstances = m_scene->getMeshInstances();
-
-    // Render all instances using the shared instance map
-    for (const auto& [meshId, matrices] : instanceMap) {
-        if (matrices.empty() || meshId >= meshInstances.size() || meshInstances[meshId]->wireframe) {
-            continue;
-        }
-
-        // Set the first matrix as the model uniform (for gl_InstanceID == 0)
-        m_shadowShader.setMat4("u_Model", matrices[0]);
-        renderer.drawInstanced(meshId);
-    }
+    // Draw scene
+    m_shadowBatch.prepare(renderer);
+    m_shadowBatch.render(renderer);
 }
 
 void ShadowPass::cleanupLightResources(entt::entity lightEntity) {

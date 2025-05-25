@@ -1,38 +1,127 @@
 #include "meshgen.h"
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
-Mesh* MeshGen::createCube() {
-    Mesh* cubeMesh = new Mesh();
+void MeshGen::packTBNframe(RawMeshData* mesh, const std::vector<glm::vec3>& normals,
+             const std::vector<glm::vec4>& tangents) {
+    size_t count = std::min(normals.size(), tangents.size());
+    mesh->packedTNBFrame.reserve(mesh->packedTNBFrame.size() + count);
 
-    // Positions for the cube
+    constexpr int storageSize = 2; // sizeof(int16_t)
+    constexpr float bias = 1.0f / ((1 << (storageSize * 8 - 1)) - 1);
+
+    for (size_t i = 0; i < count; ++i) {
+        const glm::vec3& n = normals[i];
+        const glm::vec4& t = tangents[i];
+        glm::vec3 tangent(t.x, t.y, t.z);
+
+        // Compute cross product: c = n × t (CRITICAL: this is the correct order)
+        glm::vec3 c = glm::cross(n, tangent);
+
+        // Construct matrix in COLUMN-MAJOR order: [tangent, c, normal]
+        // This matches the JavaScript toMat3 function exactly
+        glm::mat3 tbn(
+            tangent.x, tangent.y, tangent.z,  // First column: tangent
+            c.x,       c.y,       c.z,        // Second column: cross product
+            n.x,       n.y,       n.z         // Third column: normal
+        );
+
+        // Extract quaternion and normalize
+        glm::quat q = glm::normalize(glm::quat_cast(tbn));
+
+        // Ensure positive quaternion (w >= 0)
+        if (q.w < 0.0f) {
+            q = -q;
+        }
+
+        // Apply bias to prevent w from being zero
+        if (q.w < bias) {
+            q.w = bias;
+            float factor = std::sqrt(1.0f - bias * bias);
+            q.x *= factor;
+            q.y *= factor;
+            q.z *= factor;
+        }
+
+        // Compute bitangent based on handedness for reflection check
+        glm::vec3 b;
+        if (t.w > 0.0f) {
+            b = glm::cross(tangent, n);
+        } else {
+            b = glm::cross(n, tangent);
+        }
+
+        // Reflection check: if (n × t) · b < 0, negate quaternion
+        glm::vec3 cc = glm::cross(tangent, n);
+        if (glm::dot(cc, b) < 0.0f) {
+            q = -q;
+        }
+
+        // Store packed quaternion
+        mesh->packedTNBFrame.push_back(glm::vec4(q.x, q.y, q.z, q.w));
+    }
+}
+
+RawMeshData* MeshGen::createCube() {
+    RawMeshData* cubeMesh = new RawMeshData();
+
+    // Positions for the cube (properly organized by face)
     cubeMesh->vertices = {
-        { -0.5f, -0.5f, -0.5f }, { 0.5f,  0.5f, -0.5f }, { 0.5f, -0.5f, -0.5f }, { 0.5f,  0.5f, -0.5f },
-        { -0.5f, -0.5f, -0.5f }, { -0.5f,  0.5f, -0.5f }, { -0.5f, -0.5f,  0.5f }, { 0.5f, -0.5f,  0.5f },
-        { 0.5f,  0.5f,  0.5f }, { 0.5f,  0.5f,  0.5f }, { -0.5f,  0.5f,  0.5f }, { -0.5f, -0.5f,  0.5f },
-        { -0.5f,  0.5f,  0.5f }, { -0.5f,  0.5f, -0.5f }, { -0.5f, -0.5f, -0.5f }, { -0.5f, -0.5f, -0.5f },
-        { -0.5f, -0.5f,  0.5f }, { -0.5f,  0.5f,  0.5f }, { 0.5f,  0.5f,  0.5f }, { 0.5f, -0.5f, -0.5f },
-        { 0.5f,  0.5f, -0.5f }, { 0.5f, -0.5f, -0.5f }, { 0.5f,  0.5f,  0.5f }, { 0.5f, -0.5f,  0.5f },
-        { -0.5f, -0.5f, -0.5f }, { 0.5f, -0.5f, -0.5f }, { 0.5f, -0.5f,  0.5f }, { 0.5f, -0.5f,  0.5f },
-        { -0.5f, -0.5f,  0.5f }, { -0.5f, -0.5f, -0.5f }, { -0.5f,  0.5f, -0.5f }, { 0.5f,  0.5f,  0.5f },
-        { 0.5f,  0.5f, -0.5f }, { 0.5f,  0.5f,  0.5f }, { -0.5f,  0.5f, -0.5f }, { -0.5f,  0.5f,  0.5f }
+        // Front face
+        { -0.5f, -0.5f,  0.5f }, {  0.5f, -0.5f,  0.5f }, {  0.5f,  0.5f,  0.5f }, { -0.5f,  0.5f,  0.5f },
+        // Back face
+        {  0.5f, -0.5f, -0.5f }, { -0.5f, -0.5f, -0.5f }, { -0.5f,  0.5f, -0.5f }, {  0.5f,  0.5f, -0.5f },
+        // Left face
+        { -0.5f, -0.5f, -0.5f }, { -0.5f, -0.5f,  0.5f }, { -0.5f,  0.5f,  0.5f }, { -0.5f,  0.5f, -0.5f },
+        // Right face
+        {  0.5f, -0.5f,  0.5f }, {  0.5f, -0.5f, -0.5f }, {  0.5f,  0.5f, -0.5f }, {  0.5f,  0.5f,  0.5f },
+        // Bottom face
+        { -0.5f, -0.5f, -0.5f }, {  0.5f, -0.5f, -0.5f }, {  0.5f, -0.5f,  0.5f }, { -0.5f, -0.5f,  0.5f },
+        // Top face
+        { -0.5f,  0.5f,  0.5f }, {  0.5f,  0.5f,  0.5f }, {  0.5f,  0.5f, -0.5f }, { -0.5f,  0.5f, -0.5f }
     };
 
-    // Indices for the cube
-    cubeMesh->indices = {
-        0, 1, 2, 3, 4, 5,    // Front face
-        6, 7, 8, 9, 10, 11,  // Back face
-        12, 13, 14, 15, 16, 17, // Left face
-        18, 19, 20, 21, 22, 23, // Right face
-        24, 25, 26, 27, 28, 29, // Bottom face
-        30, 31, 32, 33, 34, 35  // Top face
+    // UVs for the cube
+    cubeMesh->uvs = {
+        // Front face
+        { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f },
+        // Back face
+        { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f },
+        // Left face
+        { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f },
+        // Right face
+        { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f },
+        // Bottom face
+        { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f },
+        // Top face
+        { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f }
     };
+
+    // Indices for the cube (two triangles per face)
+    cubeMesh->indices = {
+        // Front face
+        0, 1, 2,   2, 3, 0,
+        // Back face
+        4, 5, 6,   6, 7, 4,
+        // Left face
+        8, 9, 10,  10, 11, 8,
+        // Right face
+        12, 13, 14, 14, 15, 12,
+        // Bottom face
+        16, 17, 18, 18, 19, 16,
+        // Top face
+        20, 21, 22, 22, 23, 20
+    };
+
+    // Generate packed normal-tangents
+    computepackedTNBFrame(cubeMesh);
 
     return cubeMesh;
 }
 
-Mesh* MeshGen::createQuad(float scale = 1.0f) {
-    Mesh* quadMesh = new Mesh();
+RawMeshData* MeshGen::createQuad(float scale) {
+    RawMeshData* quadMesh = new RawMeshData();
 
     // Positions for the quad (a flat square in the XY plane, scaled)
     quadMesh->vertices = {
@@ -42,7 +131,7 @@ Mesh* MeshGen::createQuad(float scale = 1.0f) {
         { -0.5f * scale,  0.5f * scale, 0.0f }  // Top-left
     };
 
-    // UVs for the quad (optional, used for texture mapping)
+    // UVs for the quad
     quadMesh->uvs = {
         { 0.0f, 0.0f }, // Bottom-left
         { 1.0f, 0.0f }, // Bottom-right
@@ -56,37 +145,37 @@ Mesh* MeshGen::createQuad(float scale = 1.0f) {
         2, 3, 0  // Second triangle
     };
 
+    // Generate packed normal-tangents
+    computepackedTNBFrame(quadMesh);
+
     return quadMesh;
 }
 
-Mesh* MeshGen::createSphere(unsigned int sectorCount, unsigned int stackCount) {
-    Mesh* sphere = new Mesh();
+RawMeshData* MeshGen::createSphere(unsigned int sectorCount, unsigned int stackCount) {
+    RawMeshData* sphere = new RawMeshData();
 
     const float radius = 1.0f;
     const float PI = 3.14159265358979323846f;
 
     // Clear any existing data
     sphere->vertices.clear();
-    sphere->normals.clear();
     sphere->uvs.clear();
     sphere->indices.clear();
 
     float x, y, z, xy;                  // vertex position
-    float nx, ny, nz;                   // vertex normal
     float s, t;                         // vertex texCoord
 
     float sectorStep = 2 * PI / sectorCount;
     float stackStep = PI / stackCount;
     float sectorAngle, stackAngle;
 
-    // Compute all vertices first (for spheres, vertex position = normal)
+    // Compute all vertices first
     for(unsigned int i = 0; i <= stackCount; ++i) {
         stackAngle = PI / 2 - i * stackStep;        // starting from pi/2 to -pi/2
         xy = radius * cosf(stackAngle);               // r * cos(u)
         z = radius * sinf(stackAngle);                // r * sin(u)
 
         // Add (sectorCount+1) vertices per stack
-        // the first and last vertices have same position and normal, but different tex coords
         for(unsigned int j = 0; j <= sectorCount; ++j) {
             sectorAngle = j * sectorStep;             // starting from 0 to 2pi
 
@@ -95,12 +184,6 @@ Mesh* MeshGen::createSphere(unsigned int sectorCount, unsigned int stackCount) {
             y = xy * sinf(sectorAngle);               // r * cos(u) * sin(v)
             sphere->vertices.push_back(glm::vec3(x, y, z));
 
-            // normalized vertex normal
-            nx = x / radius;
-            ny = y / radius;
-            nz = z / radius;
-            sphere->normals.push_back(glm::vec3(nx, ny, nz));
-
             // vertex tex coord between [0, 1]
             s = (float)j / sectorCount;
             t = (float)i / stackCount;
@@ -108,7 +191,7 @@ Mesh* MeshGen::createSphere(unsigned int sectorCount, unsigned int stackCount) {
         }
     }
 
-    // Indices
+    // Generate indices
     unsigned int k1, k2;
     for(unsigned int i = 0; i < stackCount; ++i) {
         k1 = i * (sectorCount + 1);     // beginning of current stack
@@ -116,7 +199,6 @@ Mesh* MeshGen::createSphere(unsigned int sectorCount, unsigned int stackCount) {
 
         for(unsigned int j = 0; j < sectorCount; ++j, ++k1, ++k2) {
             // 2 triangles per sector excluding the first and last stacks
-
             // k1 => k2 => k1+1
             if(i != 0) {
                 sphere->indices.push_back(k1);
@@ -133,25 +215,24 @@ Mesh* MeshGen::createSphere(unsigned int sectorCount, unsigned int stackCount) {
         }
     }
 
-    // Generate tangents and bitangents
-    computeTangentBasis(sphere);
+    // Generate packed normal-tangents
+    computepackedTNBFrame(sphere);
 
     return sphere;
 }
 
-Mesh* MeshGen::createPlane(unsigned int resolutionX, unsigned int resolutionY, float width, float height) {
-    Mesh* plane = new Mesh();
+RawMeshData* MeshGen::createPlane(unsigned int resolutionX, unsigned int resolutionY, float width, float height) {
+    RawMeshData* plane = new RawMeshData();
 
     // Clear any existing data
     plane->vertices.clear();
-    plane->normals.clear();
     plane->uvs.clear();
     plane->indices.clear();
 
     float halfWidth = width / 2.0f;
     float halfHeight = height / 2.0f;
 
-    // Generate a grid of vertices (resolution + 1 in each dimension to create all quads)
+    // Generate a grid of vertices
     for (unsigned int z = 0; z <= resolutionY; ++z) {
         for (unsigned int x = 0; x <= resolutionX; ++x) {
             // Calculate position for this vertex
@@ -161,22 +242,19 @@ Mesh* MeshGen::createPlane(unsigned int resolutionX, unsigned int resolutionY, f
             // Add vertex
             plane->vertices.push_back(glm::vec3(posX, 0.0f, posZ));
 
-            // Add normal
-            plane->normals.push_back(glm::vec3(0.0f, 1.0f, 0.0f));
-
             // Add UV (normalized coordinates)
             plane->uvs.push_back(glm::vec2((float)x / resolutionX, (float)z / resolutionY));
         }
     }
 
-    // Generate indices for the quads (made up of shared vertices)
+    // Generate indices for the quads
     for (unsigned int z = 0; z < resolutionY; ++z) {
         for (unsigned int x = 0; x < resolutionX; ++x) {
             // Calculate indices for the corners of this quad
-            unsigned int topLeft = z * (resolutionX + 1) + x;
-            unsigned int topRight = topLeft + 1;
-            unsigned int bottomLeft = (z + 1) * (resolutionX + 1) + x;
-            unsigned int bottomRight = bottomLeft + 1;
+            uint32_t topLeft = z * (resolutionX + 1) + x;
+            uint32_t topRight = topLeft + 1;
+            uint32_t bottomLeft = (z + 1) * (resolutionX + 1) + x;
+            uint32_t bottomRight = bottomLeft + 1;
 
             // First triangle (top-left, bottom-right, top-right)
             plane->indices.push_back(topLeft);
@@ -190,77 +268,131 @@ Mesh* MeshGen::createPlane(unsigned int resolutionX, unsigned int resolutionY, f
         }
     }
 
-    // Generate tangents and bitangents for texturing
-    computeTangentBasis(plane);
+    // Generate packed normal-tangents
+    computepackedTNBFrame(plane);
 
     return plane;
 }
 
-// Helper function to compute tangent basis for normal mapping
-void MeshGen::computeTangentBasis(Mesh* mesh) {
-    // Resize tangents and bitangents arrays
-    mesh->tangents.resize(mesh->vertices.size(), glm::vec3(0.0f));
-    mesh->bitangents.resize(mesh->vertices.size(), glm::vec3(0.0f));
+// Helper function to compute packed normal-tangent quaternions
+void MeshGen::computepackedTNBFrame(RawMeshData* mesh) {
+    size_t vertexCount = mesh->vertices.size();
 
-    // Compute tangents and bitangents for each triangle
+    // Temporary storage for normals and tangents
+    std::vector<glm::vec3> normals(vertexCount, glm::vec3(0.0f));
+    std::vector<glm::vec4> tangents(vertexCount, glm::vec4(0.0f));
+
+    std::vector<glm::vec3> accumulatedTangents(vertexCount, glm::vec3(0.0f));
+    std::vector<glm::vec3> accumulatedBitangents(vertexCount, glm::vec3(0.0f));
+
+    // Calculate face normals and accumulate them
     for (size_t i = 0; i < mesh->indices.size(); i += 3) {
-        unsigned int idx1 = mesh->indices[i];
-        unsigned int idx2 = mesh->indices[i+1];
-        unsigned int idx3 = mesh->indices[i+2];
+        if (i + 2 >= mesh->indices.size()) break;
 
-        // Get triangle vertices
+        uint32_t idx0 = mesh->indices[i];
+        uint32_t idx1 = mesh->indices[i + 1];
+        uint32_t idx2 = mesh->indices[i + 2];
+
+        if (idx0 >= vertexCount || idx1 >= vertexCount || idx2 >= vertexCount)
+            continue;
+
+        const glm::vec3& v0 = mesh->vertices[idx0];
         const glm::vec3& v1 = mesh->vertices[idx1];
         const glm::vec3& v2 = mesh->vertices[idx2];
-        const glm::vec3& v3 = mesh->vertices[idx3];
 
-        // Get triangle UVs
+        const glm::vec2& uv0 = mesh->uvs[idx0];
         const glm::vec2& uv1 = mesh->uvs[idx1];
         const glm::vec2& uv2 = mesh->uvs[idx2];
-        const glm::vec2& uv3 = mesh->uvs[idx3];
 
-        // Edges of the triangle
-        glm::vec3 edge1 = v2 - v1;
-        glm::vec3 edge2 = v3 - v1;
+        // Calculate face normal
+        glm::vec3 edge1 = v1 - v0;
+        glm::vec3 edge2 = v2 - v0;
+        glm::vec3 faceNormal = glm::cross(edge1, edge2);
 
-        // Differences in UV coordinates
-        glm::vec2 deltaUV1 = uv2 - uv1;
-        glm::vec2 deltaUV2 = uv3 - uv1;
+        float length = glm::length(faceNormal);
+        if (length > 1e-6f) {
+            faceNormal = faceNormal / length;
+            normals[idx0] += faceNormal;
+            normals[idx1] += faceNormal;
+            normals[idx2] += faceNormal;
+        }
 
-        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+        // Calculate tangent and bitangent
+        glm::vec2 deltaUV1 = uv1 - uv0;
+        glm::vec2 deltaUV2 = uv2 - uv0;
 
-        glm::vec3 tangent;
-        tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
-        tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
-        tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
-        tangent = glm::normalize(tangent);
+        float det = deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x;
+        if (std::abs(det) > 1e-6f) {
+            float invDet = 1.0f / det;
 
-        glm::vec3 bitangent;
-        bitangent.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
-        bitangent.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
-        bitangent.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
-        bitangent = glm::normalize(bitangent);
+            glm::vec3 tangent = (edge1 * deltaUV2.y - edge2 * deltaUV1.y) * invDet;
+            glm::vec3 bitangent = (edge2 * deltaUV1.x - edge1 * deltaUV2.x) * invDet;
 
-        // Add to all three vertices of the triangle
-        mesh->tangents[idx1] += tangent;
-        mesh->tangents[idx2] += tangent;
-        mesh->tangents[idx3] += tangent;
+            accumulatedTangents[idx0] += tangent;
+            accumulatedTangents[idx1] += tangent;
+            accumulatedTangents[idx2] += tangent;
 
-        mesh->bitangents[idx1] += bitangent;
-        mesh->bitangents[idx2] += bitangent;
-        mesh->bitangents[idx3] += bitangent;
+            accumulatedBitangents[idx0] += bitangent;
+            accumulatedBitangents[idx1] += bitangent;
+            accumulatedBitangents[idx2] += bitangent;
+        }
     }
 
-    // Normalize the accumulated tangents and bitangents
-    for (size_t i = 0; i < mesh->vertices.size(); ++i) {
-        mesh->tangents[i] = glm::normalize(mesh->tangents[i]);
-        mesh->bitangents[i] = glm::normalize(mesh->bitangents[i]);
+    // Normalize normals and compute orthogonalized tangents
+    for (size_t i = 0; i < vertexCount; ++i) {
+        // Normalize normal
+        float normalLength = glm::length(normals[i]);
+        if (normalLength > 1e-6f) {
+            normals[i] = normals[i] / normalLength;
+        } else {
+            // Fallback normal
+            normals[i] = glm::vec3(0.0f, 1.0f, 0.0f);
+        }
+
+        const glm::vec3& n = normals[i];
+        glm::vec3 t = accumulatedTangents[i];
+        glm::vec3 b = accumulatedBitangents[i];
+
+        // Gram-Schmidt orthogonalization
+        float tLength = glm::length(t);
+        if (tLength > 1e-6f) {
+            t = t / tLength;
+            t = t - n * glm::dot(n, t);
+            tLength = glm::length(t);
+            if (tLength > 1e-6f) {
+                t = t / tLength;
+            } else {
+                // Fallback tangent
+                glm::vec3 c1 = glm::cross(n, glm::vec3(0.0f, 0.0f, 1.0f));
+                glm::vec3 c2 = glm::cross(n, glm::vec3(0.0f, 1.0f, 0.0f));
+                t = glm::length(c1) > glm::length(c2) ? glm::normalize(c1) : glm::normalize(c2);
+            }
+        } else {
+            // Fallback tangent
+            glm::vec3 c1 = glm::cross(n, glm::vec3(0.0f, 0.0f, 1.0f));
+            glm::vec3 c2 = glm::cross(n, glm::vec3(0.0f, 1.0f, 0.0f));
+            t = glm::length(c1) > glm::length(c2) ? glm::normalize(c1) : glm::normalize(c2);
+        }
+
+        // Calculate handedness using the original accumulated bitangent
+        glm::vec3 computedBitangent = glm::cross(n, t);
+        float w = (glm::dot(computedBitangent, b) < 0.0f) ? -1.0f : 1.0f;
+
+        tangents[i] = glm::vec4(t, w);
     }
+
+    // Pack normals and tangents into quaternions
+    mesh->packedTNBFrame.clear();
+    mesh->packedTNBFrame.reserve(vertexCount);
+
+    packTBNframe(mesh, normals, tangents);
 }
 
-Mesh* MeshGen::createCapsule(float radius, float height, int sectors, int stacks) {
-    Mesh* capsule = new Mesh();
+RawMeshData* MeshGen::createCapsule(float radius, float height, int sectors, int stacks) {
+    RawMeshData* capsule = new RawMeshData();
 
-    // Combine sphere and cylinder logic
+    // TODO: Implement capsule generation
+    // For now, return an empty mesh
 
     return capsule;
 }

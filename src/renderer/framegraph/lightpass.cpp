@@ -13,19 +13,19 @@ void LightPass::setup() {
     // Generate and bind SSBOs
     glGenBuffers(1, &m_pointSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_pointSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_LIGHTS * sizeof(PointLightSSBO), nullptr, GL_DYNAMIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_LIGHTS * sizeof(PointLightSSBO), nullptr, GL_DYNAMIC_STORAGE_BIT);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_pointSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     glGenBuffers(1, &m_spotSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_spotSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_LIGHTS * sizeof(SpotLightSSBO), nullptr, GL_DYNAMIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_LIGHTS * sizeof(SpotLightSSBO), nullptr, GL_DYNAMIC_STORAGE_BIT);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_spotSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     glGenBuffers(1, &m_lightMatrixSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_lightMatrixSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_SHADOW_MAPS * sizeof(glm::mat4), nullptr, GL_DYNAMIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_SHADOW_MAPS * sizeof(glm::mat4), nullptr, GL_DYNAMIC_STORAGE_BIT);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, m_lightMatrixSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 

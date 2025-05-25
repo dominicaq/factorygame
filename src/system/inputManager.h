@@ -1,5 +1,4 @@
-#ifndef INPUTMANAGER_H
-#define INPUTMANAGER_H
+#pragma once
 
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -107,5 +106,3 @@ private:
     double m_xOffset, m_yOffset;
     int m_cursorMode;
 };
-
-#endif // INPUTMANAGER_H

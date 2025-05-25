@@ -26,8 +26,8 @@
 // Renderer
 #include "renderer/shader.h"
 #include "renderer/computeShader.h"
-#include "renderer/texture.h"
 #include "renderer/renderer.h"
+#include "renderer/materialManager.h"
 
 // Runtime debugging
 #include "debugging/gizmos.h"
