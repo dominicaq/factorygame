@@ -4,8 +4,7 @@
 #define VERTEX_SIZE 8
 #define NUM_GATTACHMENTS 5
 
-Renderer::Renderer(config::GraphicsSettings settings, Camera* camera)
-    : config(settings), m_camera(camera) {
+Renderer::Renderer(config::GraphicsSettings settings) : config(settings) {
 
     m_width = config.display.width;
     m_height = config.display.height;
@@ -21,12 +20,11 @@ Renderer::~Renderer() {
     cleanup();
 }
 
-
 // ============================================================================
 // MESH MANAGEMENT (from your original code)
 // ============================================================================
 
-Mesh& Renderer::initMeshBuffers(std::unique_ptr<RawMeshData>& rawData, bool isStatic) {
+Mesh Renderer::initMeshBuffers(std::unique_ptr<RawMeshData>& rawData, bool isStatic) {
     static Mesh invalidMesh; // Return this for errors
 
     if (rawData->uvs.empty() || rawData->packedTNBFrame.empty()) {
@@ -62,7 +60,7 @@ Mesh& Renderer::initMeshBuffers(std::unique_ptr<RawMeshData>& rawData, bool isSt
         bufferData.push_back(rawData->packedTNBFrame[i].w);
     }
 
-    static Mesh newMesh;
+    Mesh newMesh;
 
     // Create and upload VBO
     glGenBuffers(1, &data.VBO);
@@ -231,9 +229,14 @@ void Renderer::resize(int width, int height) {
         m_gBuffer->resize(width, height);
     }
 
-    if (m_camera) {
-        m_camera->setAspectRatio(static_cast<float>(width), static_cast<float>(height));
+    if (m_targetCamera) {
+        m_targetCamera->setAspectRatio(static_cast<float>(width), static_cast<float>(height));
     }
+}
+
+void Renderer::setCameraTarget(Camera* camera) {
+    m_targetCamera = camera;
+    m_targetCamera->setAspectRatio(static_cast<float>(m_width), static_cast<float>(m_height));
 }
 
 int Renderer::getNumAttachments() {

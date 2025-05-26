@@ -34,7 +34,7 @@ public:
         glBindVertexArray(0);
     };
 
-    void execute(Renderer& renderer, entt::registry& registry) override {
+    void execute(entt::registry& registry, Camera& camera, Renderer& renderer) override {
         // Save ALL relevant OpenGL states
         GLint originalDepthFunc;
         glGetIntegerv(GL_DEPTH_FUNC, &originalDepthFunc);
@@ -43,14 +43,13 @@ public:
         glGetBooleanv(GL_DEPTH_WRITEMASK, &depthMaskEnabled);
 
         // Resources
-        Camera* camera = renderer.getCamera();
-        const glm::mat4& viewMatrix = camera->getViewMatrix();
+        const glm::mat4& viewMatrix = camera.getViewMatrix();
         glm::mat4 viewNoTranslation = glm::mat4(glm::mat3(viewMatrix));
 
         // Use skybox shader
         m_skyboxShader.use();
         m_skyboxShader.setMat4("view", viewNoTranslation);
-        m_skyboxShader.setMat4("projection", camera->getProjectionMatrix());
+        m_skyboxShader.setMat4("projection", camera.getProjectionMatrix());
 
         // Explicitly ensure depth testing is enabled
         glEnable(GL_DEPTH_TEST);

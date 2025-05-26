@@ -22,7 +22,7 @@ struct DrawArraysIndirectCommand;
  */
 class Renderer {
 public:
-    Renderer(config::GraphicsSettings settings, Camera* camera);
+    Renderer(config::GraphicsSettings settings);
     ~Renderer();
 
     config::GraphicsSettings config;
@@ -35,7 +35,6 @@ public:
         return {m_width, m_height};
     }
     Framebuffer* getFramebuffer() const { return m_gBuffer.get(); }
-    Camera* getCamera() const { return m_camera; }
     int getNumAttachments();
 
     /*
@@ -52,7 +51,7 @@ public:
      * Viewport and framebuffer management
      */
     void resize(int width, int height);
-
+    void setCameraTarget(Camera* camera);
     // ============================================================================
     // MESH MANAGEMENT SECTION - Keep this minimal for now
     // ============================================================================
@@ -60,7 +59,7 @@ public:
     /*
      * Mesh buffer management - moved from your original code
      */
-    Mesh& initMeshBuffers(std::unique_ptr<RawMeshData>& mesh, bool isStatic = true);
+    Mesh initMeshBuffers(std::unique_ptr<RawMeshData>& rawData, bool isStatic = true);
     void deleteMeshBuffer(const Mesh& mesh);
 
     /*
@@ -77,7 +76,7 @@ private:
      */
     int m_width;
     int m_height;
-    Camera* m_camera;
+    Camera* m_targetCamera;
     std::unique_ptr<Framebuffer> m_gBuffer;
 
     // Screen quad for deferred rendering

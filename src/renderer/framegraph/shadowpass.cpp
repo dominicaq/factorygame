@@ -30,7 +30,7 @@ void ShadowPass::setup() {
     m_shadowFrameBuffer = new Framebuffer(1024, 1024, 0, true);
 }
 
-void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
+void ShadowPass::execute(entt::registry& registry, Camera& camera, Renderer& renderer) {
     // Get shadow config properties
     int shadowRes = renderer.config.shadows.shadowResolution;
     bool enableShadows = renderer.config.shadows.enableShadows;
@@ -50,9 +50,13 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
     m_shadowShader.use();
 
     // Render single shadow maps (spotlights)
-    registry.view<LightSpaceMatrix, Light>().each([&](auto entity, auto& lightSpaceMatrix, auto& light) {
+    auto& singleMatrixView = registry.view<LightSpaceMatrix, Light>();
+    for (const auto& entity : singleMatrixView) {
+        LightSpaceMatrix& lightSpaceMatrix = singleMatrixView.get<LightSpaceMatrix>(entity);
+        Light& light = singleMatrixView.get<Light>(entity);
+
         if (!light.castShadow || !light.isActive) {
-            return;
+            continue;
         }
 
         // Create or reuse a shadow map for this light
@@ -71,12 +75,16 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
 
         // Store the handle in the light component
         light.depthHandle = depthHandle;
-    });
+    }
 
     // Render shadow map arrays
-    registry.view<LightSpaceMatrixArray, Light>().each([&](auto entity, auto& lightSpaceArray, auto& light) {
+    auto& multiMatrixView = registry.view<LightSpaceMatrixArray, Light>();
+    for (const auto& entity : multiMatrixView) {
+        LightSpaceMatrixArray& lightSpaceArray = multiMatrixView.get<LightSpaceMatrixArray>(entity);
+        Light& light = multiMatrixView.get<Light>(entity);
+
         if (!light.castShadow || !light.isActive) {
-            return;
+            continue;
         }
 
         int numFaces = 6;
@@ -122,7 +130,7 @@ void ShadowPass::execute(Renderer& renderer, entt::registry& registry) {
         // Store the atlas handle in the light component
         shadowRes = renderer.config.shadows.shadowResolution;
         light.depthHandle = depthAtlas;
-    });
+    }
 
     // Restore original framebuffer and viewport
     glBindFramebuffer(GL_FRAMEBUFFER, originalFramebuffer);
@@ -140,9 +148,13 @@ void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) 
     m_shadowBatch.clear();
 
     // Batch draw
-    registry.view<Mesh, ModelMatrix>().each([&](const Mesh& mesh, const ModelMatrix& modelMatrix) {
+    auto& view = registry.view<Mesh, ModelMatrix>();
+    for (const auto& entity : view) {
+        const Mesh& mesh = view.get<Mesh>(entity);
+        const ModelMatrix& modelMatrix = view.get<ModelMatrix>(entity);
+
         m_shadowBatch.addInstance(RenderInstance(mesh, modelMatrix.matrix));
-    });
+    }
 
     // Draw scene
     m_shadowBatch.prepare(renderer);

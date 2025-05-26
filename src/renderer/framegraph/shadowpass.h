@@ -13,7 +13,7 @@ public:
     ~ShadowPass();
 
     void setup() override;
-    void execute(Renderer& renderer, entt::registry& registry) override;
+    void execute(entt::registry& registry, Camera& camera, Renderer& renderer) override;
     void cleanupLightResources(entt::entity lightEntity);
 
 private:

@@ -26,7 +26,7 @@ int main() {
     DEBUG_CTX.numDepthSlices = 50;
 
     // Initialize window
-    Window window("Factory Game", settings.display.width, settings.display.height);
+    Window window("Factory Engine", settings.display.width, settings.display.height);
     if (!window.init()) {
         return -1;
     }
@@ -44,7 +44,7 @@ int main() {
 
     // Create renderer and send mesh data to GPU
     Camera& camera = scene.getPrimaryCamera();
-    Renderer renderer(settings, &camera);
+    Renderer renderer(settings);
     window.setRenderer(&renderer);
     // editor.setRenderer(&renderer);
 
@@ -64,17 +64,17 @@ int main() {
     frameGraph.addRenderPass(std::move(lightPass));
 
     // Post processing passes. Debug pass is like a post process.
-    frameGraph.addRenderPass(std::make_unique<DebugPass>(&camera));
+    frameGraph.addRenderPass(std::make_unique<DebugPass>());
 
     // ----------------------- Renderer Setup -----------------------
     MaterialManager& matManager = MaterialManager::getInstance();
-    matManager.initialize(500);
+    matManager.initialize(TEXTURE_POOL_SIZE);
 
     // Init all meshes
     for (auto& meshDef : scene.meshEntityPairs) {
         uint32_t materialIndex = matManager.getMaterialIndex(*meshDef.materialDef);
 
-        Mesh& mesh = renderer.initMeshBuffers(meshDef.rawMeshData);
+        Mesh mesh = renderer.initMeshBuffers(meshDef.rawMeshData);
         mesh.materialIndex = materialIndex;
         scene.registry.emplace<Mesh>(meshDef.entity, mesh);
     }
@@ -83,7 +83,7 @@ int main() {
     for (auto& instanceGroup : scene.instancedMeshGroups) {
         // Get or create material data for instance group
         uint32_t materialIndex = matManager.getMaterialIndex(*instanceGroup.materialDef);
-        Mesh& instancedMesh = renderer.initMeshBuffers(instanceGroup.meshData);
+        Mesh instancedMesh = renderer.initMeshBuffers(instanceGroup.meshData);
 
         instancedMesh.materialIndex = materialIndex;
         instanceGroup.initializedMesh = &instancedMesh;
@@ -98,20 +98,17 @@ int main() {
     // -------------------- Start Game -------------------
     frameGraph.setupPasses();
     GameObjectSystem gameObjectSystem(scene.registry);
-    gameObjectSystem.setOnDirtyInstanceCallback([&scene]() {
-        scene.flagDirtyInstanceCount();
-    });
     TransformSystem transformSystem(scene.registry);
-    LightSystem lightSystem(settings, scene.getPrimaryCamera(), scene.registry);
+    LightSystem lightSystem(settings, scene.registry);
+    renderer.setCameraTarget(&scene.getPrimaryCamera());
 
     std::cout << "[Info] Success. Starting game...\n";
     printPCInfo();
     gameObjectSystem.startAll();
 
+    // -------------------- Game Loop -------------------
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
-
-    // -------------------- Game Loop -------------------
     while (!window.shouldClose()) {
         float currentFrame = (float)glfwGetTime();
         deltaTime = currentFrame - lastFrame;
@@ -132,16 +129,13 @@ int main() {
         transformSystem.updateTransformComponents();
         profiler.end("Transform");
         profiler.start("Shadow");
-        lightSystem.updateShadowMatrices();
+        lightSystem.updateShadowMatrices(scene.getPrimaryCamera());
         profiler.end("Shadow");
         profiler.end("Systems");
 
         // ------------------------ Rendering ------------------------
         profiler.start("Rendering");
-        // TODO: currently each pass calculates the view matrix.
-        // later update a single resource per frame (the view matrix) to each pass
-        // TODO: maybe also do this for skybox?
-        frameGraph.executePasses(renderer, scene.registry);
+        frameGraph.executePasses(scene.registry, scene.getPrimaryCamera(), renderer);
         profiler.end("Rendering");
         profiler.end("Frame");
 

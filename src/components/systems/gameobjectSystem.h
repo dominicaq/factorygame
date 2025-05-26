@@ -9,8 +9,6 @@ public:
     GameObjectSystem(entt::registry& registry);
     ~GameObjectSystem();
 
-    void setOnDirtyInstanceCallback(std::function<void()> callback);
-
     // Start() and Update() calls
     void startAll();
     void updateAll(const float& currentTime, const float& deltaTime);
@@ -20,5 +18,4 @@ public:
 
 private:
     entt::registry& m_registry;
-    std::function<void()> m_onDirtyInstance;
 };

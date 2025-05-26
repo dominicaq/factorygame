@@ -6,20 +6,16 @@
 
 class DebugPass : public RenderPass {
 public:
-    DebugPass(Camera* camera) {
-        m_camera = camera;
-    };
+    DebugPass() {};
 
     void setup() override {
         std::string debugVertexPath = SHADER_DIR + "deferred/debug_gbuff.vs";
         std::string debugFragmentPath = SHADER_DIR + "deferred/debug_gbuff.fs";
         m_debugShader.load(debugVertexPath, debugFragmentPath);
         m_debugShader.use();
-        m_debugShader.setFloat("u_Near", m_camera->getNearPlane());
-        m_debugShader.setFloat("u_Far",  m_camera->getFarPlane());
     };
 
-    void execute(Renderer& renderer, entt::registry& registry) override {
+    void execute(entt::registry& registry, Camera& camera, Renderer& renderer) override {
         if (DEBUG_CTX.mode < 0) {
             return;
         }
@@ -31,12 +27,8 @@ public:
         // Use the debug shader
         m_debugShader.use();
 
-        Camera* camera = renderer.getCamera();
-        if (m_camera != camera) {
-            m_camera = camera;
-            m_debugShader.setFloat("u_Near", m_camera->getNearPlane());
-            m_debugShader.setFloat("u_Far",  m_camera->getFarPlane());
-        }
+        m_debugShader.setFloat("u_Near", camera.getNearPlane());
+        m_debugShader.setFloat("u_Far",  camera.getFarPlane());
 
         // Set uniform samplers for G-buffer textures
         m_debugShader.setInt("gPosition", 0);
@@ -75,7 +67,6 @@ public:
     };
 
 private:
-    Camera* m_camera;
     Shader m_debugShader;
 };
 

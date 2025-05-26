@@ -7,6 +7,7 @@
 namespace config {
 
 #define SHADOW_MAX_CASCADES 6
+#define TEXTURE_POOL_SIZE 256
 
 // Graphics settings structure that combines window and renderer settings
 struct GraphicsSettings {

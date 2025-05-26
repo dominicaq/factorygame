@@ -53,33 +53,6 @@ public:
     void loadSkyBox(const std::vector<std::string>& skyboxFilePaths);
 
     // =========================================================================
-    // Mesh Instancing
-    // =========================================================================
-    /*
-     * Retrieves the instance map that stores mesh instances and their transformation matrices.
-     * @return A reference to the unordered map of instance data.
-     */
-    const std::unordered_map<size_t, std::vector<glm::mat4>>& getInstanceMap() const { return m_instanceMap; }
-
-    /*
-     * Retrieves the list of mesh instances in the scene.
-     * @return A reference to the vector of mesh pointers.
-     */
-    const std::vector<Mesh*>& getMeshInstances() const { return m_meshInstances; }
-
-    /*
-    * Tell the scene to recount the number of active instances to keep instance map up to date
-    */
-    void flagDirtyInstanceCount() { m_instanceCountsDirty = true; };
-
-    /*
-     * Adds a mesh to be instanced and returns the associated MeshInstance component.
-     * @param mesh - The mesh to be instanced.
-     * @return The MeshInstance component created for the mesh.
-     */
-    MeshInstance addMeshInstance(Mesh* mesh);
-
-    // =========================================================================
     // TODO: TEMP, PENDING REMOVAL
     // =========================================================================
     void createSpheres(int n, float fieldSize, float minHeight, float maxHeight, std::string vertexPath, std::string fragPath, bool litSpheres);
@@ -87,13 +60,7 @@ public:
     void createSuns(int n, float circleRadius, float yPosition, std::string vertexPath, std::string fragPath);
 
 private:
-    // Scene Instancing
-    std::unordered_map<size_t, std::vector<glm::mat4>> m_instanceMap;
-    std::vector<Mesh*> m_meshInstances;
-    std::unordered_map<size_t, size_t> m_instanceCounts;
-    std::unordered_map<size_t, size_t> m_currentIndices;
     unsigned int m_skyboxHandle;
-    bool m_instanceCountsDirty = true;
 
     // Scene Management
     std::unique_ptr<Octree<entt::entity>> m_octree;
