@@ -1,5 +1,4 @@
-#ifndef RENDERPASS_H
-#define RENDERPASS_H
+#pragma once
 
 #include <unordered_map>
 #include <vector>
@@ -12,12 +11,13 @@ class Renderer;
 class FrameGraph;
 struct Mesh;
 class Scene;
+class Camera;
 
 class RenderPass {
 public:
     virtual ~RenderPass() = default;
     virtual void setup() = 0;
-    virtual void execute(Renderer& renderer, entt::registry& registry) = 0;
+    virtual void execute(entt::registry& registry, Camera& camera, Renderer& renderer) = 0;
 
     // Set the scene reference (this will be called by FrameGraph)
     void setScene(Scene* scene) {
@@ -27,5 +27,3 @@ public:
 protected:
     Scene* m_scene = nullptr;
 };
-
-#endif // RENDERPASS_H

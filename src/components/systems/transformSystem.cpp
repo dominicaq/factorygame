@@ -14,13 +14,13 @@ TransformSystem::TransformSystem(entt::registry& registry)
 
 void TransformSystem::updateTransformComponents() {
     // Start from root entities (those without a Parent)
-    auto view = m_registry.view<ModelMatrix>(entt::exclude<Parent>);
-    for (auto entity : view) {
+    auto& view = m_registry.view<ModelMatrix>(entt::exclude<Parent>);
+    for (const auto& entity : view) {
         updateTransformRecursive(entity, glm::mat4(1.0f));
     }
 }
 
-void TransformSystem::updateTransformRecursive(entt::entity entity, const glm::mat4& parentMatrix) {
+void TransformSystem::updateTransformRecursive(const entt::entity& entity, const glm::mat4& parentMatrix) {
     auto& entStatus = m_registry.get<EntityStatus>(entity).status;
     if (!entStatus.test(EntityStatus::DIRTY_MODEL_MATRIX)) {
         return;
@@ -40,7 +40,7 @@ void TransformSystem::updateTransformRecursive(entt::entity entity, const glm::m
 
     if (m_registry.all_of<Children>(entity)) {
         const auto& children = m_registry.get<Children>(entity).children;
-        for (auto child : children) {
+        for (auto& child : children) {
             updateTransformRecursive(child, modelMatrix.matrix);
         }
     }

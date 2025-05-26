@@ -34,7 +34,7 @@ void LightPass::setup() {
     m_shadowMapHandles.reserve(MAX_SHADOW_MAPS);
 }
 
-void LightPass::execute(Renderer& renderer, entt::registry& registry) {
+void LightPass::execute(entt::registry& registry, Camera& camera, Renderer& renderer) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Enable depth test to only affect geometry pixels
@@ -47,16 +47,20 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
 
     m_lightPassShader.use();
 
-    Camera* camera = renderer.getCamera();
-    m_lightPassShader.setVec3("u_CameraPosition", camera->getPosition());
-    m_lightPassShader.setMat4("view", camera->getViewMatrix());
+    m_lightPassShader.setVec3("u_CameraPosition", camera.getPosition());
+    m_lightPassShader.setMat4("view", camera.getViewMatrix());
 
     int pointCount = 0, spotCount = 0, directionalCount = 0;
     int currentMatrixIndex = 0;
     int currentMapIndex = 0;
-    registry.view<Light, Position, Rotation>().each([&](entt::entity entity, const Light& lightComponent, const Position& positionComponent, const Rotation& rotationComponent) {
+    auto& view = registry.view<Light, Position, Rotation>();
+    for (const auto& entity : view) {
+        const Light& lightComponent = view.get<Light>(entity);
+        const Position& positionComponent = view.get<Position>(entity);
+        const Rotation& rotationComponent = view.get<Rotation>(entity);
+
         if (!lightComponent.isActive) {
-            return;
+            continue;
         }
 
         switch (lightComponent.type) {
@@ -75,7 +79,7 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
                 // Retrieve the shadow map handle
                 if (lightComponent.depthHandle == 0 || !lightComponent.castShadow) {
                     m_pointData.push_back(pointSSBO);
-                    return;
+                    continue;
                 }
 
                 // Get the shadow map this light created
@@ -116,7 +120,7 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
                 // No shadow casting, dont need to do anything else
                 if (lightComponent.depthHandle == 0 || !lightComponent.castShadow) {
                     m_spotData.push_back(spotSSBO);
-                    return;
+                    continue;
                 }
 
                 // Get the shadow map this light created
@@ -149,7 +153,7 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
 
                 // No shadow casting, dont need to do anything else
                 if (lightComponent.depthHandle == 0 || !lightComponent.castShadow) {
-                    return;
+                    continue;
                 }
 
                 // Get the shadow map this light created
@@ -180,7 +184,7 @@ void LightPass::execute(Renderer& renderer, entt::registry& registry) {
                 break;
             }
         }
-    });
+    }
 
     // Safety check
     int numLights = std::min(pointCount + spotCount, MAX_LIGHTS);

@@ -7,7 +7,7 @@ class LightPass : public RenderPass {
 public:
     explicit LightPass() = default;
     void setup() override;
-    void execute(Renderer& renderer, entt::registry& registry) override;
+    void execute(entt::registry& registry, Camera& camera, Renderer& renderer);
     void setSkyBox(unsigned int id) { m_skyboxTexture = id; }
 
 private:

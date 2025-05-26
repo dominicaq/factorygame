@@ -1,17 +1,21 @@
 #include "lightSystem.h"
 
-LightSystem::LightSystem(config::GraphicsSettings& settings, Camera& activeCamera, entt::registry& registry) : m_registry(registry), m_activeCamera{activeCamera}, m_settings(settings) {}
+LightSystem::LightSystem(config::GraphicsSettings& settings, entt::registry& registry) : m_registry(registry), m_settings(settings) {}
 
-void LightSystem::updateShadowMatrices() {
-    m_registry.view<Light, Position>().each([this](auto entity, Light& light, Position& position) {
+void LightSystem::updateShadowMatrices(const Camera& activeCamera) {
+    auto& view = m_registry.view<Light, Position>();
+    for (const auto& entity : view) {
+        Light& light = view.get<Light>(entity);
+        Position& position = view.get<Position>(entity);
+
         if (!light.castShadow || !light.isActive) {
-            return; // Skip lights that don't need updates
+            continue; // Skip lights that don't need updates
         }
 
         switch (light.type) {
             case LightType::Point: {
                 if (!m_registry.all_of<LightSpaceMatrixArray>(entity)) {
-                    return;
+                    continue;
                 }
 
                 LightSpaceMatrixArray& lightSpaceCube = m_registry.get<LightSpaceMatrixArray>(entity);
@@ -20,7 +24,7 @@ void LightSystem::updateShadowMatrices() {
                 break;
             } case LightType::Directional: {
                 if (!m_registry.all_of<LightSpaceMatrixArray>(entity)) {
-                    return;
+                    continue;
                 }
 
                 // Handle directional lights with matrix arrays
@@ -29,12 +33,12 @@ void LightSystem::updateShadowMatrices() {
 
                 // Forward is the -Z axis
                 glm::vec3 lightDirection = rotationComponent.quaternion * glm::vec3(0.0f, 0.0f, -1.0f);
-                updateDirectionalLightMatrices(lightSpaceArray, glm::normalize(lightDirection));
+                updateDirectionalLightMatrices(activeCamera, lightSpaceArray, glm::normalize(lightDirection));
 
                 break;
             } default: {
                 if (!m_registry.all_of<LightSpaceMatrix>(entity)) {
-                    return;
+                    continue;
                 }
                 // Single-matrix support
                 LightSpaceMatrix& lightSpace = m_registry.get<LightSpaceMatrix>(entity);
@@ -47,7 +51,7 @@ void LightSystem::updateShadowMatrices() {
                 break;
             }
         }
-    });
+    }
 }
 
 void LightSystem::calculateSpotMatrix(glm::mat4& matrix,
@@ -82,13 +86,13 @@ void LightSystem::updatePointLightMatrices(LightSpaceMatrixArray& lightSpaceCube
     lightSpaceCube.matrices[5] = projection * glm::lookAt(position, position + glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f,  1.0f,  0.0f)); // Back face (-Z)
 }
 
-void LightSystem::updateDirectionalLightMatrices(LightSpaceMatrixArray& lightSpaceArray, const glm::vec3& lightDir) {
+void LightSystem::updateDirectionalLightMatrices(const Camera& activeCamera, LightSpaceMatrixArray& lightSpaceArray, const glm::vec3& lightDir) {
     // Calculate the splits
     int numCascades = m_settings.shadows.cascades.numCascades;
     std::vector<float> cascadeSplits(numCascades);
 
-    float nearClip = m_activeCamera.getNearPlane();
-    float farClip = m_activeCamera.getFarPlane();
+    float nearClip = activeCamera.getNearPlane();
+    float farClip = activeCamera.getFarPlane();
     float clipRange = farClip - nearClip;
 
     float minZ = nearClip;
@@ -106,8 +110,8 @@ void LightSystem::updateDirectionalLightMatrices(LightSpaceMatrixArray& lightSpa
     }
 
     // Calculate the light view matrix for each split
-    glm::mat4 projection = m_activeCamera.getProjectionMatrix();
-    glm::mat4 view = m_activeCamera.getViewMatrix();
+    glm::mat4 projection = activeCamera.getProjectionMatrix();
+    glm::mat4 view = activeCamera.getViewMatrix();
     glm::mat4 invCam = glm::inverse(projection * view);
 
     float lastSplitDist = 0.0f;

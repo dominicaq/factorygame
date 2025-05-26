@@ -16,11 +16,9 @@ public:
         }
     }
 
-    void execute(Renderer& renderer, entt::registry& registry) override {
+    void execute(entt::registry& registry, Camera& camera, Renderer& renderer) override {
         // Get resources
         Framebuffer* gbuffer = renderer.getFramebuffer();
-        Camera* camera = renderer.getCamera();
-        const glm::mat4& viewMatrix = camera->getViewMatrix();
 
         // Bind G-buffer framebuffer
         gbuffer->bind();
@@ -28,17 +26,21 @@ public:
 
         // Use Geometry Pass Shader
         m_gBufferShader.use();
-        m_gBufferShader.setVec3("u_ViewPos", camera->getPosition());
-        m_gBufferShader.setMat4("u_View", viewMatrix);
-        m_gBufferShader.setMat4("u_Projection", camera->getProjectionMatrix());
+        m_gBufferShader.setVec3("u_ViewPos", camera.getPosition());
+        m_gBufferShader.setMat4("u_View", camera.getViewMatrix());
+        m_gBufferShader.setMat4("u_Projection", camera.getProjectionMatrix());
 
         // Clear and build draw commands for indirect rendering
         m_geometryBatch.clear();
 
         // Batch draw
-        registry.view<Mesh, ModelMatrix>().each([&](const Mesh& mesh, const ModelMatrix& modelMatrix) {
+        auto& view = registry.view<Mesh, ModelMatrix>();
+        for (const auto& entity : view) {
+            const Mesh& mesh = view.get<Mesh>(entity);
+            const ModelMatrix& modelMatrix = view.get<ModelMatrix>(entity);
+
             m_geometryBatch.addInstance(RenderInstance(mesh, modelMatrix.matrix));
-        });
+        }
         MaterialManager::getInstance().bindMaterialBuffer(1);
 
         // Draw scene

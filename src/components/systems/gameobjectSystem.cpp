@@ -5,13 +5,16 @@
 GameObjectSystem::GameObjectSystem(entt::registry& registry) : m_registry(registry) {}
 
 GameObjectSystem::~GameObjectSystem() {
-    for (const auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
+    auto& view = m_registry.view<GameObject>();
+    for (const auto& entity : view) {
         m_registry.destroy(entity);
     }
 }
 
 void GameObjectSystem::startAll() {
-    for (const auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
+    auto& view = m_registry.view<GameObject>();
+    for (const auto& entity : view) {
+        GameObject& gameObject = view.get<GameObject>(entity);
         if (gameObject.isActive) {
             gameObject.startScripts();
         }
@@ -20,7 +23,11 @@ void GameObjectSystem::startAll() {
 
 void GameObjectSystem::updateAll(const float& currentTime, const float& deltaTime) {
     std::vector<entt::entity> destroyQueue;
-    for (const auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
+
+    auto& view = m_registry.view<GameObject>();
+    for (const auto& entity : view) {
+        GameObject& gameObject = view.get<GameObject>(entity);
+
         if (!gameObject.isActive) {
             continue;
         }
@@ -47,10 +54,6 @@ void GameObjectSystem::updateAll(const float& currentTime, const float& deltaTim
 
         m_registry.destroy(entity);
     }
-
-    if (updateInstanceCounts && m_onDirtyInstance) {
-        m_onDirtyInstance();
-    }
 }
 
 std::vector<GameObject*> GameObjectSystem::getActiveGameObjects() const {
@@ -62,8 +65,4 @@ std::vector<GameObject*> GameObjectSystem::getActiveGameObjects() const {
     }
 
     return activeObjects;
-}
-
-void GameObjectSystem::setOnDirtyInstanceCallback(std::function<void()> callback) {
-    m_onDirtyInstance = std::move(callback);
 }

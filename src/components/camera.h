@@ -15,6 +15,11 @@ private:
     mutable glm::mat4 m_projection;
     mutable bool m_dirtyProjection = true;
 
+    // View matrix caching
+    mutable glm::mat4 m_view;
+    mutable glm::vec3 m_lastPosition = glm::vec3(0.0f);
+    mutable glm::quat m_lastRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+
     // EnTT components
     entt::entity m_entity;
     entt::registry& m_registry;
@@ -62,22 +67,28 @@ public:
     }
 
     glm::mat4 getViewMatrix() const {
-        const auto& orientation = m_registry.get<Rotation>(m_entity).quaternion;
         const auto& position = m_registry.get<Position>(m_entity).position;
+        const auto& orientation = m_registry.get<Rotation>(m_entity).quaternion;
 
-        // Convert quaternion to rotation matrix
-        glm::mat4 rotationMatrix = glm::mat4_cast(orientation);
+        // Check if view matrix needs to be recalculated
+        if (position != m_lastPosition || orientation != m_lastRotation) {
+            // Convert quaternion to rotation matrix
+            glm::mat4 rotationMatrix = glm::mat4_cast(orientation);
 
-        // Get the forward vector from the rotation matrix (typically the -z axis)
-        glm::vec3 front = glm::normalize(glm::vec3(rotationMatrix * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)));
+            // Get the forward vector from the rotation matrix (typically the -z axis)
+            glm::vec3 front = glm::normalize(glm::vec3(rotationMatrix * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)));
 
-        // Get the up vector from the rotation matrix (typically the y axis)
-        glm::vec3 up = glm::normalize(glm::vec3(rotationMatrix * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f)));
+            // Get the up vector from the rotation matrix (typically the y axis)
+            glm::vec3 up = glm::normalize(glm::vec3(rotationMatrix * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f)));
 
-        // Right vector can be derived from cross product of front and up (optional, as lookAt might handle this)
-        // glm::vec3 right = glm::normalize(glm::cross(front, up));
+            m_view = glm::lookAt(position, position + front, up);
 
-        return glm::lookAt(position, position + front, up);
+            // Update cached values
+            m_lastPosition = position;
+            m_lastRotation = orientation;
+        }
+
+        return m_view;
     }
 
     glm::mat4 getProjectionMatrix() const {

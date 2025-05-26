@@ -14,7 +14,7 @@ public:
     void updateTransformComponents();
 
 private:
-    void updateTransformRecursive(entt::entity entity, const glm::mat4& parentMatrix);
+    void updateTransformRecursive(const entt::entity& entity, const glm::mat4& parentMatrix);
 
     entt::registry& m_registry;
 };

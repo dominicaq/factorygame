@@ -14,11 +14,10 @@ class Scene;
 
 class FrameGraph {
 public:
-    explicit FrameGraph(Scene& scene) : m_activeScene(scene) {}
+    explicit FrameGraph(Scene& scene) {}
 
     // Add a render pass to the frame graph
     void addRenderPass(std::unique_ptr<RenderPass> pass) {
-        pass->setScene(&m_activeScene);
         m_renderPasses.push_back(std::move(pass));
     }
 
@@ -30,15 +29,14 @@ public:
     }
 
     // Execute all render passes, passing in the renderer and registry
-    void executePasses(Renderer& renderer, entt::registry& registry) {
+    void executePasses(entt::registry& registry, Camera& camera, Renderer& renderer) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         for (auto& pass : m_renderPasses) {
-            pass->execute(renderer, registry);
+            pass->execute(registry, camera, renderer);
         }
     }
 
 private:
-    Scene& m_activeScene;
     std::vector<std::unique_ptr<RenderPass>> m_renderPasses;
 };
 
