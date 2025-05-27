@@ -48,10 +48,11 @@ Mesh Renderer::initMeshBuffers(std::unique_ptr<RawMeshData>& rawData, bool isSta
         bufferData.push_back(rawData->vertices[i].z);
 
         // Packed UVs (1 float)
-        uint16_t u = static_cast<uint16_t>(rawData->uvs[i].x * 65535.0f);
-        uint16_t v = static_cast<uint16_t>(rawData->uvs[i].y * 65535.0f);
-        uint32_t packedUV = (static_cast<uint32_t>(v) << 16) | u;
-        bufferData.push_back(*reinterpret_cast<float*>(&packedUV));
+        uint32_t packedUV_fp16 = glm::packHalf2x16(rawData->uvs[i]);
+        float packedUV_float_bits;
+        // Perform bit-level copy from uint32_t to float
+        std::memcpy(&packedUV_float_bits, &packedUV_fp16, sizeof(uint32_t));
+        bufferData.push_back(packedUV_float_bits);
 
         // Packed Normal & Tangent frame (4 floats)
         bufferData.push_back(rawData->packedTNBFrame[i].x);

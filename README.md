@@ -105,9 +105,8 @@ The engine supports a variety of rendering features:
   Supports point, spot, and directional lights.
 
 - **Mesh Instancing**
-  Optionally assign a `MeshInstance` component to a `GameObject`, which simply stores an ID.
+  Optionally assign a `InstancedMeshGroup` component to a `GameObject`, which simply stores an ID.
   The renderer will group and render all instances with the same ID in a single draw call, applying their respective transformation matrices.
-  To manage this efficiently, use the helper function `addMeshInstance(Mesh* mesh)` in `scene.cpp`.
 
 - **Optional Shadow Casting**
   Point, spot, and directional lights can be configured to cast shadows.

@@ -95,7 +95,6 @@ private:
 
         // Apply some air resistance to prevent infinite motion
         velocity *= 0.999f;
-
         gameObject->setPosition(position);
     }
 

@@ -62,11 +62,6 @@ struct EntityMeshDefinition {
     EntityMeshDefinition& operator=(const EntityMeshDefinition&) = delete;
 };
 
-struct MeshInstance {
-    size_t meshGroupId;  // Index into instancedMeshGroups
-    size_t instanceId;   // Index within the group
-};
-
 struct InstancedMeshGroup {
     std::unique_ptr<RawMeshData> meshData;
     std::unique_ptr<MaterialDefinition> materialDef;
