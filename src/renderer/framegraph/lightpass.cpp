@@ -53,7 +53,7 @@ void LightPass::execute(entt::registry& registry, Camera& camera, Renderer& rend
     int pointCount = 0, spotCount = 0, directionalCount = 0;
     int currentMatrixIndex = 0;
     int currentMapIndex = 0;
-    auto& view = registry.view<Light, Position, Rotation>();
+    const auto& view = registry.view<Light, Position, Rotation>();
     for (const auto& entity : view) {
         const Light& lightComponent = view.get<Light>(entity);
         const Position& positionComponent = view.get<Position>(entity);

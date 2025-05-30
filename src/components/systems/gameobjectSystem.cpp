@@ -5,14 +5,14 @@
 GameObjectSystem::GameObjectSystem(entt::registry& registry) : m_registry(registry) {}
 
 GameObjectSystem::~GameObjectSystem() {
-    auto& view = m_registry.view<GameObject>();
+    const auto& view = m_registry.view<GameObject>();
     for (const auto& entity : view) {
         m_registry.destroy(entity);
     }
 }
 
 void GameObjectSystem::startAll() {
-    auto& view = m_registry.view<GameObject>();
+    const auto& view = m_registry.view<GameObject>();
     for (const auto& entity : view) {
         GameObject& gameObject = view.get<GameObject>(entity);
         if (gameObject.isActive) {
@@ -24,7 +24,7 @@ void GameObjectSystem::startAll() {
 void GameObjectSystem::updateAll(const float& currentTime, const float& deltaTime) {
     std::vector<entt::entity> destroyQueue;
 
-    auto& view = m_registry.view<GameObject>();
+    const auto& view = m_registry.view<GameObject>();
     for (const auto& entity : view) {
         GameObject& gameObject = view.get<GameObject>(entity);
 

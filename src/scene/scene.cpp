@@ -195,7 +195,7 @@ void Scene::loadScene() {
     int n = 25;
     float circleRadius = 5.0f;
     float yPosition = 10.0f;
-    createSuns(1, 50.0f, 50.0f, defaultVertexPath, defaultFragPath);
+    createSuns(1, 100.0f, 100.0f, defaultVertexPath, defaultFragPath);
 
     createSpotLights(2, circleRadius, yPosition, defaultVertexPath, defaultFragPath);
 
