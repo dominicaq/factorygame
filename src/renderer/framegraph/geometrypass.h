@@ -34,7 +34,7 @@ public:
         m_geometryBatch.clear();
 
         // Batch draw
-        auto& view = registry.view<Mesh, ModelMatrix>();
+        const auto& view = registry.view<Mesh, ModelMatrix>();
         for (const auto& entity : view) {
             const Mesh& mesh = view.get<Mesh>(entity);
             const ModelMatrix& modelMatrix = view.get<ModelMatrix>(entity);

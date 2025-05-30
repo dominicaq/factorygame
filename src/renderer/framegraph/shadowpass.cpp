@@ -50,7 +50,7 @@ void ShadowPass::execute(entt::registry& registry, Camera& camera, Renderer& ren
     m_shadowShader.use();
 
     // Render single shadow maps (spotlights)
-    auto& singleMatrixView = registry.view<LightSpaceMatrix, Light>();
+    const auto& singleMatrixView = registry.view<LightSpaceMatrix, Light>();
     for (const auto& entity : singleMatrixView) {
         LightSpaceMatrix& lightSpaceMatrix = singleMatrixView.get<LightSpaceMatrix>(entity);
         Light& light = singleMatrixView.get<Light>(entity);
@@ -78,7 +78,7 @@ void ShadowPass::execute(entt::registry& registry, Camera& camera, Renderer& ren
     }
 
     // Render shadow map arrays
-    auto& multiMatrixView = registry.view<LightSpaceMatrixArray, Light>();
+    const auto& multiMatrixView = registry.view<LightSpaceMatrixArray, Light>();
     for (const auto& entity : multiMatrixView) {
         LightSpaceMatrixArray& lightSpaceArray = multiMatrixView.get<LightSpaceMatrixArray>(entity);
         Light& light = multiMatrixView.get<Light>(entity);
@@ -148,7 +148,7 @@ void ShadowPass::renderSceneDepth(Renderer& renderer, entt::registry& registry) 
     m_shadowBatch.clear();
 
     // Batch draw
-    auto& view = registry.view<Mesh, ModelMatrix>();
+    const auto& view = registry.view<Mesh, ModelMatrix>();
     for (const auto& entity : view) {
         const Mesh& mesh = view.get<Mesh>(entity);
         const ModelMatrix& modelMatrix = view.get<ModelMatrix>(entity);

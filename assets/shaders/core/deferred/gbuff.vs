@@ -59,11 +59,8 @@ void main() {
     vec3 position = aPosition.xyz;
 
     // Unpack UVs from the packed float in position.w
-    uint packedUV = floatBitsToUint(aPosition.w);
-    vec2 uv = vec2(
-        float(packedUV & 0xFFFFu) / 65535.0,
-        float(packedUV >> 16) / 65535.0
-    );
+    uint packedUVBits = floatBitsToUint(aPosition.w);
+    vec2 uv = unpackHalf2x16(packedUVBits);
 
     // Transform position to world space
     FragPos = vec3(modelMatrix * vec4(position, 1.0));

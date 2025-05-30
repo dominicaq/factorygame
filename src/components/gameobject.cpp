@@ -93,9 +93,6 @@ void GameObject::destroy() {
             entStatus.set(EntityStatus::DESTROY_ENTITY);
         }
     }
-
-    // Mark this gameobject as no longer usable
-    m_entity = entt::null;
 }
 
 /*

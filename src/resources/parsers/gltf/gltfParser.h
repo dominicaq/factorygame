@@ -83,12 +83,13 @@ std::string base64Decode(const std::string& base64) {
 
 size_t getComponentSize(int componentType) {
     switch (componentType) {
-        case 5120: return 1; // BYTE
-        case 5121: return 1; // UNSIGNED_BYTE
-        case 5122: return 2; // SHORT
-        case 5123: return 2; // UNSIGNED_SHORT
-        case 5126: return 4; // FLOAT
-        default: return 0;
+        case 5120: return sizeof(int8_t);   // BYTE
+        case 5121: return sizeof(uint8_t);  // UNSIGNED_BYTE
+        case 5122: return sizeof(int16_t);  // SHORT
+        case 5123: return sizeof(uint16_t); // UNSIGNED_SHORT
+        case 5125: return sizeof(uint32_t); // UNSIGNED_INT
+        case 5126: return sizeof(float);    // FLOAT
+        default: return 0; // Unknown type
     }
 }
 
@@ -700,7 +701,8 @@ void loadMaterialDefinitions(
 }
 
 template <typename T>
-void unpackData(const uint8_t* dataPtr, int componentType, int vecSize, T& target) {
+void unpackData(const uint8_t* dataPtr, int componentType, int vecSize, T& target, bool normalized = false) {
+    // Handling for integer targets (e.g., indices)
     if constexpr (std::is_same_v<T, uint32_t>) {
         switch (componentType) {
             case 5121: { // UNSIGNED_BYTE
@@ -722,57 +724,84 @@ void unpackData(const uint8_t* dataPtr, int componentType, int vecSize, T& targe
                 break;
             }
             default:
-                std::cerr << "Unsupported component type for indices: " << componentType << "\n";
+                std::cerr << "Unsupported component type for unsigned int target: " << componentType << "\n";
                 break;
         }
-        return;
+        return; // Early exit for integer targets
     }
 
+    // Handling for GLM vector targets (e.g., glm::vec2, glm::vec3, glm::vec4)
     if constexpr (std::is_same_v<T, glm::vec2> || std::is_same_v<T, glm::vec3> || std::is_same_v<T, glm::vec4>) {
-        float values[4] = {0.0f, 0.0f, 0.0f, 1.0f}; // default w = 1.0f
+        float values[4] = {0.0f, 0.0f, 0.0f, 1.0f}; // Initialize to default for vec4, w=1.0f
 
         switch (componentType) {
-            case 5120: { // BYTE
+            case 5120: { // BYTE (signed 8-bit integer)
                 for (int i = 0; i < vecSize; ++i) {
                     int8_t temp;
                     std::memcpy(&temp, dataPtr + i * sizeof(int8_t), sizeof(int8_t));
-                    values[i] = static_cast<float>(temp);
+                    if (normalized) {
+                        // SNORM: Map from [-127, 127] to [-1.0, 1.0] (glTF spec has specific handling for min int values)
+                        values[i] = glm::max(static_cast<float>(temp) / 127.0f, -1.0f);
+                    } else {
+                        values[i] = static_cast<float>(temp);
+                    }
                 }
                 break;
             }
-            case 5121: { // UNSIGNED_BYTE
+            case 5121: { // UNSIGNED_BYTE (unsigned 8-bit integer)
                 for (int i = 0; i < vecSize; ++i) {
                     uint8_t temp;
                     std::memcpy(&temp, dataPtr + i * sizeof(uint8_t), sizeof(uint8_t));
-                    values[i] = static_cast<float>(temp);
+                    if (normalized) {
+                        // UNORM: Map from [0, 255] to [0.0, 1.0]
+                        values[i] = static_cast<float>(temp) / 255.0f;
+                    } else {
+                        values[i] = static_cast<float>(temp);
+                    }
                 }
                 break;
             }
-            case 5122: { // SHORT
+            case 5122: { // SHORT (signed 16-bit integer)
                 for (int i = 0; i < vecSize; ++i) {
                     int16_t temp;
                     std::memcpy(&temp, dataPtr + i * sizeof(int16_t), sizeof(int16_t));
-                    values[i] = static_cast<float>(temp);
+                    if (normalized) {
+                        // SNORM: Map from [-32767, 32767] to [-1.0, 1.0]
+                        values[i] = glm::max(static_cast<float>(temp) / 32767.0f, -1.0f);
+                    } else {
+                        values[i] = static_cast<float>(temp);
+                    }
                 }
                 break;
             }
-            case 5123: { // UNSIGNED_SHORT
+            case 5123: { // UNSIGNED_SHORT (unsigned 16-bit integer)
                 for (int i = 0; i < vecSize; ++i) {
                     uint16_t temp;
                     std::memcpy(&temp, dataPtr + i * sizeof(uint16_t), sizeof(uint16_t));
-                    values[i] = static_cast<float>(temp);
+                    if (normalized) {
+                        // UNORM: Map from [0, 65535] to [0.0, 1.0]
+                        values[i] = static_cast<float>(temp) / 65535.0f;
+                    } else {
+                        values[i] = static_cast<float>(temp);
+                    }
                 }
                 break;
             }
-            case 5125: { // UNSIGNED_INT
+            case 5125: { // UNSIGNED_INT (unsigned 32-bit integer)
                 for (int i = 0; i < vecSize; ++i) {
                     uint32_t temp;
                     std::memcpy(&temp, dataPtr + i * sizeof(uint32_t), sizeof(uint32_t));
-                    values[i] = static_cast<float>(temp);
+                    if (normalized) {
+                        // UNORM: Map from [0, 0xFFFFFFFF] to [0.0, 1.0]
+                        values[i] = static_cast<float>(temp) / static_cast<float>(0xFFFFFFFFU);
+                    } else {
+                        values[i] = static_cast<float>(temp);
+                    }
                 }
                 break;
             }
-            case 5126: { // FLOAT
+            case 5126: { // FLOAT (32-bit float)
+                // Floats are always their own values, 'normalized' flag is irrelevant here
                 for (int i = 0; i < vecSize; ++i) {
                     float temp;
                     std::memcpy(&temp, dataPtr + i * sizeof(float), sizeof(float));
@@ -831,6 +860,6 @@ void parseAccessorData(
 
     for (size_t i = 0; i < count; ++i) {
         const uint8_t* dataPtr = bufferData + i * stride;
-        unpackData(dataPtr, componentType, vecSize, targetVector[i]);
+        unpackData(dataPtr, componentType, vecSize, targetVector[i], true);
     }
 }

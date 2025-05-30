@@ -14,7 +14,7 @@ TransformSystem::TransformSystem(entt::registry& registry)
 
 void TransformSystem::updateTransformComponents() {
     // Start from root entities (those without a Parent)
-    auto& view = m_registry.view<ModelMatrix>(entt::exclude<Parent>);
+    const auto& view = m_registry.view<ModelMatrix>(entt::exclude<Parent>);
     for (const auto& entity : view) {
         updateTransformRecursive(entity, glm::mat4(1.0f));
     }

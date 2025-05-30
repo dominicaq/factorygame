@@ -3,7 +3,7 @@
 LightSystem::LightSystem(config::GraphicsSettings& settings, entt::registry& registry) : m_registry(registry), m_settings(settings) {}
 
 void LightSystem::updateShadowMatrices(const Camera& activeCamera) {
-    auto& view = m_registry.view<Light, Position>();
+    const auto& view = m_registry.view<Light, Position>();
     for (const auto& entity : view) {
         Light& light = view.get<Light>(entity);
         Position& position = view.get<Position>(entity);

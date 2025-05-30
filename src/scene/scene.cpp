@@ -195,12 +195,12 @@ void Scene::loadScene() {
     int n = 25;
     float circleRadius = 5.0f;
     float yPosition = 10.0f;
-    createSuns(1, 50.0f, 50.0f, defaultVertexPath, defaultFragPath);
+    createSuns(1, 100.0f, 100.0f, defaultVertexPath, defaultFragPath);
 
     createSpotLights(2, circleRadius, yPosition, defaultVertexPath, defaultFragPath);
 
     // // Light balls
-    createSpheres(n, circleRadius * 10.0f, 0, 1.0f, defaultVertexPath, defaultFragPath, true);
+    // createSpheres(n, circleRadius * 10.0f, 0, 1.0f, defaultVertexPath, defaultFragPath, true);
 
     // // Normal balls
     createSpheres(10000, circleRadius * 10.0f, 0, 1.0f, defaultVertexPath, defaultFragPath, false);
@@ -415,9 +415,6 @@ void Scene::createSpheres(int n, float fieldSize, float minHeight, float maxHeig
         // Add GameObject component (handles all transform components)
         GameObject* asteroidObject = SceneUtils::addGameObjectComponent(registry, asteroidEntity, save_asteroid);
         asteroidObject->addScript<BouncingMotion>();
-
-        // Add InstancedMeshComponent
-        registry.emplace<MeshInstance>(asteroidEntity, MeshInstance{groupId, (size_t)i});
 
         // Add lighting if needed
         if (litSpheres) {

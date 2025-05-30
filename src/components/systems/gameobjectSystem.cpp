@@ -5,14 +5,14 @@
 GameObjectSystem::GameObjectSystem(entt::registry& registry) : m_registry(registry) {}
 
 GameObjectSystem::~GameObjectSystem() {
-    auto& view = m_registry.view<GameObject>();
+    const auto& view = m_registry.view<GameObject>();
     for (const auto& entity : view) {
         m_registry.destroy(entity);
     }
 }
 
 void GameObjectSystem::startAll() {
-    auto& view = m_registry.view<GameObject>();
+    const auto& view = m_registry.view<GameObject>();
     for (const auto& entity : view) {
         GameObject& gameObject = view.get<GameObject>(entity);
         if (gameObject.isActive) {
@@ -24,38 +24,38 @@ void GameObjectSystem::startAll() {
 void GameObjectSystem::updateAll(const float& currentTime, const float& deltaTime) {
     std::vector<entt::entity> destroyQueue;
 
-    auto& view = m_registry.view<GameObject>();
+    const auto& view = m_registry.view<GameObject>();
     for (const auto& entity : view) {
         GameObject& gameObject = view.get<GameObject>(entity);
 
-        if (!gameObject.isActive) {
+        if (!gameObject.isActive || gameObject.getEntity() == entt::null) {
             continue;
         }
 
-        if (Mesh** meshPtr = m_registry.try_get<Mesh*>(entity)) {
-            Mesh* mesh = *meshPtr;
-            // if (mesh && mesh->material) {
-            //     mesh->material->time = currentTime;
-            // }
-        }
+        // TODO: OLD
+        // if (Mesh** meshPtr = m_registry.try_get<Mesh*>(entity)) {
+        //     Mesh* mesh = *meshPtr;
+        //     if (mesh && mesh->material) {
+        //        mesh->material->time = currentTime;
+        //     }
+        // }
+
+        // Tick this gameobject
         gameObject.updateScripts(deltaTime);
 
+        // Check if this entity is set to be destroyed (children are already set from gameObject->destroy())
         if (m_registry.get<EntityStatus>(entity).status.test(EntityStatus::DESTROY_ENTITY)) {
             destroyQueue.push_back(entity);
         }
     }
 
-    // If any objects called to destroy themselves, we clean them up
-    bool updateInstanceCounts = false;
-    for (auto& entity : destroyQueue) {
-        if (m_registry.any_of<MeshInstance>(entity)) {
-            updateInstanceCounts = true;
+    // Destroy all entites marked after tick is over
+    for (const auto& entity : destroyQueue) {
+        if (m_registry.valid(entity)) {
+            m_registry.destroy(entity);
         }
-
-        m_registry.destroy(entity);
     }
 }
-
 std::vector<GameObject*> GameObjectSystem::getActiveGameObjects() const {
     std::vector<GameObject*> activeObjects;
     for (const auto& [entity, gameObject] : m_registry.view<GameObject>().each()) {
